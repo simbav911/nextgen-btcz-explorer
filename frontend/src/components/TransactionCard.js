@@ -155,4 +155,4 @@ const TransactionCard = ({ transaction }) => {
   );
 };
 
-export default TransactionCard;
+export default React.memo(TransactionCard);

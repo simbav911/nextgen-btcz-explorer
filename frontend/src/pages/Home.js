@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useContext } from 'react';
+import React, { useState, useEffect, useContext, useRef } from 'react';
 import { Link } from 'react-router-dom';
 import { FaCube, FaExchangeAlt, FaNetworkWired, FaSearch } from 'react-icons/fa';
 
@@ -27,6 +27,7 @@ const Home = () => {
   
   const socket = useContext(SocketContext);
   const { showToast } = useContext(ToastContext);
+  const notifiedBlockHeights = useRef(new Set()); // Track notified block heights
   
   // Fetch initial data
   useEffect(() => {
@@ -71,7 +72,12 @@ const Home = () => {
         uniqueBlocksArray.sort((a, b) => b.height - a.height);
         return uniqueBlocksArray.slice(0, 5);
       });
-      showToast(`New block #${block.height} mined`, 'info');
+      
+      // Show toast only once per block height
+      if (!notifiedBlockHeights.current.has(block.height)) {
+        showToast(`New block #${block.height} mined`, 'info');
+        notifiedBlockHeights.current.add(block.height);
+      }
     });
     
     socket.on('new_transactions', (transactions) => {

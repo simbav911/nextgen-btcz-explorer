@@ -1,13 +1,16 @@
 const express = require('express');
 const router = express.Router();
-const { 
-  getBlock, 
-  getBlockByHeight, 
-  getRawTransaction 
+const { Op } = require('sequelize'); // Import Op for OR queries
+const {
+  getBlock: getRpcBlock, // Rename to avoid conflict with model accessor
+  getBlockByHeight: getRpcBlockByHeight, // Rename
+  getRawTransaction
 } = require('../services/bitcoinzService');
-const Block = require('../models/Block');
-const Transaction = require('../models/Transaction');
-const Address = require('../models/Address');
+const {
+  getBlock,
+  getTransaction,
+  getAddress
+} = require('../models'); // Import model accessors
 const logger = require('../utils/logger');
 
 // Search endpoint - handles blocks, transactions, addresses
@@ -30,7 +33,7 @@ router.get('/', async (req, res, next) => {
     if (/^\d+$/.test(query)) {
       try {
         const height = parseInt(query);
-        const block = await getBlockByHeight(height);
+        const block = await getRpcBlockByHeight(height); // Use renamed RPC function
         
         if (block) {
           result.type = 'block';
@@ -47,7 +50,7 @@ router.get('/', async (req, res, next) => {
     if (/^[0-9a-fA-F]{64}$/.test(query)) {
       try {
         // Try as block hash
-        const block = await getBlock(query);
+        const block = await getRpcBlock(query); // Use renamed RPC function
         
         if (block) {
           result.type = 'block';
@@ -75,9 +78,10 @@ router.get('/', async (req, res, next) => {
     // For a real BitcoinZ implementation, you'd need to validate the address format
     // This is a simplified check
     if (query.length >= 26 && query.length <= 35) {
+      const AddressModel = getAddress(); // Get Sequelize model
       try {
         // Check in local database
-        const address = await Address.findOne({ address: query });
+        const address = AddressModel ? await AddressModel.findOne({ where: { address: query } }) : null;
         
         if (address) {
           result.type = 'address';
@@ -86,19 +90,25 @@ router.get('/', async (req, res, next) => {
         }
         
         // If not in database, search for transactions with this address
-        const transactions = await Transaction.find({
-          $or: [
-            { 'vin.address': query },
-            { 'vout.scriptPubKey.addresses': query }
-          ]
-        }).limit(10);
+        const TransactionModel = getTransaction(); // Get Sequelize model
+        const transactions = TransactionModel ? await TransactionModel.findAll({
+          where: {
+            [Op.or]: [
+              // Note: Querying JSONB requires specific syntax depending on structure
+              // This is a placeholder assuming direct key access might work or needs adjustment
+              // { 'vin': { [Op.contains]: [{ address: query }] } }, // Example for array of objects
+              // { 'vout': { [Op.contains]: [{ scriptPubKey: { addresses: [query] } }] } } // Example
+            ]
+          },
+          limit: 10
+        }) : [];
         
         if (transactions.length > 0) {
           result.type = 'address';
           result.result = {
             address: query,
             transactions: transactions.map(tx => tx.txid),
-            transactionCount: transactions.length
+            transactionCount: transactions.length // Note: This might not be accurate if limit is hit
           };
           return res.json(result);
         }

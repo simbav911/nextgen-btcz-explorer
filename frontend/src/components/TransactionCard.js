@@ -1,12 +1,21 @@
 import React from 'react';
 import { Link } from 'react-router-dom';
-import { FaExchangeAlt, FaClock, FaCheck } from 'react-icons/fa';
+import { FaExchangeAlt, FaClock, FaCheck, CopyToClipboard } from 'react-icons/fa';
 import { formatTimestamp, formatRelativeTime, formatHash, formatBTCZ, formatConfirmations } from '../utils/formatting';
 
 const TransactionCard = ({ transaction }) => {
   if (!transaction) return null;
   
   const confirmationInfo = formatConfirmations(transaction.confirmations || 0);
+  
+  // Style for truncated text with ellipsis
+  const truncateStyle = {
+    whiteSpace: 'nowrap',
+    overflow: 'hidden',
+    textOverflow: 'ellipsis',
+    maxWidth: '100%',
+    display: 'inline-block'
+  };
   
   return (
     <div className="card hover:shadow-lg transition-shadow duration-300">
@@ -37,18 +46,26 @@ const TransactionCard = ({ transaction }) => {
       </div>
       
       <div className="mt-4">
-        <div className="text-sm mb-2">
+        <div className="text-sm mb-2 overflow-hidden">
           <span className="font-medium">TxID:</span>{' '}
-          <Link to={`/tx/${transaction.txid}`} className="font-mono text-bitcoinz-600 hover:underline">
-            {formatHash(transaction.txid, 16)}
+          <Link 
+            to={`/tx/${transaction.txid}`} 
+            className="font-mono text-bitcoinz-600 hover:underline"
+            title={transaction.txid}
+          >
+            <span style={truncateStyle}>{formatHash(transaction.txid, 16)}</span>
           </Link>
         </div>
         
         {transaction.blockhash && (
-          <div className="text-sm mb-2">
+          <div className="text-sm mb-2 overflow-hidden">
             <span className="font-medium">Block:</span>{' '}
-            <Link to={`/blocks/${transaction.blockhash}`} className="font-mono text-bitcoinz-600 hover:underline">
-              {formatHash(transaction.blockhash)}
+            <Link 
+              to={`/blocks/${transaction.blockhash}`} 
+              className="font-mono text-bitcoinz-600 hover:underline"
+              title={transaction.blockhash}
+            >
+              <span style={truncateStyle}>{formatHash(transaction.blockhash)}</span>
             </Link>
           </div>
         )}
@@ -61,26 +78,37 @@ const TransactionCard = ({ transaction }) => {
             <h4 className="text-sm font-medium text-gray-500 mb-2">
               {transaction.vin && transaction.vin.length} Input{transaction.vin && transaction.vin.length !== 1 ? 's' : ''}
             </h4>
-            {transaction.vin && transaction.vin.map((input, index) => (
-              <div key={index} className="text-sm mb-2">
-                {input.coinbase ? (
-                  <span className="text-gray-600">Coinbase (New Coins)</span>
-                ) : (
-                  <>
-                    {input.address ? (
-                      <Link to={`/address/${input.address}`} className="text-bitcoinz-600 hover:underline">
-                        {formatHash(input.address, 12)}
-                      </Link>
-                    ) : (
-                      <span className="text-gray-600">Unknown Address</span>
-                    )}
-                    {input.value && (
-                      <span className="ml-2 text-gray-600">{formatBTCZ(input.value)}</span>
-                    )}
-                  </>
-                )}
-              </div>
-            ))}
+            <div className="max-h-40 overflow-y-auto pr-2">
+              {transaction.vin && transaction.vin.map((input, index) => (
+                <div key={index} className="text-sm mb-2 bg-gray-50 p-2 rounded">
+                  {input.coinbase ? (
+                    <span className="text-gray-600">Coinbase (New Coins)</span>
+                  ) : (
+                    <>
+                      {input.address ? (
+                        <div className="overflow-hidden">
+                          <Link 
+                            to={`/address/${input.address}`} 
+                            className="text-bitcoinz-600 hover:underline block"
+                            title={input.address}
+                            style={truncateStyle}
+                          >
+                            {formatHash(input.address, 12)}
+                          </Link>
+                        </div>
+                      ) : (
+                        <span className="text-gray-600">Unknown Address</span>
+                      )}
+                      {input.value && (
+                        <div className="mt-1 text-gray-600 font-medium">
+                          {formatBTCZ(input.value)}
+                        </div>
+                      )}
+                    </>
+                  )}
+                </div>
+              ))}
+            </div>
           </div>
           
           {/* Outputs */}
@@ -88,25 +116,38 @@ const TransactionCard = ({ transaction }) => {
             <h4 className="text-sm font-medium text-gray-500 mb-2">
               {transaction.vout && transaction.vout.length} Output{transaction.vout && transaction.vout.length !== 1 ? 's' : ''}
             </h4>
-            {transaction.vout && transaction.vout.map((output, index) => (
-              <div key={index} className="text-sm mb-2">
-                {output.scriptPubKey && output.scriptPubKey.addresses ? (
-                  <>
-                    <Link to={`/address/${output.scriptPubKey.addresses[0]}`} className="text-bitcoinz-600 hover:underline">
-                      {formatHash(output.scriptPubKey.addresses[0], 12)}
-                    </Link>
-                    <span className="ml-2 text-gray-600">{formatBTCZ(output.value)}</span>
-                  </>
-                ) : (
-                  <span className="text-gray-600">
-                    {output.scriptPubKey && output.scriptPubKey.type ? output.scriptPubKey.type : 'Unknown'}
-                    {output.value !== undefined && (
-                      <span className="ml-2">{formatBTCZ(output.value)}</span>
-                    )}
-                  </span>
-                )}
-              </div>
-            ))}
+            <div className="max-h-40 overflow-y-auto pr-2">
+              {transaction.vout && transaction.vout.map((output, index) => (
+                <div key={index} className="text-sm mb-2 bg-gray-50 p-2 rounded">
+                  {output.scriptPubKey && output.scriptPubKey.addresses ? (
+                    <>
+                      <div className="overflow-hidden">
+                        <Link 
+                          to={`/address/${output.scriptPubKey.addresses[0]}`} 
+                          className="text-bitcoinz-600 hover:underline block"
+                          title={output.scriptPubKey.addresses[0]}
+                          style={truncateStyle}
+                        >
+                          {formatHash(output.scriptPubKey.addresses[0], 12)}
+                        </Link>
+                      </div>
+                      <div className="mt-1 text-gray-600 font-medium">
+                        {formatBTCZ(output.value)}
+                      </div>
+                    </>
+                  ) : (
+                    <div className="text-gray-600">
+                      {output.scriptPubKey && output.scriptPubKey.type ? output.scriptPubKey.type : 'Unknown'}
+                      {output.value !== undefined && (
+                        <div className="mt-1 font-medium">
+                          {formatBTCZ(output.value)}
+                        </div>
+                      )}
+                    </div>
+                  )}
+                </div>
+              ))}
+            </div>
           </div>
         </div>
       </div>

@@ -1,10 +1,11 @@
 import React, { useState, useEffect } from 'react';
 import { useParams, Link } from 'react-router-dom';
-import { FaExchangeAlt, FaCheckCircle, FaTimesCircle, FaClock } from 'react-icons/fa';
+import { FaExchangeAlt, FaCheckCircle, FaClock } from 'react-icons/fa';
 
 // Components
 import Spinner from '../components/Spinner';
 import DetailCard from '../components/DetailCard';
+import HashLink from '../components/HashLink';
 
 // Services
 import { transactionService } from '../services/api';
@@ -92,7 +93,10 @@ const Transaction = () => {
   
   // Prepare transaction details for detail card
   const txDetails = [
-    { label: 'Transaction ID', value: transaction.txid },
+    { 
+      label: 'Transaction ID', 
+      value: <HashLink hash={transaction.txid} type="tx" length={20} showCopy={true} />
+    },
     { 
       label: 'Status', 
       value: (
@@ -105,14 +109,17 @@ const Transaction = () => {
         </span>
       )
     },
-    { label: 'Block', value: transaction.blockhash ? (
-      <Link to={`/blocks/${transaction.blockhash}`} className="text-bitcoinz-600 hover:underline">
-        {transaction.blockhash}
-      </Link>
-    ) : 'Pending' },
-    { label: 'Timestamp', value: transaction.time ? 
-      `${formatTimestamp(transaction.time)} (${formatRelativeTime(transaction.time)})` : 
-      'Pending'
+    { 
+      label: 'Block', 
+      value: transaction.blockhash ? (
+        <HashLink hash={transaction.blockhash} type="block" length={20} showCopy={true} />
+      ) : 'Pending' 
+    },
+    { 
+      label: 'Timestamp', 
+      value: transaction.time ? 
+        `${formatTimestamp(transaction.time)} (${formatRelativeTime(transaction.time)})` : 
+        'Pending'
     },
     { label: 'Size', value: `${formatNumber(transaction.size || 0)} bytes` },
     { label: 'Fee', value: calculateFee() },
@@ -123,6 +130,12 @@ const Transaction = () => {
   if (transaction.fOverwintered) {
     txDetails.push({ label: 'Overwintered', value: 'Yes' });
   }
+  
+  // Style for content containers
+  const contentStyle = {
+    maxHeight: '300px',
+    overflowY: 'auto'
+  };
   
   return (
     <div>
@@ -145,25 +158,23 @@ const Transaction = () => {
         
         <div className="card">
           {transaction.vin && transaction.vin.length > 0 ? (
-            <div className="divide-y divide-gray-200">
+            <div className="divide-y divide-gray-200" style={contentStyle}>
               {transaction.vin.map((input, index) => (
                 <div key={index} className="py-4 first:pt-0 last:pb-0">
                   {input.coinbase ? (
                     <div>
                       <p className="font-medium">Coinbase (New Coins)</p>
-                      <p className="text-sm font-mono text-gray-500 mt-1">
+                      <p className="text-sm font-mono text-gray-500 mt-1 break-all">
                         {input.coinbase}
                       </p>
                     </div>
                   ) : (
                     <div>
                       <div className="flex flex-wrap justify-between">
-                        <div>
+                        <div className="w-full md:w-1/2 break-words">
                           <p className="font-medium">
                             {input.address ? (
-                              <Link to={`/address/${input.address}`} className="text-bitcoinz-600 hover:underline">
-                                {input.address}
-                              </Link>
+                              <HashLink hash={input.address} type="address" length={24} />
                             ) : (
                               'Unknown Address'
                             )}
@@ -174,18 +185,24 @@ const Transaction = () => {
                             </p>
                           )}
                         </div>
-                        <div className="text-sm text-gray-500">
-                          <p>Outpoint: {input.txid}:{input.vout}</p>
-                          <p>Sequence: {input.sequence}</p>
+                        <div className="text-sm text-gray-500 w-full md:w-1/2 mt-2 md:mt-0">
+                          <p className="truncate">
+                            <span className="font-medium">Outpoint:</span> {input.txid}:{input.vout}
+                          </p>
+                          <p>
+                            <span className="font-medium">Sequence:</span> {input.sequence}
+                          </p>
                         </div>
                       </div>
                       
                       {input.scriptSig && (
                         <div className="mt-3">
                           <p className="text-sm font-medium">Script</p>
-                          <p className="text-sm font-mono text-gray-500 break-all">
-                            {input.scriptSig.hex}
-                          </p>
+                          <div className="mt-1 p-2 bg-gray-50 rounded-md">
+                            <p className="text-sm font-mono text-gray-500 break-all">
+                              {input.scriptSig.hex}
+                            </p>
+                          </div>
                         </div>
                       )}
                     </div>
@@ -207,45 +224,47 @@ const Transaction = () => {
         
         <div className="card">
           {transaction.vout && transaction.vout.length > 0 ? (
-            <div className="divide-y divide-gray-200">
+            <div className="divide-y divide-gray-200" style={contentStyle}>
               {transaction.vout.map((output, index) => (
                 <div key={index} className="py-4 first:pt-0 last:pb-0">
                   <div className="flex flex-wrap justify-between">
-                    <div>
+                    <div className="w-full md:w-1/2 break-words">
                       <p className="font-medium">
                         {output.scriptPubKey && output.scriptPubKey.addresses ? (
-                          <Link to={`/address/${output.scriptPubKey.addresses[0]}`} className="text-bitcoinz-600 hover:underline">
-                            {output.scriptPubKey.addresses[0]}
-                          </Link>
+                          <HashLink 
+                            hash={output.scriptPubKey.addresses[0]} 
+                            type="address" 
+                            length={24} 
+                          />
                         ) : (
                           `${output.scriptPubKey ? output.scriptPubKey.type : 'Unknown'}`
                         )}
                       </p>
-                      <p className="text-sm text-gray-500 mt-1">
+                      <p className="text-sm font-medium text-gray-700 mt-1">
                         {formatBTCZ(output.value)}
                       </p>
                     </div>
-                    <div className="text-sm text-gray-500">
-                      <p>Output Index: {output.n}</p>
-                      <p>Type: {output.scriptPubKey ? output.scriptPubKey.type : 'Unknown'}</p>
+                    <div className="text-sm text-gray-500 w-full md:w-1/2 mt-2 md:mt-0">
+                      <p><span className="font-medium">Output Index:</span> {output.n}</p>
+                      <p><span className="font-medium">Type:</span> {output.scriptPubKey ? output.scriptPubKey.type : 'Unknown'}</p>
                     </div>
                   </div>
                   
                   {output.scriptPubKey && (
                     <div className="mt-3">
                       <p className="text-sm font-medium">Script</p>
-                      <p className="text-sm font-mono text-gray-500 break-all">
-                        {output.scriptPubKey.hex}
-                      </p>
+                      <div className="mt-1 p-2 bg-gray-50 rounded-md">
+                        <p className="text-sm font-mono text-gray-500 break-all">
+                          {output.scriptPubKey.hex}
+                        </p>
+                      </div>
                     </div>
                   )}
                   
                   {output.spentTxid && (
-                    <div className="mt-2 text-sm">
-                      <span className="font-medium text-red-600">Spent</span> in transaction{' '}
-                      <Link to={`/tx/${output.spentTxid}`} className="text-bitcoinz-600 hover:underline">
-                        {output.spentTxid}
-                      </Link>
+                    <div className="mt-2 text-sm bg-red-50 p-2 rounded-md">
+                      <span className="font-medium text-red-600 mr-1">Spent</span> in transaction{' '}
+                      <HashLink hash={output.spentTxid} type="tx" length={20} />
                     </div>
                   )}
                 </div>
@@ -271,7 +290,9 @@ const Transaction = () => {
               
               <div>
                 <h3 className="text-lg font-medium mb-3">Binding Signature</h3>
-                <p className="font-mono text-sm break-all">{transaction.bindingSig || 'None'}</p>
+                <p className="font-mono text-sm break-all">
+                  {transaction.bindingSig || 'None'}
+                </p>
               </div>
             </div>
             
@@ -281,9 +302,9 @@ const Transaction = () => {
                   Shielded Spends ({transaction.spendDescs ? transaction.spendDescs.length : 0})
                 </h3>
                 {transaction.spendDescs && transaction.spendDescs.length > 0 ? (
-                  <div className="space-y-3">
+                  <div className="space-y-3 max-h-40 overflow-y-auto p-2 bg-gray-50 rounded">
                     {transaction.spendDescs.map((desc, index) => (
-                      <div key={index} className="text-sm font-mono text-gray-600">
+                      <div key={index} className="text-sm font-mono text-gray-600 break-all p-2 bg-white rounded shadow-sm">
                         Spend {index + 1}: {JSON.stringify(desc)}
                       </div>
                     ))}
@@ -298,9 +319,9 @@ const Transaction = () => {
                   Shielded Outputs ({transaction.outputDescs ? transaction.outputDescs.length : 0})
                 </h3>
                 {transaction.outputDescs && transaction.outputDescs.length > 0 ? (
-                  <div className="space-y-3">
+                  <div className="space-y-3 max-h-40 overflow-y-auto p-2 bg-gray-50 rounded">
                     {transaction.outputDescs.map((desc, index) => (
-                      <div key={index} className="text-sm font-mono text-gray-600">
+                      <div key={index} className="text-sm font-mono text-gray-600 break-all p-2 bg-white rounded shadow-sm">
                         Output {index + 1}: {JSON.stringify(desc)}
                       </div>
                     ))}
@@ -313,22 +334,6 @@ const Transaction = () => {
           </div>
         </div>
       )}
-      
-      {/* Raw Transaction */}
-      <div className="mt-8">
-        <h2 className="text-2xl font-bold mb-4">Raw Transaction</h2>
-        
-        <div className="card">
-          <details>
-            <summary className="cursor-pointer text-bitcoinz-600 font-medium hover:text-bitcoinz-800">
-              Show Raw Transaction Data
-            </summary>
-            <pre className="mt-4 text-sm overflow-x-auto bg-gray-100 p-4 rounded">
-              {JSON.stringify(transaction, null, 2)}
-            </pre>
-          </details>
-        </div>
-      </div>
     </div>
   );
 };

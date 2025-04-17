@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useContext, useRef } from 'react';
+import React, { useState, useEffect, useContext, useRef, useMemo } from 'react';
 import { Link } from 'react-router-dom';
 import { FaCube, FaExchangeAlt, FaNetworkWired, FaSearch } from 'react-icons/fa';
 
@@ -18,6 +18,12 @@ import { blockService, transactionService, statsService } from '../services/api'
 
 // Utils
 import { formatNumber, formatBTCZ, formatDifficulty } from '../utils/formatting';
+
+// Define icons outside the component for stable references
+const latestBlockIcon = <FaCube className="text-blue-600" size={24} />;
+const difficultyIcon = <FaNetworkWired className="text-green-600" size={24} />;
+const hashrateIcon = <FaNetworkWired className="text-yellow-600" size={24} />;
+const connectionsIcon = <FaNetworkWired className="text-red-600" size={24} />;
 
 const Home = () => {
   const [loading, setLoading] = useState(true);
@@ -123,6 +129,20 @@ const Home = () => {
       socket.off('new_transactions');
     };
   }, [socket, showToast]);
+
+  // Memoize the rendered list of blocks
+  const blockCards = useMemo(() => {
+    return latestBlocks.map(block => (
+      <BlockCard key={block.hash} block={block} />
+    ));
+  }, [latestBlocks]);
+
+  // Memoize the rendered list of transactions
+  const transactionCards = useMemo(() => {
+    return latestTransactions.map(tx => (
+      <TransactionCard key={tx.txid} transaction={tx} />
+    ));
+  }, [latestTransactions]);
   
   return (
     <div>
@@ -145,28 +165,28 @@ const Home = () => {
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
             {stats && (
               <>
-                <StatCard 
-                  title="Latest Block" 
-                  value={formatNumber(stats.blockchainInfo.blocks)} 
-                  icon={<FaCube className="text-blue-600" size={24} />}
+                <StatCard
+                  title="Latest Block"
+                  value={formatNumber(stats.blockchainInfo.blocks)}
+                  icon={latestBlockIcon}
                   color="blue"
                 />
-                <StatCard 
-                  title="Difficulty" 
-                  value={formatDifficulty(stats.blockchainInfo.difficulty)} 
-                  icon={<FaNetworkWired className="text-green-600" size={24} />}
+                <StatCard
+                  title="Difficulty"
+                  value={formatDifficulty(stats.blockchainInfo.difficulty)}
+                  icon={difficultyIcon}
                   color="green"
                 />
-                <StatCard 
-                  title="Network Hashrate" 
-                  value={formatNumber(stats.miningInfo.networkhashps)} 
-                  icon={<FaNetworkWired className="text-yellow-600" size={24} />}
+                <StatCard
+                  title="Network Hashrate"
+                  value={formatNumber(stats.miningInfo.networkhashps)}
+                  icon={hashrateIcon}
                   color="yellow"
                 />
-                <StatCard 
-                  title="Connections" 
-                  value={formatNumber(stats.networkInfo.connections)} 
-                  icon={<FaNetworkWired className="text-red-600" size={24} />}
+                <StatCard
+                  title="Connections"
+                  value={formatNumber(stats.networkInfo.connections)}
+                  icon={connectionsIcon}
                   color="red"
                 />
               </>
@@ -183,10 +203,8 @@ const Home = () => {
               </div>
               
               {latestBlocks.length > 0 ? (
-                <div className="space-y-4">
-                  {latestBlocks.map(block => (
-                    <BlockCard key={block.hash} block={block} />
-                  ))}
+                <div>
+                  {blockCards}
                 </div>
               ) : (
                 <div className="card text-center py-8">
@@ -203,10 +221,8 @@ const Home = () => {
               </div>
               
               {latestTransactions.length > 0 ? (
-                <div className="space-y-4">
-                  {latestTransactions.map(tx => (
-                    <TransactionCard key={tx.txid} transaction={tx} />
-                  ))}
+                <div>
+                  {transactionCards}
                 </div>
               ) : (
                 <div className="card text-center py-8">
@@ -221,4 +237,4 @@ const Home = () => {
   );
 };
 
-export default Home;
+export default React.memo(Home);

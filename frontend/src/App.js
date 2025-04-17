@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import { Routes, Route } from 'react-router-dom';
 import { io } from 'socket.io-client';
 
@@ -27,60 +27,89 @@ const API_URL = process.env.REACT_APP_API_URL || 'http://localhost:3000/api';
 const SOCKET_URL = process.env.REACT_APP_SOCKET_URL || 'http://localhost:3000';
 
 function App() {
-  const [socket, setSocket] = useState(null);
+  const socketRef = useRef(null); // Use ref for socket instance
+  const [isConnected, setIsConnected] = useState(false); // Track connection status for potential UI feedback
   const [toast, setToast] = useState(null);
   
   // Initialize socket connection
   useEffect(() => {
-    const newSocket = io(SOCKET_URL, {
+    // Prevent creating multiple sockets if component re-renders unexpectedly
+    if (socketRef.current) return;
+
+    socketRef.current = io(SOCKET_URL, {
       transports: ['websocket'],
       reconnection: true,
       reconnectionAttempts: 5,
       reconnectionDelay: 1000,
     });
     
-    newSocket.on('connect', () => {
+    const currentSocket = socketRef.current;
+    
+    currentSocket.on('connect', () => {
       console.log('Connected to WebSocket server');
-      showToast('Connected to live updates', 'success');
+      setIsConnected(true);
+      // showToast('Connected to live updates', 'success'); // Toast handled by context now
       
       // Subscribe to channels
-      newSocket.emit('subscribe', 'blocks');
-      newSocket.emit('subscribe', 'transactions');
+      currentSocket.emit('subscribe', 'blocks');
+      currentSocket.emit('subscribe', 'transactions');
     });
     
-    newSocket.on('connect_error', (error) => {
+    currentSocket.on('connect_error', (error) => {
       console.error('WebSocket connection error:', error);
-      showToast('Connection error. Retrying...', 'error');
+      setIsConnected(false);
+      // showToast('Connection error. Retrying...', 'error'); // Toast handled by context now
     });
     
-    newSocket.on('disconnect', () => {
+    currentSocket.on('disconnect', () => {
       console.log('Disconnected from WebSocket server');
-      showToast('Disconnected from live updates', 'warning');
+      setIsConnected(false);
+      // showToast('Disconnected from live updates', 'warning'); // Toast handled by context now
     });
     
-    setSocket(newSocket);
+    // No need to setSocket state anymore
     
     // Cleanup on unmount
     return () => {
-      if (newSocket) {
-        newSocket.disconnect();
+      if (currentSocket) {
+        currentSocket.disconnect();
+        socketRef.current = null;
       }
     };
-  }, []);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []); // showToast dependency removed as it's stable via useCallback now
   
-  // Toast message handler
-  const showToast = (message, type = 'info', duration = 5000) => {
+  // Stable Toast message handler using useCallback
+  const showToast = useCallback((message, type = 'info', duration = 5000) => {
     setToast({ message, type, duration });
     
     // Auto-clear toast after duration
-    setTimeout(() => {
+    const timer = setTimeout(() => {
       setToast(null);
     }, duration);
-  };
-  
+    
+    // Optional: Clear timer if component unmounts or toast changes
+    return () => clearTimeout(timer);
+  }, []); // Empty dependency array means this function reference is stable
+
+  // Memoize the Toast context value
+  const toastContextValue = useMemo(() => ({ showToast }), [showToast]);
+
+  // Add connection status toasts based on isConnected state
+  useEffect(() => {
+    if (isConnected) {
+      showToast('Connected to live updates', 'success');
+    } else if (socketRef.current) { // Only show disconnect/error if socket was initialized
+      // You might want more specific error/disconnect messages here
+      showToast('Disconnected from live updates. Retrying...', 'warning');
+    }
+  }, [isConnected, showToast]);
+
   return (
-    <SocketContext.Provider value={socket}>
-      <ToastContext.Provider value={{ showToast }}>
+    // Provide the stable ref to the SocketContext
+    <SocketContext.Provider value={socketRef.current}>
+      {/* Provide the memoized value to ToastContext */}
+      <ToastContext.Provider value={toastContextValue}>
         <div className="flex flex-col min-h-screen">
           <Header />
           <main className="flex-grow container-custom py-8">

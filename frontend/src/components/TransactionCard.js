@@ -18,7 +18,7 @@ const TransactionCard = ({ transaction }) => {
   };
   
   return (
-    <div className="card hover:shadow-lg transition-shadow duration-300">
+    <div className="card hover:shadow-lg">
       <div className="flex flex-col md:flex-row md:items-center justify-between">
         <div className="flex items-center">
           <div className="bg-bitcoinz-100 p-3 rounded-full mr-4">

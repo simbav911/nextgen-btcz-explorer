@@ -77,11 +77,18 @@ const SyncStatus = () => {
     });
     
     socket.on('new_block', (block) => {
-      setSyncInfo(prev => ({
-        ...prev,
-        currentBlock: block.height,
-        lastUpdated: new Date()
-      }));
+      setSyncInfo(prev => {
+        // Only update if the block height is actually new
+        if (prev.currentBlock !== block.height) {
+          return {
+            ...prev,
+            currentBlock: block.height,
+            lastUpdated: new Date()
+          };
+        }
+        // Otherwise, return the previous state reference
+        return prev;
+      });
     });
     
     return () => {
@@ -136,4 +143,4 @@ const SyncStatus = () => {
   );
 };
 
-export default SyncStatus;
+export default React.memo(SyncStatus);

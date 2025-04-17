@@ -48,11 +48,6 @@ const Header = () => {
             <Link to="/stats" className="text-gray-700 hover:text-bitcoinz-600">Statistics</Link>
           </nav>
 
-          {/* Sync Status (Desktop) */}
-          <div className="hidden md:block">
-            <SyncStatus />
-          </div>
-
           {/* Desktop Search */}
           <div className="hidden md:block">
             <form onSubmit={handleSearch} className="flex">
@@ -131,11 +126,6 @@ const Header = () => {
                 <FaSearch />
               </button>
             </form>
-            
-            {/* Sync Status (Mobile) */}
-            <div className="mt-2">
-              <SyncStatus />
-            </div>
           </div>
         )}
       </div>

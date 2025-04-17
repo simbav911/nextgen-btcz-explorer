@@ -66,11 +66,24 @@ const Home = () => {
         const combined = [block, ...prevBlocks];
         // Use a Map to deduplicate based on block hash
         const uniqueBlocksMap = new Map(combined.map(b => [b.hash, b]));
-        // Convert back to an array and slice (limit to 5 latest)
-        const uniqueBlocksArray = Array.from(uniqueBlocksMap.values());
-        // Ensure blocks are sorted by height descending before slicing
+        // Convert back to an array
+        let uniqueBlocksArray = Array.from(uniqueBlocksMap.values());
+        // Ensure blocks are sorted by height descending
         uniqueBlocksArray.sort((a, b) => b.height - a.height);
-        return uniqueBlocksArray.slice(0, 5);
+        // Slice to limit (e.g., 5)
+        const finalBlocks = uniqueBlocksArray.slice(0, 5);
+
+        // Compare hashes to see if the list actually changed
+        const newHashes = finalBlocks.map(b => b.hash);
+        const prevHashes = prevBlocks.map(b => b.hash);
+
+        if (newHashes.length !== prevHashes.length || newHashes.some((hash, index) => hash !== prevHashes[index])) {
+          // Only update state if the list content has changed
+          return finalBlocks;
+        } else {
+          // Return previous state reference if no change
+          return prevBlocks;
+        }
       });
       
       // Show toast only once per block height
@@ -86,9 +99,22 @@ const Home = () => {
         const combined = [...transactions, ...prevTxs];
         // Use a Map to deduplicate based on txid
         const uniqueTxsMap = new Map(combined.map(tx => [tx.txid, tx]));
-        // Convert back to an array and slice
+        // Convert back to an array
         const uniqueTxsArray = Array.from(uniqueTxsMap.values());
-        return uniqueTxsArray.slice(0, 5); // Keep the limit of 5
+        // Slice to limit (e.g., 5)
+        const finalTxs = uniqueTxsArray.slice(0, 5);
+
+        // Compare txids to see if the list actually changed
+        const newTxids = finalTxs.map(tx => tx.txid);
+        const prevTxids = prevTxs.map(tx => tx.txid);
+
+        if (newTxids.length !== prevTxids.length || newTxids.some((txid, index) => txid !== prevTxids[index])) {
+          // Only update state if the list content has changed
+          return finalTxs;
+        } else {
+          // Return previous state reference if no change
+          return prevTxs;
+        }
       });
     });
     

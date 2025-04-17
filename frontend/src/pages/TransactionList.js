@@ -75,9 +75,13 @@ const TransactionList = () => {
       // Only update if we're on the first page
       if (currentPage === 1) {
         setTransactions(prevTxs => {
-          // Add new transactions to beginning and remove extras
+          // Combine new and previous transactions
           const combined = [...newTransactions, ...prevTxs];
-          return combined.slice(0, TRANSACTIONS_PER_PAGE);
+          // Use a Map to deduplicate based on txid
+          const uniqueTxsMap = new Map(combined.map(tx => [tx.txid, tx]));
+          // Convert back to an array and slice
+          const uniqueTxsArray = Array.from(uniqueTxsMap.values());
+          return uniqueTxsArray.slice(0, TRANSACTIONS_PER_PAGE);
         });
       }
     });

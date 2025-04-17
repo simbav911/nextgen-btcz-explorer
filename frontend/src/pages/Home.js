@@ -61,18 +61,28 @@ const Home = () => {
     
     socket.on('new_block', (block) => {
       setLatestBlocks(prevBlocks => {
-        // Add block to beginning and remove last block
-        const newBlocks = [block, ...prevBlocks.slice(0, -1)];
-        return newBlocks;
+        // Combine new block with previous blocks
+        const combined = [block, ...prevBlocks];
+        // Use a Map to deduplicate based on block hash
+        const uniqueBlocksMap = new Map(combined.map(b => [b.hash, b]));
+        // Convert back to an array and slice (limit to 5 latest)
+        const uniqueBlocksArray = Array.from(uniqueBlocksMap.values());
+        // Ensure blocks are sorted by height descending before slicing
+        uniqueBlocksArray.sort((a, b) => b.height - a.height);
+        return uniqueBlocksArray.slice(0, 5);
       });
       showToast(`New block #${block.height} mined`, 'info');
     });
     
     socket.on('new_transactions', (transactions) => {
       setLatestTransactions(prevTxs => {
-        // Add new transactions to beginning and limit total
-        const newTxs = [...transactions, ...prevTxs].slice(0, 5);
-        return newTxs;
+        // Combine new and previous transactions
+        const combined = [...transactions, ...prevTxs];
+        // Use a Map to deduplicate based on txid
+        const uniqueTxsMap = new Map(combined.map(tx => [tx.txid, tx]));
+        // Convert back to an array and slice
+        const uniqueTxsArray = Array.from(uniqueTxsMap.values());
+        return uniqueTxsArray.slice(0, 5); // Keep the limit of 5
       });
     });
     

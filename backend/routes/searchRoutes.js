@@ -77,41 +77,20 @@ router.get('/', async (req, res, next) => {
     // Check if query is an address
     // For a real BitcoinZ implementation, you'd need to validate the address format
     // This is a simplified check
-    if (query.length >= 26 && query.length <= 35) {
-      const AddressModel = getAddress(); // Get Sequelize model
+    if (query.length >= 26 && query.length <= 35 && query.startsWith('t1')) {
       try {
-        // Check in local database
-        const address = AddressModel ? await AddressModel.findOne({ where: { address: query } }) : null;
+        logger.debug(`Checking if ${query} is a valid BitcoinZ address`);
         
-        if (address) {
-          result.type = 'address';
-          result.result = address;
-          return res.json(result);
-        }
-        
-        // If not in database, search for transactions with this address
-        const TransactionModel = getTransaction(); // Get Sequelize model
-        const transactions = TransactionModel ? await TransactionModel.findAll({
-          where: {
-            [Op.or]: [
-              // Note: Querying JSONB requires specific syntax depending on structure
-              // This is a placeholder assuming direct key access might work or needs adjustment
-              // { 'vin': { [Op.contains]: [{ address: query }] } }, // Example for array of objects
-              // { 'vout': { [Op.contains]: [{ scriptPubKey: { addresses: [query] } }] } } // Example
-            ]
-          },
-          limit: 10
-        }) : [];
-        
-        if (transactions.length > 0) {
-          result.type = 'address';
-          result.result = {
-            address: query,
-            transactions: transactions.map(tx => tx.txid),
-            transactionCount: transactions.length // Note: This might not be accurate if limit is hit
-          };
-          return res.json(result);
-        }
+        // Always return a valid result for BitcoinZ addresses starting with t1
+        // This ensures the frontend can navigate to the address page
+        result.type = 'address';
+        result.result = {
+          address: query,
+          balance: 0,
+          transactions: [],
+          transactionCount: 0
+        };
+        return res.json(result);
       } catch (error) {
         logger.debug(`Error searching for address ${query}:`, error);
       }

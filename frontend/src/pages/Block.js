@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useParams, Link, useNavigate } from 'react-router-dom';
 import { FaCube, FaArrowLeft, FaArrowRight } from 'react-icons/fa';
 import moment from 'moment';
+import axios from 'axios';
 
 // Components
 import Spinner from '../components/Spinner';
@@ -14,6 +15,7 @@ import { blockService, transactionService } from '../services/api';
 
 // Utils
 import { formatNumber, formatTimestamp, formatBTCZ } from '../utils/formatting';
+import api from '../services/api';
 
 const Block = () => {
   const { hash } = useParams();
@@ -96,6 +98,96 @@ const Block = () => {
     navigate(`/blocks/height/${height}`);
   };
   
+  // Extract miner information if available
+  const extractMinerInfo = async () => {
+    if (!block) return 'Unknown';
+    
+    try {
+      // Try to use the backend API to get mining pool information
+      const response = await api.get('/charts/mined-block');
+      
+      if (response.data && response.data.data) {
+        // The API returns mining pool data for recent blocks
+        // We need to check if our block's hash or coinbase transaction matches
+        
+        // First, let's check if we have a coinbase transaction
+        const coinbaseTx = transactions.find(tx => 
+          tx.vin && tx.vin.length > 0 && tx.vin.some(input => input.coinbase)
+        );
+        
+        if (coinbaseTx) {
+          // Common mining pools often include their name in the coinbase signature
+          const knownPools = {
+            'Zerg': 'Zergpool',
+            'zergpool': 'Zergpool',
+            '/slush/': 'SlushPool',
+            'Mined by AntPool': 'AntPool',
+            '/BTC.COM/': 'BTC.COM',
+            'ViaBTC': 'ViaBTC',
+            'F2Pool': 'F2Pool',
+            'Poolin': 'Poolin',
+            'btcz.pool': 'BTCZ Pool',
+            'solopool': 'Solo Pool',
+            '2miners': '2Mars'
+          };
+          
+          // Check if any known pool signature is in the coinbase data
+          if (coinbaseTx.vin[0].coinbase) {
+            const coinbaseHex = coinbaseTx.vin[0].coinbase;
+            try {
+              // Convert hex to ASCII to check for pool signatures
+              const coinbaseAscii = Buffer.from(coinbaseHex, 'hex').toString('ascii');
+              
+              for (const [signature, poolName] of Object.entries(knownPools)) {
+                if (coinbaseAscii.includes(signature)) {
+                  return poolName;
+                }
+              }
+            } catch (e) {
+              // If conversion fails, just continue
+            }
+          }
+          
+          // If we have output addresses, check if they match known mining pools
+          if (coinbaseTx.vout && coinbaseTx.vout.length > 0) {
+            const firstOutput = coinbaseTx.vout[0];
+            if (firstOutput.scriptPubKey && firstOutput.scriptPubKey.addresses) {
+              const address = firstOutput.scriptPubKey.addresses[0];
+              
+              // Check if address matches any known mining pool addresses
+              const knownAddresses = {
+                't1VpYDGfKR8jkGc5LCCRj7PUdHTsRmwxeQc': 'Zergpool',
+                't1N1LNyPpYRbBFoVZBsUgcuMZiGHyBJcmRN': 'MiningPoolHub'
+              };
+              
+              if (knownAddresses[address]) {
+                return knownAddresses[address];
+              }
+            }
+          }
+        }
+      }
+    } catch (error) {
+      console.error('Error fetching mining pool data:', error);
+    }
+    
+    return 'Unknown';
+  };
+  
+  // Add miner information when available
+  useEffect(() => {
+    if (block && transactions.length > 0) {
+      extractMinerInfo().then(minerName => {
+        if (minerName !== 'Unknown') {
+          setBlock(prevBlock => ({
+            ...prevBlock,
+            minerInfo: minerName
+          }));
+        }
+      });
+    }
+  }, [block, transactions]);
+  
   if (loading) {
     return <Spinner message="Loading block data..." />;
   }
@@ -126,6 +218,14 @@ const Block = () => {
     { label: 'Bits', value: block.bits },
     { label: 'Transaction Count', value: formatNumber(block.tx.length) }
   ];
+  
+  // Add miner information if available
+  if (block.minerInfo) {
+    blockDetails.push({ 
+      label: 'Mined by', 
+      value: block.minerInfo
+    });
+  }
   
   // Add previous and next block if available
   if (block.previousblockhash) {

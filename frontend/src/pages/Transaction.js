@@ -487,7 +487,7 @@ const Transaction = () => {
                               {input.address ? (
                                 <HashLink hash={input.address} type="address" length={24} />
                               ) : (
-                                'Unknown Address'
+                                <span className="italic text-gray-500">Nonstandard Input (No Address or Shielded)</span>
                               )}
                             </p>
                             {input.value && (

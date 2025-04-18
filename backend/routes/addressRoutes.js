@@ -1,6 +1,6 @@
 const express = require('express');
 const router = express.Router();
-const { getAddressInfo } = require('../services/bitcoinzService');
+const { getAddressInfo, getAddressTransactions, getAddressBalanceHistory } = require('../services/bitcoinzService');
 const { getAddress: getAddressModel } = require('../models');
 const logger = require('../utils/logger');
 
@@ -10,17 +10,8 @@ router.get('/:address', async (req, res, next) => {
     const { address } = req.params;
     logger.info(`Fetching address info: ${address}`);
     
-    // Direct mode - mock address data for now
-    // In a real implementation, you would use an address indexing service
-    const addressInfo = {
-      address,
-      balance: 0,
-      totalReceived: 0,
-      totalSent: 0,
-      unconfirmedBalance: 0,
-      txCount: 0,
-      transactions: []
-    };
+    // Get real address data from the blockchain
+    const addressInfo = await getAddressInfo(address);
     
     res.json(addressInfo);
   } catch (error) {
@@ -38,15 +29,10 @@ router.get('/:address/transactions', async (req, res, next) => {
     
     logger.info(`Fetching transactions for address ${address}`);
     
-    // Direct mode - mock transactions for now
-    // In a real implementation, you would use an address indexing service
+    // Get real transaction data from the blockchain
+    const transactions = await getAddressTransactions(address, limit, offset);
     
-    res.json({
-      address,
-      transactions: [],
-      count: 0,
-      offset
-    });
+    res.json(transactions);
   } catch (error) {
     logger.error(`Error fetching transactions for address ${req.params.address}:`, error);
     next(error);
@@ -59,18 +45,37 @@ router.get('/:address/balance', async (req, res, next) => {
     const { address } = req.params;
     logger.info(`Fetching balance for address ${address}`);
     
-    // Direct mode - mock balance data for now
-    // In a real implementation, you would use an address indexing service
+    // Get real address data from the blockchain
+    const addressInfo = await getAddressInfo(address);
     
+    // Return just the balance information
     res.json({
       address,
-      balance: 0,
-      totalReceived: 0,
-      totalSent: 0,
-      unconfirmedBalance: 0
+      balance: addressInfo.balance,
+      totalReceived: addressInfo.totalReceived,
+      totalSent: addressInfo.totalSent,
+      unconfirmedBalance: addressInfo.unconfirmedBalance
     });
   } catch (error) {
     logger.error(`Error fetching balance for address ${req.params.address}:`, error);
+    next(error);
+  }
+});
+
+// Get address balance history
+router.get('/:address/history', async (req, res, next) => {
+  try {
+    const { address } = req.params;
+    const days = parseInt(req.query.days) || 30;
+    
+    logger.info(`Fetching balance history for address ${address}`);
+    
+    // Get real balance history data
+    const history = await getAddressBalanceHistory(address, days);
+    
+    res.json(history);
+  } catch (error) {
+    logger.error(`Error fetching balance history for address ${req.params.address}:`, error);
     next(error);
   }
 });

@@ -268,22 +268,438 @@ const getNetworkStats = async () => {
  */
 const getAddressInfo = async (address) => {
   try {
-    // Note: Core BitcoinZ client doesn't have a direct method for this
-    // This would typically use an indexing service like Electrum or a custom index
+    logger.info(`Fetching address info for ${address}`);
     
-    // For demonstration, we'll return a mock structure
-    // In real implementation, use an address indexing service
+    // Initialize variables to track address statistics
+    let balance = 0;
+    let totalReceived = 0;
+    let totalSent = 0;
+    let unconfirmedBalance = 0;
+    let transactions = [];
+    let txIds = new Set();
+    
+    // Get unspent transaction outputs (UTXOs) for the address
+    logger.debug(`Executing listunspent for address ${address}`);
+    try {
+      const utxos = await executeRpcCommand('listunspent', [0, 9999999, [address]]);
+      logger.debug(`Found ${utxos.length} UTXOs for address ${address}`);
+      
+      // Calculate confirmed balance from UTXOs
+      for (const utxo of utxos) {
+        balance += utxo.amount;
+        
+        // Add transaction to our set if not already included
+        if (!txIds.has(utxo.txid)) {
+          txIds.add(utxo.txid);
+        }
+      }
+    } catch (utxoError) {
+      logger.error(`Error fetching UTXOs for ${address}: ${utxoError.message}`);
+    }
+    
+    // Try a different approach - use z_listreceivedbyaddress if it's available (for transparent addresses too)
+    try {
+      logger.debug(`Trying z_listreceivedbyaddress for ${address}`);
+      const receivedTxs = await executeRpcCommand('z_listreceivedbyaddress', [address, 0]);
+      logger.debug(`Found ${receivedTxs.length} received transactions for ${address} using z_listreceivedbyaddress`);
+      
+      for (const tx of receivedTxs) {
+        // Add to transaction IDs set if not already included
+        if (!txIds.has(tx.txid)) {
+          txIds.add(tx.txid);
+        }
+        
+        // Add to total received
+        totalReceived += tx.amount;
+      }
+    } catch (zListError) {
+      logger.warn(`z_listreceivedbyaddress not available or failed for ${address}: ${zListError.message}`);
+    }
+    
+    // Try to get transactions if the address is in the wallet
+    try {
+      logger.debug(`Trying listtransactions for ${address}`);
+      const walletTxs = await executeRpcCommand('listtransactions', ['*', 100, 0, true]);
+      let addressTxs = walletTxs.filter(tx => tx.address === address);
+      logger.debug(`Found ${addressTxs.length} transactions for ${address} in wallet`);
+      
+      for (const tx of addressTxs) {
+        // Add to transaction IDs set if not already included
+        if (!txIds.has(tx.txid)) {
+          txIds.add(tx.txid);
+        }
+        
+        // Calculate received and sent amounts
+        if (tx.category === 'receive') {
+          totalReceived += tx.amount;
+        } else if (tx.category === 'send') {
+          totalSent += Math.abs(tx.amount);
+        }
+        
+        // Track unconfirmed balance
+        if (tx.confirmations === 0) {
+          if (tx.category === 'receive') {
+            unconfirmedBalance += tx.amount;
+          } else if (tx.category === 'send') {
+            unconfirmedBalance -= Math.abs(tx.amount);
+          }
+        }
+      }
+    } catch (walletError) {
+      logger.warn(`Could not get wallet transactions for ${address}: ${walletError.message}`);
+    }
+    
+    // Try using importaddress to add the address to the wallet temporarily
+    // This can be resource-intensive but helps with addresses not in the wallet
+    if (txIds.size === 0) {
+      try {
+        logger.debug(`No transactions found for ${address}, trying importaddress`);
+        // Use rescan=false to avoid rescanning the entire blockchain
+        await executeRpcCommand('importaddress', [address, '', false]);
+        logger.debug(`Successfully imported address ${address}`);
+        
+        // Try listunspent again after import
+        const utxos = await executeRpcCommand('listunspent', [0, 9999999, [address]]);
+        logger.debug(`After import: Found ${utxos.length} UTXOs for address ${address}`);
+        
+        // Calculate confirmed balance from UTXOs
+        for (const utxo of utxos) {
+          balance += utxo.amount;
+          
+          // Add transaction to our set if not already included
+          if (!txIds.has(utxo.txid)) {
+            txIds.add(utxo.txid);
+          }
+        }
+      } catch (importError) {
+        logger.error(`Error importing address ${address}: ${importError.message}`);
+      }
+    }
+    
+    // If we have transaction IDs, fetch each transaction and analyze inputs/outputs
+    if (txIds.size > 0) {
+      logger.debug(`Fetching ${txIds.size} transactions for address ${address}`);
+      
+      for (const txid of txIds) {
+        try {
+          const tx = await getRawTransaction(txid, 1);
+          
+          // Process outputs (vout) to find receives
+          if (tx.vout) {
+            for (const output of tx.vout) {
+              if (output.scriptPubKey && 
+                  output.scriptPubKey.addresses && 
+                  output.scriptPubKey.addresses.includes(address)) {
+                // Only count towards totalReceived if not already counted
+                if (totalReceived === 0) {
+                  totalReceived += output.value;
+                }
+              }
+            }
+          }
+          
+          // Process inputs (vin) to find sends
+          if (tx.vin) {
+            for (const input of tx.vin) {
+              // Skip coinbase inputs
+              if (input.coinbase) continue;
+              
+              // We need to get the previous transaction to check if the address was the sender
+              if (input.txid && input.vout !== undefined) {
+                try {
+                  const prevTx = await getRawTransaction(input.txid, 1);
+                  if (prevTx && 
+                      prevTx.vout && 
+                      prevTx.vout[input.vout] && 
+                      prevTx.vout[input.vout].scriptPubKey && 
+                      prevTx.vout[input.vout].scriptPubKey.addresses && 
+                      prevTx.vout[input.vout].scriptPubKey.addresses.includes(address)) {
+                    // Only count towards totalSent if not already counted
+                    if (totalSent === 0) {
+                      totalSent += prevTx.vout[input.vout].value;
+                    }
+                  }
+                } catch (prevTxError) {
+                  logger.error(`Failed to fetch previous transaction ${input.txid}: ${prevTxError.message}`);
+                }
+              }
+            }
+          }
+          
+          // Add transaction to our list with formatted data
+          transactions.push({
+            txid: tx.txid,
+            time: tx.time,
+            confirmations: tx.confirmations || 0,
+            isReceived: tx.vout.some(out => 
+              out.scriptPubKey && 
+              out.scriptPubKey.addresses && 
+              out.scriptPubKey.addresses.includes(address)
+            ),
+            vin: tx.vin,
+            vout: tx.vout
+          });
+        } catch (txError) {
+          logger.error(`Failed to process transaction ${txid}: ${txError.message}`);
+        }
+      }
+    } else {
+      logger.warn(`No transactions found for address ${address} after all attempts`);
+    }
+    
+    // If balance is still 0 but we have transactions, try to calculate balance from transactions
+    if (balance === 0 && transactions.length > 0) {
+      logger.debug(`Calculating balance from transactions for ${address}`);
+      
+      // Sort transactions by time (oldest first)
+      transactions.sort((a, b) => a.time - b.time);
+      
+      // Calculate running balance
+      let runningBalance = 0;
+      
+      for (const tx of transactions) {
+        // Check outputs (vout) for receives
+        for (const output of tx.vout) {
+          if (output.scriptPubKey && 
+              output.scriptPubKey.addresses && 
+              output.scriptPubKey.addresses.includes(address)) {
+            runningBalance += output.value;
+          }
+        }
+        
+        // Check inputs (vin) for sends
+        for (const input of tx.vin) {
+          // Skip coinbase inputs
+          if (input.coinbase) continue;
+          
+          // Check if this input references a previous output owned by this address
+          if (input.prevout && 
+              input.prevout.scriptPubKey && 
+              input.prevout.scriptPubKey.addresses && 
+              input.prevout.scriptPubKey.addresses.includes(address)) {
+            runningBalance -= input.prevout.value;
+          }
+        }
+      }
+      
+      // Update balance if we calculated a non-zero value
+      if (runningBalance > 0) {
+        balance = runningBalance;
+      }
+    }
+    
+    // Sort transactions by time (newest first)
+    transactions.sort((a, b) => b.time - a.time);
+    
+    // If we still have no data, try one last approach - search for the address in recent blocks
+    if (txIds.size === 0) {
+      logger.debug(`No transactions found for ${address}, searching in recent blocks`);
+      
+      try {
+        // Get the latest block hash
+        const bestBlockHash = await getBestBlockHash();
+        let currentBlockHash = bestBlockHash;
+        
+        // Search through the last 10 blocks
+        for (let i = 0; i < 10; i++) {
+          if (!currentBlockHash) break;
+          
+          const block = await getBlock(currentBlockHash, 2); // Verbosity 2 includes transaction details
+          
+          // Check each transaction in the block
+          for (const tx of block.tx) {
+            let found = false;
+            
+            // Check outputs
+            for (const vout of tx.vout) {
+              if (vout.scriptPubKey && 
+                  vout.scriptPubKey.addresses && 
+                  vout.scriptPubKey.addresses.includes(address)) {
+                found = true;
+                txIds.add(tx.txid);
+                totalReceived += vout.value;
+                
+                // Add transaction to our list
+                transactions.push({
+                  txid: tx.txid,
+                  time: block.time,
+                  confirmations: block.confirmations || 0,
+                  isReceived: true,
+                  vin: tx.vin,
+                  vout: tx.vout
+                });
+                
+                break;
+              }
+            }
+            
+            // Check inputs if not already found
+            if (!found) {
+              for (const vin of tx.vin) {
+                if (vin.prevout && 
+                    vin.prevout.scriptPubKey && 
+                    vin.prevout.scriptPubKey.addresses && 
+                    vin.prevout.scriptPubKey.addresses.includes(address)) {
+                  txIds.add(tx.txid);
+                  totalSent += vin.prevout.value;
+                  
+                  // Add transaction to our list
+                  transactions.push({
+                    txid: tx.txid,
+                    time: block.time,
+                    confirmations: block.confirmations || 0,
+                    isReceived: false,
+                    vin: tx.vin,
+                    vout: tx.vout
+                  });
+                  
+                  break;
+                }
+              }
+            }
+          }
+          
+          // Move to the previous block
+          currentBlockHash = block.previousblockhash;
+        }
+      } catch (blockSearchError) {
+        logger.error(`Error searching for address in blocks: ${blockSearchError.message}`);
+      }
+    }
+    
+    logger.info(`Completed address info fetch for ${address}: found ${txIds.size} transactions, balance: ${balance}`);
+    
     return {
       address,
-      balance: 0,
-      totalReceived: 0,
-      totalSent: 0,
-      unconfirmedBalance: 0, 
-      txCount: 0,
-      transactions: []
+      balance,
+      totalReceived,
+      totalSent,
+      unconfirmedBalance,
+      txCount: txIds.size,
+      transactions: transactions.slice(0, 10) // Return only the first 10 transactions
     };
   } catch (error) {
     logger.error(`Failed to get address info for ${address}:`, error.message);
+    throw error;
+  }
+};
+
+/**
+ * Get address transactions
+ */
+const getAddressTransactions = async (address, limit = 10, offset = 0) => {
+  try {
+    // Get the full address info first
+    const addressInfo = await getAddressInfo(address);
+    
+    // Return the paginated transactions
+    return {
+      address,
+      transactions: addressInfo.transactions.slice(offset, offset + limit),
+      count: addressInfo.txCount,
+      offset
+    };
+  } catch (error) {
+    logger.error(`Failed to get transactions for address ${address}:`, error.message);
+    throw error;
+  }
+};
+
+/**
+ * Get address balance history
+ * Note: This requires historical data which may not be directly available from the node
+ * For a complete solution, an indexing service would be needed
+ */
+const getAddressBalanceHistory = async (address, days = 30) => {
+  try {
+    logger.info(`Fetching balance history for ${address}`);
+    
+    // Get current address info
+    const addressInfo = await getAddressInfo(address);
+    
+    // For a real implementation, you would need historical data
+    // Here we'll return the current balance as the latest point
+    // and estimate previous points based on transactions
+    
+    const history = [];
+    const now = Math.floor(Date.now() / 1000);
+    const daySeconds = 86400;
+    
+    // Start with current balance
+    let currentBalance = addressInfo.balance;
+    
+    // Add current balance as the latest point
+    history.push({
+      date: new Date(now * 1000).toISOString().split('T')[0],
+      balance: currentBalance
+    });
+    
+    // Sort transactions by time (oldest first)
+    const sortedTxs = [...addressInfo.transactions].sort((a, b) => a.time - b.time);
+    
+    // Create a map of dates to balance changes
+    const dateBalanceMap = new Map();
+    
+    // Process each transaction to determine balance changes
+    for (const tx of sortedTxs) {
+      const txDate = new Date(tx.time * 1000).toISOString().split('T')[0];
+      
+      // Calculate the balance change for this transaction
+      let balanceChange = 0;
+      
+      // Check outputs (vout) for receives
+      for (const output of tx.vout) {
+        if (output.scriptPubKey && 
+            output.scriptPubKey.addresses && 
+            output.scriptPubKey.addresses.includes(address)) {
+          balanceChange += output.value;
+        }
+      }
+      
+      // Check inputs (vin) for sends
+      for (const input of tx.vin) {
+        // Skip coinbase inputs
+        if (input.coinbase) continue;
+        
+        // Check if this input references a previous output owned by this address
+        if (input.prevout && 
+            input.prevout.scriptPubKey && 
+            input.prevout.scriptPubKey.addresses && 
+            input.prevout.scriptPubKey.addresses.includes(address)) {
+          balanceChange -= input.prevout.value;
+        }
+      }
+      
+      // Update the balance change for this date
+      if (dateBalanceMap.has(txDate)) {
+        dateBalanceMap.set(txDate, dateBalanceMap.get(txDate) + balanceChange);
+      } else {
+        dateBalanceMap.set(txDate, balanceChange);
+      }
+    }
+    
+    // Generate balance history for the requested number of days
+    for (let i = 1; i <= days; i++) {
+      const date = new Date((now - (i * daySeconds)) * 1000).toISOString().split('T')[0];
+      
+      // If we have a balance change for this date, apply it
+      if (dateBalanceMap.has(date)) {
+        currentBalance -= dateBalanceMap.get(date);
+      }
+      
+      // Add this date's balance to our history (at the beginning since we're going backwards)
+      history.unshift({
+        date,
+        balance: Math.max(0, currentBalance) // Ensure balance is never negative
+      });
+    }
+    
+    return {
+      address,
+      history
+    };
+  } catch (error) {
+    logger.error(`Failed to get balance history for ${address}:`, error.message);
     throw error;
   }
 };
@@ -299,5 +715,7 @@ module.exports = {
   getRawTransaction,
   getLatestTransactions,
   getNetworkStats,
-  getAddressInfo
+  getAddressInfo,
+  getAddressTransactions,
+  getAddressBalanceHistory
 };

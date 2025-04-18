@@ -51,9 +51,16 @@ const WealthDistribution = () => {
   const [totalSupply, setTotalSupply] = useState(0);
   const [totalAddresses, setTotalAddresses] = useState(0);
   const [usingMockData, setUsingMockData] = useState(false);
+  const [dataVersion, setDataVersion] = useState(0); // Add a version to prevent data changing on refresh
   const { showToast } = useContext(ToastContext);
 
-  const COLORS = ['#0088FE', '#00C49F', '#FFBB28', '#FF8042', '#8884d8', '#82ca9d', '#ffc658', '#8dd1e1'];
+  // Enhanced colors with better contrast
+  const COLORS = [
+    '#0088FE', '#00C49F', '#FFBB28', '#FF8042', 
+    '#8884d8', '#82ca9d', '#ffc658', '#8dd1e1',
+    '#a4de6c', '#d0ed57', '#83a6ed', '#8884d8',
+    '#fa8072', '#ff6347', '#ff7f50', '#ffa500'
+  ];
 
   useEffect(() => {
     const fetchRealData = async () => {
@@ -62,7 +69,13 @@ const WealthDistribution = () => {
         console.log('Attempting to fetch real data from:', `${API_BASE_URL}/wealth/top-holders`);
         
         // Attempt to fetch real data first
-        const holdersResponse = await fetch(`${API_BASE_URL}/wealth/top-holders?limit=100`);
+        const holdersResponse = await fetch(`${API_BASE_URL}/wealth/top-holders?limit=100&v=${dataVersion}`, {
+          headers: {
+            'Cache-Control': 'no-cache, no-store, must-revalidate',
+            'Pragma': 'no-cache',
+            'Expires': '0'
+          }
+        });
         
         if (!holdersResponse.ok) {
           console.error('Holders response not OK:', holdersResponse.status, holdersResponse.statusText);
@@ -83,7 +96,13 @@ const WealthDistribution = () => {
         
         // Fetch distribution data
         console.log('Fetching distribution data from:', `${API_BASE_URL}/wealth/distribution`);
-        const distributionResponse = await fetch(`${API_BASE_URL}/wealth/distribution`);
+        const distributionResponse = await fetch(`${API_BASE_URL}/wealth/distribution?v=${dataVersion}`, {
+          headers: {
+            'Cache-Control': 'no-cache, no-store, must-revalidate',
+            'Pragma': 'no-cache',
+            'Expires': '0'
+          }
+        });
         
         if (!distributionResponse.ok) {
           console.error('Distribution response not OK:', distributionResponse.status, distributionResponse.statusText);
@@ -128,7 +147,7 @@ const WealthDistribution = () => {
     
     // Start by trying to fetch real data
     fetchRealData();
-  }, [showToast]);
+  }, [showToast, dataVersion]);
 
   // Format number with commas
   const formatNumber = (num) => {
@@ -138,6 +157,13 @@ const WealthDistribution = () => {
   // Format percentage
   const formatPercentage = (percent) => {
     return percent.toFixed(4) + '%';
+  };
+
+  // Format address for better readability
+  const formatAddress = (address) => {
+    if (!address) return '';
+    // Take first 6 and last 4 characters
+    return `${address.substring(0, 6)}...${address.substring(address.length - 4)}`;
   };
 
   // Prepare data for pie chart
@@ -151,12 +177,14 @@ const WealthDistribution = () => {
     
     const chartData = [
       ...topN.map(holder => ({
-        name: holder.address.substring(0, 6) + '...' + holder.address.substring(holder.address.length - 4),
+        name: formatAddress(holder.address),
+        fullAddress: holder.address,
         value: holder.balance,
         percentage: holder.percentageOfSupply
       })),
       {
         name: 'Others',
+        fullAddress: 'Multiple addresses',
         value: othersSum,
         percentage: othersPercentage
       }
@@ -180,7 +208,8 @@ const WealthDistribution = () => {
       return (
         <div className="bg-white p-3 border rounded shadow-md">
           <p className="font-semibold">{payload[0].name}</p>
-          <p className="text-sm">Balance: {formatNumber(payload[0].value)} BTCZ</p>
+          <p className="text-sm text-gray-600 break-all">{payload[0].payload.fullAddress}</p>
+          <p className="text-sm mt-1">Balance: {formatNumber(payload[0].value)} BTCZ</p>
           <p className="text-sm">Percentage: {formatPercentage(payload[0].payload.percentage)}</p>
         </div>
       );
@@ -191,8 +220,17 @@ const WealthDistribution = () => {
   // Force refresh data
   const handleRefreshData = () => {
     setLoading(true);
-    // Fetch real data again
-    fetch(`${API_BASE_URL}/wealth/top-holders?limit=100`)
+    // Increment data version to force a new fetch and prevent caching
+    setDataVersion(prev => prev + 1);
+    
+    // Force a complete refresh by directly fetching the data again
+    fetch(`${API_BASE_URL}/wealth/top-holders?limit=100&v=${Date.now()}`, {
+      headers: {
+        'Cache-Control': 'no-cache, no-store, must-revalidate',
+        'Pragma': 'no-cache',
+        'Expires': '0'
+      }
+    })
       .then(response => {
         if (!response.ok) throw new Error('Failed to fetch top holders');
         return response.json();
@@ -201,7 +239,13 @@ const WealthDistribution = () => {
         setTopHolders(holdersData.topHolders);
         setTotalSupply(holdersData.totalSupply);
         
-        return fetch(`${API_BASE_URL}/wealth/distribution`);
+        return fetch(`${API_BASE_URL}/wealth/distribution?v=${Date.now()}`, {
+          headers: {
+            'Cache-Control': 'no-cache, no-store, must-revalidate',
+            'Pragma': 'no-cache',
+            'Expires': '0'
+          }
+        });
       })
       .then(response => {
         if (!response.ok) throw new Error('Failed to fetch distribution');
@@ -222,7 +266,7 @@ const WealthDistribution = () => {
   };
 
   return (
-    <div className="max-w-7xl mx-auto">
+    <div className="wealth-distribution-container w-full max-w-none px-4 mx-auto">
       <div className="bg-white rounded-lg shadow-md p-6 mb-8">
         <div className="flex justify-between items-center mb-4">
           <h1 className="text-3xl font-bold text-gray-800">
@@ -291,11 +335,11 @@ const WealthDistribution = () => {
           <>
             {activeTab === 'topHolders' && (
               <div>
-                <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-8">
-                  {/* Pie Chart */}
-                  <div className="bg-gray-50 p-4 rounded-lg shadow-sm">
+                <div className="grid grid-cols-1 xl:grid-cols-3 gap-6 mb-8">
+                  {/* Pie Chart - Larger and 3D */}
+                  <div className="bg-gray-50 p-4 rounded-lg shadow-sm xl:col-span-2">
                     <h3 className="text-lg font-semibold mb-4">Top Holders Distribution</h3>
-                    <div className="h-80">
+                    <div className="h-96"> {/* Increased height for larger chart */}
                       <ResponsiveContainer width="100%" height="100%">
                         <PieChart>
                           <Pie
@@ -303,18 +347,30 @@ const WealthDistribution = () => {
                             cx="50%"
                             cy="50%"
                             labelLine={false}
-                            outerRadius={80}
+                            outerRadius={120} /* Increased size */
+                            innerRadius={40} /* Added inner radius for 3D effect */
                             fill="#8884d8"
                             dataKey="value"
                             nameKey="name"
-                            label={({ name, percent }) => `${name} (${(percent * 100).toFixed(2)}%)`}
+                            paddingAngle={2} /* Added padding for 3D effect */
+                            label={({ name, percent }) => `${name} (${(percent * 100).toFixed(1)}%)`}
                           >
                             {preparePieChartData().map((entry, index) => (
-                              <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
+                              <Cell 
+                                key={`cell-${index}`} 
+                                fill={COLORS[index % COLORS.length]} 
+                                stroke="#ffffff"
+                                strokeWidth={2}
+                              />
                             ))}
                           </Pie>
                           <Tooltip content={<CustomTooltip />} />
-                          <Legend />
+                          <Legend 
+                            layout="vertical" 
+                            verticalAlign="middle" 
+                            align="right"
+                            wrapperStyle={{ fontSize: '12px' }}
+                          />
                         </PieChart>
                       </ResponsiveContainer>
                     </div>
@@ -352,28 +408,32 @@ const WealthDistribution = () => {
                   </div>
                 </div>
                 
-                {/* Top Holders Table */}
+                {/* Top Holders Table - Improved readability */}
                 <div className="overflow-x-auto">
                   <table className="min-w-full bg-white rounded-lg overflow-hidden">
                     <thead className="bg-gray-100">
                       <tr>
-                        <th className="py-3 px-4 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Rank</th>
+                        <th className="py-3 px-4 text-left text-xs font-medium text-gray-500 uppercase tracking-wider w-16">Rank</th>
                         <th className="py-3 px-4 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Address</th>
-                        <th className="py-3 px-4 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Balance (BTCZ)</th>
-                        <th className="py-3 px-4 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">% of Supply</th>
-                        <th className="py-3 px-4 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Transactions</th>
+                        <th className="py-3 px-4 text-left text-xs font-medium text-gray-500 uppercase tracking-wider w-1/5">Balance (BTCZ)</th>
+                        <th className="py-3 px-4 text-left text-xs font-medium text-gray-500 uppercase tracking-wider w-1/6">% of Supply</th>
+                        <th className="py-3 px-4 text-left text-xs font-medium text-gray-500 uppercase tracking-wider w-1/6">Transactions</th>
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-gray-200">
                       {topHolders.map((holder, index) => (
                         <tr key={holder.address} className={index % 2 === 0 ? 'bg-white' : 'bg-gray-50'}>
                           <td className="py-3 px-4 text-sm font-medium text-gray-900">{index + 1}</td>
-                          <td className="py-3 px-4 text-sm text-blue-600 hover:text-blue-800">
-                            <a href={`/address/${holder.address}`}>
+                          <td className="py-3 px-4 text-sm">
+                            <a 
+                              href={`/address/${holder.address}`}
+                              className="text-blue-600 hover:text-blue-800 font-mono text-xs break-all"
+                              title={holder.address}
+                            >
                               {holder.address}
                             </a>
                           </td>
-                          <td className="py-3 px-4 text-sm text-gray-900">{formatNumber(holder.balance)}</td>
+                          <td className="py-3 px-4 text-sm text-gray-900 font-medium">{formatNumber(holder.balance)}</td>
                           <td className="py-3 px-4 text-sm text-gray-900">{formatPercentage(holder.percentageOfSupply)}</td>
                           <td className="py-3 px-4 text-sm text-gray-900">{formatNumber(holder.txCount)}</td>
                         </tr>
@@ -389,7 +449,7 @@ const WealthDistribution = () => {
                 {/* Bar Chart */}
                 <div className="bg-gray-50 p-4 rounded-lg shadow-sm mb-8">
                   <h3 className="text-lg font-semibold mb-4">Address Distribution by Balance Range</h3>
-                  <div className="h-80">
+                  <div className="h-96">
                     <ResponsiveContainer width="100%" height="100%">
                       <BarChart
                         data={prepareBarChartData()}
@@ -425,9 +485,9 @@ const WealthDistribution = () => {
                   <table className="min-w-full bg-white rounded-lg overflow-hidden">
                     <thead className="bg-gray-100">
                       <tr>
-                        <th className="py-3 px-4 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Balance Range (BTCZ)</th>
-                        <th className="py-3 px-4 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Number of Addresses</th>
-                        <th className="py-3 px-4 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">% of Total Addresses</th>
+                        <th className="py-3 px-4 text-left text-xs font-medium text-gray-500 uppercase tracking-wider w-1/3">Balance Range (BTCZ)</th>
+                        <th className="py-3 px-4 text-left text-xs font-medium text-gray-500 uppercase tracking-wider w-1/3">Number of Addresses</th>
+                        <th className="py-3 px-4 text-left text-xs font-medium text-gray-500 uppercase tracking-wider w-1/3">% of Total Addresses</th>
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-gray-200">

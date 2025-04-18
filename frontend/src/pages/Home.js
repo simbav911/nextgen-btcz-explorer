@@ -145,7 +145,7 @@ const Home = () => {
   }, [latestTransactions]);
   
   return (
-    <div>
+    <div className="container-custom">
       {/* Hero section with search */}
       <div className="bg-gradient-to-r from-bitcoinz-700 to-bitcoinz-900 text-white py-16 px-4 rounded-lg mb-8">
         <div className="max-w-3xl mx-auto text-center">

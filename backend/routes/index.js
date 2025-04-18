@@ -7,6 +7,11 @@ const transactionRoutes = require('./transactionRoutes');
 const addressRoutes = require('./addressRoutes');
 const statsRoutes = require('./statsRoutes');
 const searchRoutes = require('./searchRoutes');
+const chartsRoutes = require('./chartsRoutes');
+const testRoutes = require('./testRoutes');
+
+// Console log to verify the routes are being loaded
+console.log('Loading routes modules...');
 
 // Use route modules
 router.use('/blocks', blockRoutes);
@@ -14,6 +19,14 @@ router.use('/transactions', transactionRoutes);
 router.use('/addresses', addressRoutes);
 router.use('/stats', statsRoutes);
 router.use('/search', searchRoutes);
+router.use('/charts', chartsRoutes);
+router.use('/test', testRoutes);
+
+// Direct route for testing
+router.get('/ping', (req, res) => {
+  console.log('Ping endpoint hit directly on index router');
+  res.json({ success: true, message: 'Pong!' });
+});
 
 // Root endpoint - API info
 router.get('/', (req, res) => {
@@ -25,7 +38,8 @@ router.get('/', (req, res) => {
       transactions: '/api/transactions',
       addresses: '/api/addresses',
       stats: '/api/stats',
-      search: '/api/search'
+      search: '/api/search',
+      charts: '/api/charts'
     }
   });
 });

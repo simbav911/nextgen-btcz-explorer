@@ -29,7 +29,13 @@ app.use(express.urlencoded({ extended: true }));
 setupSocket(io);
 
 // API Routes
+console.log('Mounting API routes at /api');
 app.use('/api', routes);
+
+// Direct test route at root level
+app.get('/test-root', (req, res) => {
+  res.json({ message: 'Root test endpoint working' });
+});
 
 // Error handling middleware
 app.use((err, req, res, next) => {

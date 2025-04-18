@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { Link } from 'react-router-dom';
-import { FaSearch } from 'react-icons/fa';
+import { FaSearch, FaCoins } from 'react-icons/fa';
 
 // Modern Header component - simple, clean and beautiful
 const ModernHeader = () => {
@@ -50,6 +50,9 @@ const ModernHeader = () => {
             </Link>
             <Link to="/transactions" className="text-blue-100 hover:text-white px-3 py-2 rounded-md text-sm font-medium hover:bg-blue-800 transition-colors">
               Transactions
+            </Link>
+            <Link to="/wealth-distribution" className="text-blue-100 hover:text-white px-3 py-2 rounded-md text-sm font-medium hover:bg-blue-800 transition-colors flex items-center">
+              <FaCoins className="mr-1" /> Wealth Distribution
             </Link>
             <Link to="/stats" className="text-blue-100 hover:text-white px-3 py-2 rounded-md text-sm font-medium hover:bg-blue-800 transition-colors">
               Statistics

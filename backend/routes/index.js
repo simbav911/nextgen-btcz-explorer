@@ -8,6 +8,7 @@ const addressRoutes = require('./addressRoutes');
 const statsRoutes = require('./statsRoutes');
 const searchRoutes = require('./searchRoutes');
 const chartsRoutes = require('./chartsRoutes');
+const wealthRoutes = require('./wealthRoutes');
 
 // Use route modules
 router.use('/blocks', blockRoutes);
@@ -16,6 +17,7 @@ router.use('/addresses', addressRoutes);
 router.use('/stats', statsRoutes);
 router.use('/search', searchRoutes);
 router.use('/charts', chartsRoutes);
+router.use('/wealth', wealthRoutes);
 
 // Root endpoint - API info
 router.get('/', (req, res) => {
@@ -28,7 +30,8 @@ router.get('/', (req, res) => {
       addresses: '/api/addresses',
       stats: '/api/stats',
       search: '/api/search',
-      charts: '/api/charts'
+      charts: '/api/charts',
+      wealth: '/api/wealth'
     }
   });
 });

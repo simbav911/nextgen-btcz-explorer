@@ -18,6 +18,7 @@ import Status from './pages/Status';
 import Charts from './pages/Charts';
 import Search from './pages/Search';
 import NotFound from './pages/NotFound';
+import WealthDistribution from './pages/WealthDistribution';
 
 // Context
 import { SocketContext } from './contexts/SocketContext';
@@ -103,6 +104,7 @@ function App({ skipHeader = false }) {
               <Route path="/address/:address" element={<Address />} />
               <Route path="/stats" element={<Status />} />
               <Route path="/charts" element={<Charts />} />
+              <Route path="/wealth-distribution" element={<WealthDistribution />} />
               <Route path="/search" element={<Search />} />
               <Route path="*" element={<NotFound />} />
             </Routes>

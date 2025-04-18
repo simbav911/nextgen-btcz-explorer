@@ -12,14 +12,6 @@ body {
 header {
   position: static !important;
   z-index: 1000;
-  transition: none !important;
-  animation: none !important;
-}
-
-/* Prevent all transitions in the header */
-header * {
-  transition: none !important;
-  animation: none !important;
 }
 
 /* Custom Components */

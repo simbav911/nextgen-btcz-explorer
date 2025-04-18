@@ -3,6 +3,7 @@ import { Routes, Route } from 'react-router-dom';
 import { io } from 'socket.io-client';
 
 // Components
+import ModernHeader from './components/ModernHeader';
 import Footer from './components/Footer';
 import Toast from './components/Toast';
 
@@ -13,7 +14,8 @@ import Transaction from './pages/Transaction';
 import Address from './pages/Address';
 import BlockList from './pages/BlockList';
 import TransactionList from './pages/TransactionList';
-import Stats from './pages/Stats';
+import Status from './pages/Status';
+import Charts from './pages/Charts';
 import Search from './pages/Search';
 import NotFound from './pages/NotFound';
 
@@ -24,52 +26,7 @@ import { ToastContext } from './contexts/ToastContext';
 // API Configuration
 const SOCKET_URL = process.env.REACT_APP_SOCKET_URL || 'http://localhost:3000';
 
-// Modern Header component - no state, no props, no context
-const ModernHeader = () => (
-  <header 
-    className="bg-gradient-to-r from-blue-900 to-blue-700 shadow-lg" 
-    style={{ position: "static", zIndex: 1000 }} 
-  >
-    <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-      <div className="flex justify-between items-center h-16">
-        {/* Logo and Title */}
-        <div className="flex items-center">
-          <div className="flex-shrink-0 w-10">
-            <img 
-              src="/logo.png" 
-              alt="BitcoinZ" 
-              className="h-10 w-10"
-              onError={(e) => {
-                e.target.onerror = null;
-                e.target.src = 'https://bitcoinz.global/wp-content/uploads/branding/btcz-website-logo.png';
-              }}
-            />
-          </div>
-          <div className="ml-3 flex flex-col">
-            <span className="font-bold text-xl text-white tracking-wide">BitcoinZ</span>
-            <span className="text-xs text-blue-200 tracking-wider">Explorer</span>
-          </div>
-        </div>
-
-        {/* Navigation Links */}
-        <nav className="flex space-x-8">
-          <a href="/" className="text-blue-100 hover:text-white px-3 py-2 rounded-md text-sm font-medium hover:bg-blue-800 transition-colors">
-            Home
-          </a>
-          <a href="/blocks" className="text-blue-100 hover:text-white px-3 py-2 rounded-md text-sm font-medium hover:bg-blue-800 transition-colors">
-            Blocks
-          </a>
-          <a href="/transactions" className="text-blue-100 hover:text-white px-3 py-2 rounded-md text-sm font-medium hover:bg-blue-800 transition-colors">
-            Transactions
-          </a>
-          <a href="/stats" className="text-blue-100 hover:text-white px-3 py-2 rounded-md text-sm font-medium hover:bg-blue-800 transition-colors">
-            Statistics
-          </a>
-        </nav>
-      </div>
-    </div>
-  </header>
-);
+// Using the DarkHeader component instead of defining it here
 
 function App({ skipHeader = false }) {
   const socketRef = useRef(null);
@@ -144,7 +101,8 @@ function App({ skipHeader = false }) {
               <Route path="/transactions" element={<TransactionList />} />
               <Route path="/tx/:txid" element={<Transaction />} />
               <Route path="/address/:address" element={<Address />} />
-              <Route path="/stats" element={<Stats />} />
+              <Route path="/stats" element={<Status />} />
+              <Route path="/charts" element={<Charts />} />
               <Route path="/search" element={<Search />} />
               <Route path="*" element={<NotFound />} />
             </Routes>

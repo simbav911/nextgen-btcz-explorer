@@ -2,6 +2,10 @@
 @tailwind components;
 @tailwind utilities;
 
+html, body {
+  min-height: 100vh;
+}
+
 body {
   @apply bg-gray-50 text-gray-900;
   -webkit-font-smoothing: antialiased;
@@ -99,5 +103,103 @@ header {
   /* Override parent container constraints for wealth distribution page */
   main > .wealth-distribution-container {
     max-width: none !important;
+  }
+
+  /* Blue shadow effect for tables - more prominent version */
+  .blue-shadow-effect {
+    position: relative;
+    z-index: 10;
+    box-shadow: 0 0 30px 5px rgba(59, 130, 246, 0.5) !important;
+  }
+
+  /* Add this specific style for the blocks table */
+  .blocks-table-container {
+    box-shadow: 
+      0 10px 25px -5px rgba(59, 130, 246, 0.4),
+      0 5px 10px -5px rgba(37, 99, 235, 0.5),
+      0 0 0 1px rgba(59, 130, 246, 0.1) !important;
+    position: relative;
+  }
+
+  .blocks-table-container::after {
+    content: '';
+    position: absolute;
+    top: -2px;
+    left: -2px;
+    right: -2px;
+    bottom: -2px;
+    background: linear-gradient(to bottom, rgba(59, 130, 246, 0.2), rgba(37, 99, 235, 0.1));
+    border-radius: 16px;
+    z-index: -1;
+    filter: blur(15px);
+  }
+
+  /* Animation for total blocks counter */
+  .total-blocks-counter {
+    background: linear-gradient(to right, rgba(59, 130, 246, 0.1), rgba(37, 99, 235, 0.05));
+    padding: 0.5rem 1rem;
+    border-radius: 8px;
+    box-shadow: 0 2px 10px rgba(59, 130, 246, 0.1);
+    display: inline-flex;
+    align-items: center;
+  }
+
+  .total-blocks-counter span {
+    position: relative;
+    display: inline-block;
+    color: #2563eb;
+    font-weight: 700;
+    text-shadow: 0 0 1px rgba(37, 99, 235, 0.3);
+  }
+
+  /* Animation for digit changes */
+  .digit-animation {
+    animation: pulse 0.5s ease-in-out;
+  }
+
+  @keyframes pulse {
+    0% {
+      transform: scale(1);
+    }
+    50% {
+      transform: scale(1.2);
+      color: #1d4ed8;
+      text-shadow: 0 0 8px rgba(37, 99, 235, 0.5);
+    }
+    100% {
+      transform: scale(1);
+    }
+  }
+
+  /* Stylish page headers */
+  .page-title {
+    position: relative;
+    font-weight: 800;
+    background: linear-gradient(135deg, #2563eb, #3b82f6, #60a5fa);
+    background-clip: text;
+    -webkit-background-clip: text;
+    color: transparent;
+    letter-spacing: -0.02em;
+    padding: 0.5rem 1rem;
+    border-radius: 8px;
+    display: inline-flex;
+    align-items: center;
+    filter: drop-shadow(0 1px 2px rgba(0, 0, 0, 0.1));
+  }
+
+  .page-title::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background: linear-gradient(to right, rgba(59, 130, 246, 0.1), rgba(37, 99, 235, 0.05));
+    border-radius: 8px;
+    z-index: -1;
+  }
+
+  .page-title svg {
+    filter: drop-shadow(0 2px 4px rgba(37, 99, 235, 0.3));
+    color: #3b82f6 !important;
+    font-size: 1.5em;
+    margin-right: 0.75rem !important;
   }
 }

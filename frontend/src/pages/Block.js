@@ -29,6 +29,44 @@ const Block = () => {
   
   const txsPerPage = 20;
   
+  // Helper function to decode hex to ASCII
+  const hexToAscii = (hex) => {
+    try {
+      let str = '';
+      for (let i = 0; i < hex.length; i += 2) {
+        const charCode = parseInt(hex.substr(i, 2), 16);
+        if (charCode >= 32 && charCode <= 126) {
+          str += String.fromCharCode(charCode);
+        }
+      }
+      return str;
+    } catch (e) {
+      return '';
+    }
+  };
+
+  // Get pool URL based on pool name
+  const getPoolUrl = (poolName) => {
+    const poolUrls = {
+      'Zergpool': 'https://zergpool.com',
+      'Zpool': 'https://zpool.ca',
+      'Z-NOMP': 'https://github.com/z-classic/z-nomp',
+      'DarkFiberMines': 'https://darkfibermines.com',
+      '2Mars': 'https://2mars.io',
+      'Solo Pool': 'https://solo-pool.com',
+      'F2Pool': 'https://www.f2pool.com',
+      'ViaBTC': 'https://www.viabtc.com',
+      'BTCZ Pool': 'https://btcz.pool.com',
+      'SlushPool': 'https://slushpool.com',
+      'AntPool': 'https://www.antpool.com',
+      'BTC.COM': 'https://btc.com',
+      'Poolin': 'https://www.poolin.com',
+      'MiningPoolHub': 'https://miningpoolhub.com'
+    };
+    
+    return poolUrls[poolName] || `https://www.google.com/search?q=${encodeURIComponent(poolName)}+mining+pool`;
+  };
+
   // Fetch block data
   useEffect(() => {
     const fetchBlock = async () => {
@@ -100,69 +138,77 @@ const Block = () => {
   
   // Extract miner information if available
   const extractMinerInfo = async () => {
-    if (!block) return 'Unknown';
+    if (!block) return { name: 'Unknown Pool', url: null };
     
     try {
-      // Try to use the backend API to get mining pool information
-      const response = await api.get('/charts/mined-block');
+      // First, let's check if we have a coinbase transaction
+      const coinbaseTx = transactions.find(tx => 
+        tx.vin && tx.vin.length > 0 && tx.vin.some(input => input.coinbase)
+      );
       
-      if (response.data && response.data.data) {
-        // The API returns mining pool data for recent blocks
-        // We need to check if our block's hash or coinbase transaction matches
+      if (coinbaseTx) {
+        // Common mining pools often include their name in the coinbase signature
+        const knownPools = {
+          'Zerg': 'Zergpool',
+          'zergpool': 'Zergpool',
+          'zpool': 'Zpool',
+          'Z-NOMP': 'Z-NOMP',
+          'darkfibermines': 'DarkFiberMines',
+          '2miners': '2Mars',
+          'solopool': 'Solo Pool',
+          'f2pool': 'F2Pool',
+          'viabtc': 'ViaBTC',
+          'btcz.pool': 'BTCZ Pool',
+          'slush': 'SlushPool',
+          'antpool': 'AntPool',
+          'btc.com': 'BTC.COM',
+          'poolin': 'Poolin'
+        };
         
-        // First, let's check if we have a coinbase transaction
-        const coinbaseTx = transactions.find(tx => 
-          tx.vin && tx.vin.length > 0 && tx.vin.some(input => input.coinbase)
-        );
-        
-        if (coinbaseTx) {
-          // Common mining pools often include their name in the coinbase signature
-          const knownPools = {
-            'Zerg': 'Zergpool',
-            'zergpool': 'Zergpool',
-            '/slush/': 'SlushPool',
-            'Mined by AntPool': 'AntPool',
-            '/BTC.COM/': 'BTC.COM',
-            'ViaBTC': 'ViaBTC',
-            'F2Pool': 'F2Pool',
-            'Poolin': 'Poolin',
-            'btcz.pool': 'BTCZ Pool',
-            'solopool': 'Solo Pool',
-            '2miners': '2Mars'
-          };
+        // Check if any known pool signature is in the coinbase data
+        if (coinbaseTx.vin[0].coinbase) {
+          const coinbaseHex = coinbaseTx.vin[0].coinbase;
+          // Convert hex to ASCII to check for pool signatures
+          const coinbaseAscii = hexToAscii(coinbaseHex);
           
-          // Check if any known pool signature is in the coinbase data
-          if (coinbaseTx.vin[0].coinbase) {
-            const coinbaseHex = coinbaseTx.vin[0].coinbase;
-            try {
-              // Convert hex to ASCII to check for pool signatures
-              const coinbaseAscii = Buffer.from(coinbaseHex, 'hex').toString('ascii');
-              
-              for (const [signature, poolName] of Object.entries(knownPools)) {
-                if (coinbaseAscii.includes(signature)) {
-                  return poolName;
-                }
-              }
-            } catch (e) {
-              // If conversion fails, just continue
+          for (const [signature, poolName] of Object.entries(knownPools)) {
+            if (coinbaseAscii.toLowerCase().includes(signature.toLowerCase())) {
+              return { 
+                name: poolName, 
+                url: getPoolUrl(poolName) 
+              };
             }
           }
           
-          // If we have output addresses, check if they match known mining pools
-          if (coinbaseTx.vout && coinbaseTx.vout.length > 0) {
-            const firstOutput = coinbaseTx.vout[0];
-            if (firstOutput.scriptPubKey && firstOutput.scriptPubKey.addresses) {
-              const address = firstOutput.scriptPubKey.addresses[0];
-              
-              // Check if address matches any known mining pool addresses
-              const knownAddresses = {
-                't1VpYDGfKR8jkGc5LCCRj7PUdHTsRmwxeQc': 'Zergpool',
-                't1N1LNyPpYRbBFoVZBsUgcuMZiGHyBJcmRN': 'MiningPoolHub'
+          // Look for anything that might be a pool name
+          const nameMatch = coinbaseAscii.match(/([A-Za-z0-9]+\s*Pool|[A-Za-z0-9]+\s*Miner)/);
+          if (nameMatch) {
+            const poolName = nameMatch[0];
+            return { 
+              name: poolName, 
+              url: getPoolUrl(poolName) 
+            };
+          }
+        }
+        
+        // If we have output addresses, check if they match known mining pools
+        if (coinbaseTx.vout && coinbaseTx.vout.length > 0) {
+          const firstOutput = coinbaseTx.vout[0];
+          if (firstOutput.scriptPubKey && firstOutput.scriptPubKey.addresses) {
+            const address = firstOutput.scriptPubKey.addresses[0];
+            
+            // Check if address matches any known mining pool addresses
+            const knownAddresses = {
+              't1VpYDGfKR8jkGc5LCCRj7PUdHTsRmwxeQc': 'Zergpool',
+              't1N1LNyPpYRbBFoVZBsUgcuMZiGHyBJcmRN': 'MiningPoolHub'
+            };
+            
+            if (knownAddresses[address]) {
+              const poolName = knownAddresses[address];
+              return { 
+                name: poolName, 
+                url: getPoolUrl(poolName) 
               };
-              
-              if (knownAddresses[address]) {
-                return knownAddresses[address];
-              }
             }
           }
         }
@@ -171,17 +217,18 @@ const Block = () => {
       console.error('Error fetching mining pool data:', error);
     }
     
-    return 'Unknown';
+    return { name: 'Unknown Pool', url: null };
   };
   
   // Add miner information when available
   useEffect(() => {
     if (block && transactions.length > 0) {
-      extractMinerInfo().then(minerName => {
-        if (minerName !== 'Unknown') {
+      extractMinerInfo().then(minerInfo => {
+        if (minerInfo.name !== 'Unknown Pool') {
           setBlock(prevBlock => ({
             ...prevBlock,
-            minerInfo: minerName
+            minerInfo: minerInfo.name,
+            minerUrl: minerInfo.url
           }));
         }
       });
@@ -223,7 +270,11 @@ const Block = () => {
   if (block.minerInfo) {
     blockDetails.push({ 
       label: 'Mined by', 
-      value: block.minerInfo
+      value: block.minerUrl ? (
+        <a href={block.minerUrl} target="_blank" rel="noopener noreferrer" className="text-bitcoinz-600 hover:underline">
+          {block.minerInfo}
+        </a>
+      ) : block.minerInfo
     });
   }
   

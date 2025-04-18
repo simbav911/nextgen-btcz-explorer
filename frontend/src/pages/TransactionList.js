@@ -99,11 +99,46 @@ const TransactionList = () => {
     window.scrollTo({ top: 0, behavior: 'smooth' });
   };
   
+  // --- Improved Transaction type classifier ---
+  function classifyTxType(tx) {
+    const isCoinbase = tx.vin && tx.vin.length > 0 && !!tx.vin[0].coinbase;
+    if (isCoinbase) return 'coinbase';
+
+    // Shielded fields
+    const hasValueBalance = typeof tx.valueBalance === 'number' && tx.valueBalance !== 0;
+    const hasVJoinSplit = tx.vjoinsplit && tx.vjoinsplit.length > 0;
+    const hasShieldedSpends = tx.vShieldedSpend && tx.vShieldedSpend.length > 0;
+    const hasShieldedOutputs = tx.vShieldedOutput && tx.vShieldedOutput.length > 0;
+
+    // Transparent fields
+    const hasTransparentInputs = tx.vin && tx.vin.some(v => v.address);
+    const hasTransparentOutputs = tx.vout && tx.vout.some(v => v.scriptPubKey && v.scriptPubKey.addresses);
+
+    // t->z: Shielding (transparent input, shielded output, valueBalance<0)
+    if ((hasTransparentInputs || tx.vin?.length > 0) && (hasValueBalance && tx.valueBalance < 0 || hasShieldedOutputs || hasVJoinSplit) && !hasShieldedSpends) {
+      return 't2z';
+    }
+    // z->t: Deshielding (shielded input, transparent output, valueBalance>0)
+    if ((hasShieldedSpends || hasVJoinSplit || (hasValueBalance && tx.valueBalance > 0)) && (hasTransparentOutputs || tx.vout?.length > 0)) {
+      return 'z2t';
+    }
+    // z->z: Fully shielded (shielded spends and outputs, no transparent)
+    if ((hasShieldedSpends || hasVJoinSplit) && (hasShieldedOutputs || hasVJoinSplit) && !hasTransparentInputs && !hasTransparentOutputs) {
+      return 'z2z';
+    }
+    // t->t: Fully transparent
+    if (hasTransparentInputs && hasTransparentOutputs && !hasShieldedSpends && !hasShieldedOutputs && !hasVJoinSplit && !hasValueBalance) {
+      return 't2t';
+    }
+    // Fallback
+    return 'other';
+  }
+  
   return (
     <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pb-12">
       <div className="flex justify-between items-center mb-6">
-        <h1 className="text-3xl font-bold flex items-center">
-          <FaExchangeAlt className="text-bitcoinz-600 mr-3" />
+        <h1 className="page-title">
+          <FaExchangeAlt />
           Transactions
         </h1>
       </div>
@@ -114,17 +149,68 @@ const TransactionList = () => {
         <>
           <div className="space-y-4 mb-6">
             {transactions.map(tx => {
-              const isCoinbase = tx.vin && tx.vin.length > 0 && !!tx.vin[0].coinbase;
+              const txType = classifyTxType(tx);
+              const isCoinbase = txType === 'coinbase';
+
+              // Style map
+              const styleMap = {
+                coinbase: {
+                  bg: 'bg-gradient-to-br from-yellow-50 via-yellow-100 to-white',
+                  border: '6px solid #facc15',
+                  iconBg: 'bg-yellow-200',
+                  icon: <FaCoins className="text-yellow-600" size={16} />,
+                  label: 'Coinbase',
+                  labelClass: 'bg-yellow-100 text-yellow-700',
+                },
+                t2z: {
+                  bg: 'bg-gradient-to-br from-purple-50 via-purple-100 to-white',
+                  border: '6px solid #a78bfa',
+                  iconBg: 'bg-purple-200',
+                  icon: <FaArrowRight className="text-purple-600" size={16} />,
+                  label: 't→z',
+                  labelClass: 'bg-purple-100 text-purple-700',
+                },
+                z2t: {
+                  bg: 'bg-gradient-to-br from-teal-50 via-green-100 to-white',
+                  border: '6px solid #14b8a6',
+                  iconBg: 'bg-teal-200',
+                  icon: <FaArrowRight className="text-teal-600" size={16} />,
+                  label: 'z→t',
+                  labelClass: 'bg-teal-100 text-teal-700',
+                },
+                z2z: {
+                  bg: 'bg-gradient-to-br from-blue-50 via-blue-200 to-white',
+                  border: '6px solid #2563eb',
+                  iconBg: 'bg-blue-300',
+                  icon: <FaArrowRight className="text-blue-800" size={16} />,
+                  label: 'z→z',
+                  labelClass: 'bg-blue-200 text-blue-800',
+                },
+                t2t: {
+                  bg: 'bg-gradient-to-br from-blue-50 via-white to-blue-100',
+                  border: '6px solid #38bdf8',
+                  iconBg: 'bg-blue-200',
+                  icon: <FaExchangeAlt className="text-blue-600" size={16} />,
+                  label: 't→t',
+                  labelClass: 'bg-blue-100 text-blue-700',
+                },
+                other: {
+                  bg: 'bg-gradient-to-br from-gray-50 via-gray-100 to-white',
+                  border: '6px solid #a3a3a3',
+                  iconBg: 'bg-gray-200',
+                  icon: <FaExchangeAlt className="text-gray-600" size={16} />,
+                  label: 'Other',
+                  labelClass: 'bg-gray-100 text-gray-700',
+                },
+              };
+              const style = styleMap[txType] || styleMap.other;
+
               return (
                 <div
                   key={tx.txid}
-                  className={`relative rounded-xl overflow-hidden shadow-md transition-shadow duration-200 border border-gray-100 hover:shadow-xl ${
-                    isCoinbase
-                      ? 'bg-gradient-to-br from-yellow-50 via-yellow-100 to-white'
-                      : 'bg-gradient-to-br from-blue-50 via-white to-blue-100'
-                  }`}
+                  className={`relative rounded-xl overflow-hidden shadow-md transition-shadow duration-200 border border-gray-100 hover:shadow-xl ${style.bg}`}
                   style={{
-                    borderLeft: isCoinbase ? '6px solid #facc15' : '6px solid #38bdf8',
+                    borderLeft: style.border,
                     boxShadow: '0 2px 8px 0 rgba(56, 189, 248, 0.07)'
                   }}
                 >
@@ -133,16 +219,14 @@ const TransactionList = () => {
                       <div className="flex flex-col md:flex-row justify-between">
                         {/* Left side - Transaction info */}
                         <div className="flex items-start space-x-3 mb-3 md:mb-0 md:w-2/5">
-                          <div className={`${isCoinbase ? 'bg-yellow-200' : 'bg-blue-200'} p-2 rounded-full flex-shrink-0 mt-1 shadow-sm`}>
-                            {isCoinbase ? 
-                              <FaCoins className="text-yellow-600" size={16} /> : 
-                              <FaExchangeAlt className="text-blue-600" size={16} />
-                            }
+                          <div className={`${style.iconBg} p-2 rounded-full flex-shrink-0 mt-1 shadow-sm`}>
+                            {style.icon}
                           </div>
                           <div>
                             <h3 className="text-base font-semibold flex items-center">
                               {isCoinbase ? 'Coinbase Transaction' : 'Transaction'}
-                              <span className={`ml-2 text-xs py-0.5 px-2 rounded-full font-semibold ${isCoinbase ? 'bg-yellow-100 text-yellow-700' : 'bg-blue-100 text-blue-700'}`}>{tx.confirmations > 0 ? `${tx.confirmations} Confirms` : 'Unconfirmed'}</span>
+                              <span className={`ml-2 text-xs py-0.5 px-2 rounded-full font-semibold ${style.labelClass}`}>{style.label}</span>
+                              <span className="ml-2 text-xs py-0.5 px-2 rounded font-semibold bg-gray-50 text-gray-400 border border-gray-100">{tx.confirmations > 0 ? `${tx.confirmations} Confirms` : 'Unconfirmed'}</span>
                             </h3>
                             <div className="text-xs text-gray-500 mt-1">
                               <div className="flex items-center">

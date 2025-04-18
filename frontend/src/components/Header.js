@@ -1,23 +1,11 @@
-import React, { useState } from 'react';
+import React from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { FaSearch, FaBars, FaTimes } from 'react-icons/fa';
 
-// Components
-import SyncStatus from './SyncStatus';
-
+// Static Header Component
 const Header = () => {
-  const [searchQuery, setSearchQuery] = useState('');
-  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
-  const navigate = useNavigate();
-
-  const handleSearch = (e) => {
-    e.preventDefault();
-    if (searchQuery.trim()) {
-      navigate(`/search?query=${encodeURIComponent(searchQuery.trim())}`);
-      setSearchQuery('');
-      setMobileMenuOpen(false);
-    }
-  };
+  const [mobileMenuOpen, setMobileMenuOpen] = React.useState(false);
+=======
 
   return (
     <header className="bg-white shadow-md">
@@ -50,21 +38,7 @@ const Header = () => {
 
           {/* Desktop Search */}
           <div className="hidden md:block">
-            <form onSubmit={handleSearch} className="flex">
-              <input
-                type="text"
-                placeholder="Search blocks, transactions, addresses..."
-                className="input w-64"
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-              />
-              <button
-                type="submit"
-                className="ml-2 btn btn-primary"
-              >
-                <FaSearch />
-              </button>
-            </form>
+            <HeaderSearchForm />
           </div>
 
           {/* Mobile Menu Button */}
@@ -111,21 +85,7 @@ const Header = () => {
             </nav>
             
             {/* Mobile Search */}
-            <form onSubmit={handleSearch} className="flex mb-4">
-              <input
-                type="text"
-                placeholder="Search blocks, txs, addresses..."
-                className="input flex-grow"
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-              />
-              <button
-                type="submit"
-                className="ml-2 btn btn-primary"
-              >
-                <FaSearch />
-              </button>
-            </form>
+            <HeaderSearchForm mobile={true} />
           </div>
         )}
       </div>
@@ -133,4 +93,37 @@ const Header = () => {
   );
 };
 
-export default Header;
+// Create a separate SearchForm component to handle the navigation logic
+const HeaderSearchForm = React.memo(({ mobile = false }) => {
+  const [searchQuery, setSearchQuery] = React.useState('');
+  const navigate = useNavigate();
+  
+  const handleSearch = (e) => {
+    e.preventDefault();
+    if (searchQuery.trim()) {
+      navigate(`/search?query=${encodeURIComponent(searchQuery.trim())}`);
+      setSearchQuery('');
+    }
+  };
+  
+  return (
+    <form onSubmit={handleSearch} className={`flex ${mobile ? 'mb-4' : ''}`}>
+      <input
+        type="text"
+        placeholder={mobile ? "Search blocks, txs, addresses..." : "Search blocks, transactions, addresses..."}
+        className={mobile ? "input flex-grow" : "input w-64"}
+        value={searchQuery}
+        onChange={(e) => setSearchQuery(e.target.value)}
+      />
+      <button
+        type="submit"
+        className="ml-2 btn btn-primary"
+      >
+        <FaSearch />
+      </button>
+    </form>
+  );
+});
+
+// Use React.memo with props comparison to prevent re-renders
+export default React.memo(Header);

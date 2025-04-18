@@ -3,7 +3,6 @@ import { Routes, Route } from 'react-router-dom';
 import { io } from 'socket.io-client';
 
 // Components
-import Header from './components/Header';
 import Footer from './components/Footer';
 import Toast from './components/Toast';
 
@@ -23,17 +22,44 @@ import { SocketContext } from './contexts/SocketContext';
 import { ToastContext } from './contexts/ToastContext';
 
 // API Configuration
-const API_URL = process.env.REACT_APP_API_URL || 'http://localhost:3000/api';
 const SOCKET_URL = process.env.REACT_APP_SOCKET_URL || 'http://localhost:3000';
 
-function App() {
-  const socketRef = useRef(null); // Use ref for socket instance
-  const [isConnected, setIsConnected] = useState(false); // Track connection status for potential UI feedback
+// This is a pure static HTML header component - no state, no props, no context
+const StaticHeader = () => (
+  <header 
+    className="bg-white shadow-md" 
+    style={{ position: "static" }} // Force static positioning
+  >
+    <div className="max-w-7xl mx-auto px-4 py-4 flex justify-between items-center">
+      <div className="flex items-center">
+        <img 
+          src="https://bitcoinz.global/wp-content/uploads/branding/btcz-website-logo.png" 
+          alt="BitcoinZ" 
+          className="h-10 w-auto mr-3"
+        />
+        <div className="flex flex-col">
+          <span className="font-bold text-xl text-gray-900">BitcoinZ</span>
+          <span className="text-sm text-gray-600">Explorer</span>
+        </div>
+      </div>
+
+      <div className="flex space-x-8">
+        <a href="/" className="text-gray-700">Home</a>
+        <a href="/blocks" className="text-gray-700">Blocks</a>
+        <a href="/transactions" className="text-gray-700">Transactions</a>
+        <a href="/stats" className="text-gray-700">Statistics</a>
+      </div>
+    </div>
+  </header>
+);
+
+function App({ skipHeader = false }) {
+  const socketRef = useRef(null);
+  const [isConnected, setIsConnected] = useState(false);
   const [toast, setToast] = useState(null);
   
   // Initialize socket connection
   useEffect(() => {
-    // Prevent creating multiple sockets if component re-renders unexpectedly
     if (socketRef.current) return;
 
     socketRef.current = io(SOCKET_URL, {
@@ -48,7 +74,6 @@ function App() {
     currentSocket.on('connect', () => {
       console.log('Connected to WebSocket server');
       setIsConnected(true);
-      // showToast('Connected to live updates', 'success'); // Toast handled by context now
       
       // Subscribe to channels
       currentSocket.emit('subscribe', 'blocks');
@@ -58,60 +83,41 @@ function App() {
     currentSocket.on('connect_error', (error) => {
       console.error('WebSocket connection error:', error);
       setIsConnected(false);
-      // showToast('Connection error. Retrying...', 'error'); // Toast handled by context now
     });
     
     currentSocket.on('disconnect', () => {
       console.log('Disconnected from WebSocket server');
       setIsConnected(false);
-      // showToast('Disconnected from live updates', 'warning'); // Toast handled by context now
     });
     
-    // No need to setSocket state anymore
-    
-    // Cleanup on unmount
     return () => {
       if (currentSocket) {
         currentSocket.disconnect();
         socketRef.current = null;
       }
     };
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []); // showToast dependency removed as it's stable via useCallback now
+  }, []);
   
-  // Stable Toast message handler using useCallback
   const showToast = useCallback((message, type = 'info', duration = 5000) => {
     setToast({ message, type, duration });
     
-    // Auto-clear toast after duration
     const timer = setTimeout(() => {
       setToast(null);
     }, duration);
     
-    // Optional: Clear timer if component unmounts or toast changes
     return () => clearTimeout(timer);
-  }, []); // Empty dependency array means this function reference is stable
+  }, []);
 
-  // Memoize the Toast context value
   const toastContextValue = useMemo(() => ({ showToast }), [showToast]);
 
-  // Add connection status toasts based on isConnected state
-  useEffect(() => {
-    if (isConnected) {
-      showToast('Connected to live updates', 'success');
-    } else if (socketRef.current) { // Only show disconnect/error if socket was initialized
-      // You might want more specific error/disconnect messages here
-      showToast('Disconnected from live updates. Retrying...', 'warning');
-    }
-  }, [isConnected, showToast]);
-
   return (
-    // Provide the stable ref to the SocketContext
-    <SocketContext.Provider value={socketRef.current}>
-      {/* Provide the memoized value to ToastContext */}
-      <ToastContext.Provider value={toastContextValue}>
-        <div className="flex flex-col min-h-screen">
-          <Header />
+    <div className="flex flex-col min-h-screen">
+      {/* Only include the header if skipHeader is false */}
+      {!skipHeader && <StaticHeader />}
+      
+      {/* Main content with WebSocket context */}
+      <SocketContext.Provider value={socketRef.current}>
+        <ToastContext.Provider value={toastContextValue}>
           <main className="flex-grow container-custom py-8">
             <Routes>
               <Route path="/" element={<Home />} />
@@ -127,9 +133,9 @@ function App() {
           </main>
           <Footer />
           {toast && <Toast message={toast.message} type={toast.type} />}
-        </div>
-      </ToastContext.Provider>
-    </SocketContext.Provider>
+        </ToastContext.Provider>
+      </SocketContext.Provider>
+    </div>
   );
 }
 

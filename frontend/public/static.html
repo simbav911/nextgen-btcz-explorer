@@ -1,0 +1,146 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>BitcoinZ Explorer - Static</title>
+  <link href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css" rel="stylesheet">
+  <style>
+    body {
+      background-color: #f9fafb;
+      color: #111827;
+    }
+    .card {
+      background-color: white;
+      border-radius: 0.5rem;
+      box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
+      padding: 1.5rem;
+      margin-bottom: 1.5rem;
+    }
+    .container-custom {
+      max-width: 80rem;
+      margin-left: auto;
+      margin-right: auto;
+      padding-left: 1rem;
+      padding-right: 1rem;
+    }
+  </style>
+</head>
+<body>
+  <div class="flex flex-col min-h-screen">
+    <!-- Static Header -->
+    <header class="bg-white shadow-md">
+      <div class="container-custom">
+        <div class="flex justify-between items-center py-4">
+          <!-- Logo -->
+          <div class="flex items-center">
+            <img 
+              src="https://bitcoinz.global/wp-content/uploads/branding/btcz-website-logo.png" 
+              alt="BitcoinZ Explorer" 
+              class="h-10 w-auto mr-3"
+            />
+            <div class="flex flex-col">
+              <span class="font-bold text-xl text-gray-900">BitcoinZ</span>
+              <span class="text-sm text-gray-600">Explorer</span>
+            </div>
+          </div>
+
+          <!-- Navigation -->
+          <nav class="flex space-x-8">
+            <a href="#" class="text-gray-700 hover:text-blue-600">Home</a>
+            <a href="#" class="text-gray-700 hover:text-blue-600">Blocks</a>
+            <a href="#" class="text-gray-700 hover:text-blue-600">Transactions</a>
+            <a href="#" class="text-gray-700 hover:text-blue-600">Statistics</a>
+          </nav>
+        </div>
+      </div>
+    </header>
+    
+    <!-- Main Content -->
+    <main class="flex-grow container-custom py-8">
+      <!-- Hero Section -->
+      <div class="bg-gradient-to-r from-blue-700 to-blue-900 text-white py-16 px-4 rounded-lg mb-8">
+        <div class="max-w-3xl mx-auto text-center">
+          <h1 class="text-4xl font-bold mb-4">BitcoinZ Blockchain Explorer</h1>
+          <p class="text-xl mb-8">
+            Search for blocks, transactions, and addresses on the BitcoinZ blockchain
+          </p>
+          <div class="w-full">
+            <form class="relative">
+              <input
+                type="text"
+                placeholder="Enter a block height, transaction hash, or address..."
+                class="w-full px-4 py-2 rounded-md border border-gray-300"
+              />
+            </form>
+          </div>
+        </div>
+      </div>
+      
+      <!-- Stats Section -->
+      <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
+        <div class="card flex items-center">
+          <div class="bg-blue-100 p-3 rounded-full mr-4">
+            <svg class="w-6 h-6 text-blue-600" fill="currentColor" viewBox="0 0 20 20">
+              <path d="M4 4a2 2 0 00-2 2v4a2 2 0 002 2h12a2 2 0 002-2V6a2 2 0 00-2-2H4z"></path>
+              <path d="M3 10h14v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4z"></path>
+            </svg>
+          </div>
+          <div>
+            <h3 class="text-lg font-semibold">Latest Block</h3>
+            <p class="text-xl font-bold">1,545,706</p>
+          </div>
+        </div>
+        
+        <div class="card flex items-center">
+          <div class="bg-green-100 p-3 rounded-full mr-4">
+            <svg class="w-6 h-6 text-green-600" fill="currentColor" viewBox="0 0 20 20">
+              <path d="M5.5 13a3.5 3.5 0 01-3.5-3.5V8.5a3.5 3.5 0 112.25-3.292A3.5 3.5 0 0111.5 8.5v1A3.5 3.5 0 015.5 13zm4.5.5a3 3 0 100-6 3 3 0 000 6z"></path>
+            </svg>
+          </div>
+          <div>
+            <h3 class="text-lg font-semibold">Difficulty</h3>
+            <p class="text-xl font-bold">666.68</p>
+          </div>
+        </div>
+        
+        <div class="card flex items-center">
+          <div class="bg-yellow-100 p-3 rounded-full mr-4">
+            <svg class="w-6 h-6 text-yellow-600" fill="currentColor" viewBox="0 0 20 20">
+              <path d="M5 12a1 1 0 102 0V6.414l1.293 1.293a1 1 0 001.414-1.414l-3-3a1 1 0 00-1.414 0l-3 3a1 1 0 001.414 1.414L5 6.414V12z"></path>
+              <path d="M15 12a1 1 0 10-2 0v5.586l-1.293-1.293a1 1 0 00-1.414 1.414l3 3a1 1 0 001.414 0l3-3a1 1 0 00-1.414-1.414L15 17.586V12z"></path>
+            </svg>
+          </div>
+          <div>
+            <h3 class="text-lg font-semibold">Network Hashrate</h3>
+            <p class="text-xl font-bold">34,936</p>
+          </div>
+        </div>
+        
+        <div class="card flex items-center">
+          <div class="bg-red-100 p-3 rounded-full mr-4">
+            <svg class="w-6 h-6 text-red-600" fill="currentColor" viewBox="0 0 20 20">
+              <path d="M2 11a1 1 0 011-1h2a1 1 0 011 1v5a1 1 0 01-1 1H3a1 1 0 01-1-1v-5z"></path>
+              <path d="M8 7a1 1 0 011-1h2a1 1 0 011 1v9a1 1 0 01-1 1H9a1 1 0 01-1-1V7z"></path>
+              <path d="M14 4a1 1 0 011-1h2a1 1 0 011 1v12a1 1 0 01-1 1h-2a1 1 0 01-1-1V4z"></path>
+            </svg>
+          </div>
+          <div>
+            <h3 class="text-lg font-semibold">Connections</h3>
+            <p class="text-xl font-bold">4</p>
+          </div>
+        </div>
+      </div>
+    </main>
+
+    <!-- Footer -->
+    <footer class="bg-white mt-auto py-8 border-t border-gray-200">
+      <div class="container-custom">
+        <div class="text-center text-gray-500 text-sm">
+          © 2023 BitcoinZ Explorer. All rights reserved.
+        </div>
+      </div>
+    </footer>
+  </div>
+</body>
+</html>

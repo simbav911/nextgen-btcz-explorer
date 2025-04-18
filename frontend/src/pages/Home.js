@@ -153,7 +153,10 @@ const Home = () => {
           <p className="text-xl mb-8">
             Search for blocks, transactions, and addresses on the BitcoinZ blockchain
           </p>
-          <SearchBox placeholder="Enter a block height, transaction hash, or address..." />
+          <SearchBox 
+            placeholder="Enter a block height, transaction hash, or address..." 
+            key="home-search-box" // Add a stable key
+          />
         </div>
       </div>
       

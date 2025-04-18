@@ -8,6 +8,20 @@ body {
   -moz-osx-font-smoothing: grayscale;
 }
 
+/* Force the header to be completely static */
+header {
+  position: static !important;
+  z-index: 1000;
+  transition: none !important;
+  animation: none !important;
+}
+
+/* Prevent all transitions in the header */
+header * {
+  transition: none !important;
+  animation: none !important;
+}
+
 /* Custom Components */
 @layer components {
   .card {
@@ -15,7 +29,7 @@ body {
   }
   
   .btn {
-    @apply px-4 py-2 rounded font-medium transition-colors duration-200 flex items-center justify-center;
+    @apply px-4 py-2 rounded font-medium flex items-center justify-center;
   }
   
   .btn-primary {

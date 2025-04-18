@@ -266,8 +266,8 @@ const Transaction = () => {
   
   return (
     <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pb-12">
-      <h1 className="text-3xl font-bold flex items-center mb-6">
-        <FaExchangeAlt className="text-bitcoinz-600 mr-3" />
+      <h1 className="page-title mb-6">
+        <FaExchangeAlt />
         Transaction Details
       </h1>
       

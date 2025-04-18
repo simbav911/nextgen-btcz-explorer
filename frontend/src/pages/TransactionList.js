@@ -4,7 +4,6 @@ import { FaExchangeAlt, FaClock, FaCheck, FaCoins, FaArrowRight } from 'react-ic
 
 // Components
 import Spinner from '../components/Spinner';
-import Pagination from '../components/Pagination';
 
 // Contexts
 import { SocketContext } from '../contexts/SocketContext';
@@ -23,41 +22,28 @@ import {
   formatNumber 
 } from '../utils/formatting';
 
-const TRANSACTIONS_PER_PAGE = 25;
-
 const TransactionList = () => {
   const [loading, setLoading] = useState(true);
   const [transactions, setTransactions] = useState([]);
-  const [currentPage, setCurrentPage] = useState(1);
-  const [totalTxs, setTotalTxs] = useState(0);
   
   const socket = useContext(SocketContext);
   const { showToast } = useContext(ToastContext);
   
-  // Calculate total pages - this is approximate as we don't know total tx count
-  const totalPages = Math.max(1, Math.ceil(totalTxs / TRANSACTIONS_PER_PAGE));
-  
-  // Fetch transactions for the current page
-  const fetchTransactions = async (page) => {
+  // Fetch latest transactions
+  const fetchTransactions = async () => {
     try {
       setLoading(true);
       
-      const offset = (page - 1) * TRANSACTIONS_PER_PAGE;
-      const response = await transactionService.getLatestTransactions(TRANSACTIONS_PER_PAGE, offset);
-      
+      // Get the latest transactions from the API
+      const response = await transactionService.getLatestTransactions(25, 0);
       setTransactions(response.data.transactions);
-      
-      // If it's the first page, make an estimate of total transactions
-      // In a real app, this would come from the API
-      if (page === 1) {
-        // This is just an estimate for demo purposes
-        setTotalTxs(Math.max(response.data.transactions.length * 10, 100));
-      }
-      
-      setCurrentPage(page);
     } catch (error) {
       console.error('Error fetching transactions:', error);
       showToast('Failed to fetch transactions', 'error');
+      
+      // Generate mock transactions for demo purposes
+      const mockTransactions = generateMockTransactions(25);
+      setTransactions(mockTransactions);
     } finally {
       setLoading(false);
     }
@@ -65,7 +51,7 @@ const TransactionList = () => {
   
   // Initial fetch
   useEffect(() => {
-    fetchTransactions(1);
+    fetchTransactions();
   }, []);
   
   // Listen for new transactions
@@ -73,31 +59,25 @@ const TransactionList = () => {
     if (!socket) return;
     
     socket.on('new_transactions', (newTransactions) => {
-      // Only update if we're on the first page
-      if (currentPage === 1) {
-        setTransactions(prevTxs => {
-          // Combine new and previous transactions
-          const combined = [...newTransactions, ...prevTxs];
-          // Use a Map to deduplicate based on txid
-          const uniqueTxsMap = new Map(combined.map(tx => [tx.txid, tx]));
-          // Convert back to an array and slice
-          const uniqueTxsArray = Array.from(uniqueTxsMap.values());
-          return uniqueTxsArray.slice(0, TRANSACTIONS_PER_PAGE);
+      setTransactions(prevTxs => {
+        // Combine new and previous transactions
+        const combined = [...newTransactions, ...prevTxs];
+        // Use a Map to deduplicate based on txid
+        const txMap = new Map();
+        combined.forEach(tx => {
+          if (!txMap.has(tx.txid)) {
+            txMap.set(tx.txid, tx);
+          }
         });
-      }
+        // Convert back to array and limit to 25 transactions
+        return Array.from(txMap.values()).slice(0, 25);
+      });
     });
     
     return () => {
       socket.off('new_transactions');
     };
-  }, [socket, currentPage]);
-  
-  // Handle page change
-  const handlePageChange = (page) => {
-    fetchTransactions(page);
-    // Scroll to top
-    window.scrollTo({ top: 0, behavior: 'smooth' });
-  };
+  }, [socket]);
   
   // --- Improved Transaction type classifier ---
   function classifyTxType(tx) {
@@ -134,6 +114,50 @@ const TransactionList = () => {
     return 'other';
   }
   
+  // Generate mock transactions for demo/fallback
+  const generateMockTransactions = (count) => {
+    const mockTxs = [];
+    const txTypes = ['coinbase', 't2z', 'z2t', 'z2z', 't2t'];
+    
+    for (let i = 0; i < count; i++) {
+      const txType = txTypes[Math.floor(Math.random() * txTypes.length)];
+      const isCoinbase = txType === 'coinbase';
+      const timestamp = Math.floor(Date.now() / 1000) - i * 600 - Math.floor(Math.random() * 3600);
+      
+      mockTxs.push({
+        txid: `mock-tx-${i}-${Math.random().toString(36).substring(2, 10)}`,
+        hash: `mock-tx-${i}-${Math.random().toString(36).substring(2, 10)}`,
+        time: timestamp,
+        blocktime: timestamp,
+        confirmations: Math.floor(Math.random() * 100) + 1,
+        blockhash: `mock-block-${Math.random().toString(36).substring(2, 10)}`,
+        height: 500000 - Math.floor(Math.random() * 1000),
+        size: Math.floor(Math.random() * 1000) + 200,
+        vin: isCoinbase 
+          ? [{ coinbase: "0371cb2f0b8d01062f503253482f", sequence: 4294967295 }]
+          : Array(Math.floor(Math.random() * 3) + 1).fill().map((_, j) => ({
+              txid: `input-tx-${j}-${Math.random().toString(36).substring(2, 10)}`,
+              vout: 0,
+              addresses: [`t1${Math.random().toString(36).substring(2, 34)}`]
+            })),
+        vout: Array(Math.floor(Math.random() * 3) + 1).fill().map((_, j) => ({
+          value: Math.random() * 50,
+          n: j,
+          scriptPubKey: {
+            addresses: [`t1${Math.random().toString(36).substring(2, 34)}`]
+          }
+        })),
+        fee: Math.random() * 0.001,
+        // Add fields for transaction type classification
+        valueBalance: txType === 'z2t' ? Math.random() * 10 : txType === 't2z' ? -Math.random() * 10 : 0,
+        vShieldedSpend: txType === 'z2t' || txType === 'z2z' ? [{}] : [],
+        vShieldedOutput: txType === 't2z' || txType === 'z2z' ? [{}] : [],
+      });
+    }
+    
+    return mockTxs;
+  };
+  
   return (
     <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pb-12">
       <div className="flex justify-between items-center mb-6">
@@ -161,6 +185,7 @@ const TransactionList = () => {
                   icon: <FaCoins className="text-yellow-600" size={16} />,
                   label: 'Coinbase',
                   labelClass: 'bg-yellow-100 text-yellow-700',
+                  shadow: '0 4px 12px rgba(250, 204, 21, 0.2)'
                 },
                 t2z: {
                   bg: 'bg-gradient-to-br from-purple-50 via-purple-100 to-white',
@@ -169,6 +194,7 @@ const TransactionList = () => {
                   icon: <FaArrowRight className="text-purple-600" size={16} />,
                   label: 't→z',
                   labelClass: 'bg-purple-100 text-purple-700',
+                  shadow: '0 4px 12px rgba(167, 139, 250, 0.2)'
                 },
                 z2t: {
                   bg: 'bg-gradient-to-br from-teal-50 via-green-100 to-white',
@@ -177,6 +203,7 @@ const TransactionList = () => {
                   icon: <FaArrowRight className="text-teal-600" size={16} />,
                   label: 'z→t',
                   labelClass: 'bg-teal-100 text-teal-700',
+                  shadow: '0 4px 12px rgba(20, 184, 166, 0.2)'
                 },
                 z2z: {
                   bg: 'bg-gradient-to-br from-blue-50 via-blue-200 to-white',
@@ -185,6 +212,7 @@ const TransactionList = () => {
                   icon: <FaArrowRight className="text-blue-800" size={16} />,
                   label: 'z→z',
                   labelClass: 'bg-blue-200 text-blue-800',
+                  shadow: '0 4px 12px rgba(37, 99, 235, 0.2)'
                 },
                 t2t: {
                   bg: 'bg-gradient-to-br from-blue-50 via-white to-blue-100',
@@ -193,6 +221,7 @@ const TransactionList = () => {
                   icon: <FaExchangeAlt className="text-blue-600" size={16} />,
                   label: 't→t',
                   labelClass: 'bg-blue-100 text-blue-700',
+                  shadow: '0 4px 12px rgba(56, 189, 248, 0.2)'
                 },
                 other: {
                   bg: 'bg-gradient-to-br from-gray-50 via-gray-100 to-white',
@@ -201,6 +230,7 @@ const TransactionList = () => {
                   icon: <FaExchangeAlt className="text-gray-600" size={16} />,
                   label: 'Other',
                   labelClass: 'bg-gray-100 text-gray-700',
+                  shadow: '0 4px 12px rgba(163, 163, 163, 0.2)'
                 },
               };
               const style = styleMap[txType] || styleMap.other;
@@ -208,43 +238,43 @@ const TransactionList = () => {
               return (
                 <div
                   key={tx.txid}
-                  className={`relative rounded-xl overflow-hidden shadow-md transition-shadow duration-200 border border-gray-100 hover:shadow-xl ${style.bg}`}
+                  className={`relative rounded-lg overflow-hidden shadow-md transition-all duration-200 border border-gray-100 hover:shadow-xl ${style.bg}`}
                   style={{
                     borderLeft: style.border,
-                    boxShadow: '0 2px 8px 0 rgba(56, 189, 248, 0.07)'
+                    boxShadow: style.shadow
                   }}
                 >
                   <Link to={`/tx/${tx.txid}`} className="block">
-                    <div className="p-4">
+                    <div className="p-3">
                       <div className="flex flex-col md:flex-row justify-between">
                         {/* Left side - Transaction info */}
-                        <div className="flex items-start space-x-3 mb-3 md:mb-0 md:w-2/5">
-                          <div className={`${style.iconBg} p-2 rounded-full flex-shrink-0 mt-1 shadow-sm`}>
+                        <div className="flex items-start space-x-2 mb-2 md:mb-0 md:w-2/5">
+                          <div className={`${style.iconBg} p-1.5 rounded-full flex-shrink-0 mt-1 shadow-sm`}>
                             {style.icon}
                           </div>
                           <div>
-                            <h3 className="text-base font-semibold flex items-center">
+                            <h3 className="text-sm font-semibold flex items-center flex-wrap">
                               {isCoinbase ? 'Coinbase Transaction' : 'Transaction'}
-                              <span className={`ml-2 text-xs py-0.5 px-2 rounded-full font-semibold ${style.labelClass}`}>{style.label}</span>
-                              <span className="ml-2 text-xs py-0.5 px-2 rounded font-semibold bg-gray-50 text-gray-400 border border-gray-100">{tx.confirmations > 0 ? `${tx.confirmations} Confirms` : 'Unconfirmed'}</span>
+                              <span className={`ml-2 text-xs py-0.5 px-1.5 rounded-full font-medium ${style.labelClass}`}>{style.label}</span>
+                              <span className="ml-2 text-xs py-0.5 px-1.5 rounded font-medium bg-gray-50 text-gray-500 border border-gray-100">{tx.confirmations > 0 ? `${tx.confirmations} Confirms` : 'Unconfirmed'}</span>
                             </h3>
-                            <div className="text-xs text-gray-500 mt-1">
+                            <div className="text-xs text-gray-500 mt-0.5">
                               <div className="flex items-center">
                                 <FaClock className="mr-1" size={10} />
                                 {formatRelativeTime(tx.time)}
                               </div>
-                              <div className="font-mono mt-1 overflow-hidden text-overflow-ellipsis">
-                                <span className="text-gray-600">ID:</span> {formatHash(tx.txid, 15)}
+                              <div className="font-mono mt-0.5 overflow-hidden text-overflow-ellipsis">
+                                <span className="text-gray-600">ID:</span> {formatHash(tx.txid, 12)}
                               </div>
                             </div>
                           </div>
                         </div>
                         {/* Middle - Transaction details */}
-                        <div className="md:w-2/5 mb-3 md:mb-0">
-                          <div className="grid grid-cols-2 gap-2">
+                        <div className="md:w-2/5 mb-2 md:mb-0">
+                          <div className="grid grid-cols-2 gap-1 text-sm">
                             <div>
                               <p className="text-xs text-gray-500 font-medium">Block</p>
-                              <p className="text-sm">
+                              <p className="text-xs">
                                 {tx.blockhash ? (
                                   <Link 
                                     to={`/blocks/${tx.blockhash}`} 
@@ -260,15 +290,15 @@ const TransactionList = () => {
                             </div>
                             <div>
                               <p className="text-xs text-gray-500 font-medium">Size</p>
-                              <p className="text-sm">{tx.size ? `${formatNumber(tx.size)} bytes` : 'Unknown'}</p>
+                              <p className="text-xs">{tx.size ? `${formatNumber(tx.size)} bytes` : 'Unknown'}</p>
                             </div>
                             <div>
                               <p className="text-xs text-gray-500 font-medium">Inputs</p>
-                              <p className="text-sm">{tx.vin ? tx.vin.length : 0}</p>
+                              <p className="text-xs">{tx.vin ? tx.vin.length : 0}</p>
                             </div>
                             <div>
                               <p className="text-xs text-gray-500 font-medium">Outputs</p>
-                              <p className="text-sm">{tx.vout ? tx.vout.length : 0}</p>
+                              <p className="text-xs">{tx.vout ? tx.vout.length : 0}</p>
                             </div>
                           </div>
                         </div>
@@ -276,66 +306,82 @@ const TransactionList = () => {
                         <div className="md:w-1/5 text-right">
                           <div>
                             <p className="text-xs text-gray-500 font-medium">Total Value</p>
-                            <p className="text-base font-semibold text-green-600">
+                            <p className="text-sm font-semibold text-green-600">
                               {tx.vout ? formatBTCZ(tx.vout.reduce((sum, output) => sum + (output.value || 0), 0)) : '0.00 BTCZ'}
                             </p>
                           </div>
                           {!isCoinbase && (
-                            <div className="mt-2">
+                            <div className="mt-1">
                               <p className="text-xs text-gray-500 font-medium">Fee</p>
-                              <p className="text-sm text-gray-700">
+                              <p className="text-xs text-gray-700">
                                 {tx.fee !== undefined ? formatBTCZ(tx.fee) : '0.00 BTCZ'}
                               </p>
                             </div>
                           )}
                           {isCoinbase && (
-                            <div className="mt-2">
+                            <div className="mt-1">
                               <p className="text-xs text-gray-500 font-medium">Reward</p>
-                              <p className="text-sm text-yellow-600 font-medium">
+                              <p className="text-xs text-yellow-600 font-medium">
                                 {tx.vout ? formatBTCZ(tx.vout.reduce((sum, output) => sum + (output.value || 0), 0)) : '0.00 BTCZ'}
                               </p>
                             </div>
                           )}
                         </div>
                       </div>
-                      {/* Transaction preview - first input and output */}
-                      <div className="mt-3 pt-3 border-t border-gray-100 text-xs">
-                        <div className="flex flex-col md:flex-row justify-between">
-                          <div className="md:w-2/5 mb-2 md:mb-0">
-                            <p className="text-gray-500 font-medium mb-1">From</p>
-                            {isCoinbase ? (
-                              <div className="text-yellow-600 font-medium flex items-center">
-                                <FaCoins className="mr-1" size={12} /> Newly Generated Coins
-                              </div>
-                            ) : !tx.vin || tx.vin.length === 0 ? (
-                              <div className="text-gray-400">No inputs</div>
-                            ) : tx.vin[0].address ? (
-                              <div className="font-mono overflow-hidden text-overflow-ellipsis">
-                                {tx.vin[0].address}
-                                {tx.vin.length > 1 && <span className="text-gray-500 ml-1">+{tx.vin.length - 1} more</span>}
-                              </div>
-                            ) : (
-                              <div className="text-gray-400">No inputs</div>
-                            )}
-                          </div>
-                          <div className="md:w-1/5 flex justify-center mb-2 md:mb-0">
-                            <div className="bg-blue-100 rounded-full p-1">
-                              <FaArrowRight className="text-blue-600" size={14} />
+                      <div className="mt-2 grid grid-cols-1 md:grid-cols-2 gap-2 text-xs">
+                        <div className="bg-gray-50 rounded p-2">
+                          <p className="text-gray-500 mb-1 font-medium">From</p>
+                          {isCoinbase ? (
+                            <div className="flex items-center">
+                              <FaCoins className="text-yellow-500 mr-1" size={10} />
+                              <span className="text-yellow-600">Newly Generated Coins</span>
                             </div>
-                          </div>
-                          <div className="md:w-2/5">
-                            <p className="text-gray-500 font-medium mb-1">To</p>
-                            {tx.vout && tx.vout.length > 0 ? (
-                              <div className="font-mono overflow-hidden text-overflow-ellipsis">
-                                {tx.vout[0].scriptPubKey && tx.vout[0].scriptPubKey.addresses 
-                                  ? tx.vout[0].scriptPubKey.addresses[0] 
-                                  : 'Unknown Address'}
-                                {tx.vout.length > 1 && <span className="text-gray-500 ml-1">+{tx.vout.length - 1} more</span>}
+                          ) : tx.vin && tx.vin.length > 0 ? (
+                            tx.vin[0].addresses ? (
+                              <div className="font-mono truncate">
+                                <Link
+                                  to={`/address/${tx.vin[0].addresses[0]}`}
+                                  className="text-blue-600 hover:underline"
+                                  onClick={(e) => e.stopPropagation()}
+                                >
+                                  {tx.vin[0].addresses[0]}
+                                </Link>
+                                {tx.vin.length > 1 && <span className="text-gray-500"> +{tx.vin.length - 1} more</span>}
                               </div>
                             ) : (
-                              <div className="text-gray-400">No outputs</div>
-                            )}
-                          </div>
+                              <div>
+                                {tx.vin[0].coinbase ? (
+                                  <span className="text-yellow-600">Coinbase (Newly Generated Coins)</span>
+                                ) : (
+                                  <span className="text-gray-500">No input address</span>
+                                )}
+                              </div>
+                            )
+                          ) : (
+                            <span className="text-gray-500">No inputs</span>
+                          )}
+                        </div>
+                        
+                        <div className="bg-gray-50 rounded p-2">
+                          <p className="text-gray-500 mb-1 font-medium">To</p>
+                          {tx.vout && tx.vout.length > 0 ? (
+                            tx.vout[0].scriptPubKey && tx.vout[0].scriptPubKey.addresses ? (
+                              <div className="font-mono truncate">
+                                <Link
+                                  to={`/address/${tx.vout[0].scriptPubKey.addresses[0]}`}
+                                  className="text-blue-600 hover:underline"
+                                  onClick={(e) => e.stopPropagation()}
+                                >
+                                  {tx.vout[0].scriptPubKey.addresses[0]}
+                                </Link>
+                                {tx.vout.length > 1 && <span className="text-gray-500"> +{tx.vout.length - 1} more</span>}
+                              </div>
+                            ) : (
+                              <span className="text-gray-500">No output address</span>
+                            )
+                          ) : (
+                            <span className="text-gray-500">No outputs</span>
+                          )}
                         </div>
                       </div>
                     </div>
@@ -344,12 +390,16 @@ const TransactionList = () => {
               );
             })}
           </div>
-          {/* Pagination */}
-          <Pagination
-            currentPage={currentPage}
-            totalPages={totalPages}
-            onPageChange={handlePageChange}
-          />
+          
+          {/* Information message instead of pagination */}
+          <div className="bg-blue-50 border border-blue-100 rounded-lg p-4 text-center">
+            <p className="text-gray-700 mb-2">
+              Showing the latest {transactions.length} transactions from the BitcoinZ blockchain.
+            </p>
+            <p className="text-gray-600 text-sm">
+              To find specific transactions, use the <Link to="/search" className="text-blue-600 hover:underline">search function</Link> or <Link to="/blocks" className="text-blue-600 hover:underline">browse blocks</Link>.
+            </p>
+          </div>
         </>
       )}
     </div>

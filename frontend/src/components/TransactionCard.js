@@ -1,7 +1,42 @@
 import React from 'react';
 import { Link } from 'react-router-dom';
-import { FaExchangeAlt, FaClock, FaCheck, FaArrowRight, FaCoins } from 'react-icons/fa';
+import { FaExchangeAlt, FaClock, FaCheck, FaArrowRight, FaCoins, FaLock, FaLockOpen, FaExclamationTriangle } from 'react-icons/fa';
 import { formatRelativeTime, formatNumber } from '../utils/formatting';
+
+// Transaction type classifier function
+const classifyTxType = (tx) => {
+  const isCoinbase = tx.vin && tx.vin.length > 0 && !!tx.vin[0].coinbase;
+  if (isCoinbase) return 'coinbase';
+
+  // Shielded fields
+  const hasValueBalance = typeof tx.valueBalance === 'number' && tx.valueBalance !== 0;
+  const hasVJoinSplit = tx.vjoinsplit && tx.vjoinsplit.length > 0;
+  const hasShieldedSpends = tx.vShieldedSpend && tx.vShieldedSpend.length > 0;
+  const hasShieldedOutputs = tx.vShieldedOutput && tx.vShieldedOutput.length > 0;
+  
+  // Transparent fields
+  const hasTransparentInputs = tx.vin && tx.vin.length > 0 && !tx.vin[0].coinbase;
+  const hasTransparentOutputs = tx.vout && tx.vout.length > 0;
+  
+  // t->z: Shielding (transparent input, shielded output, valueBalance<0)
+  if (hasTransparentInputs && (hasShieldedOutputs || hasVJoinSplit || (hasValueBalance && tx.valueBalance < 0))) {
+    return 't2z';
+  }
+  // z->t: Deshielding (shielded input, transparent output, valueBalance>0)
+  if ((hasShieldedSpends || hasVJoinSplit || (hasValueBalance && tx.valueBalance > 0)) && (hasTransparentOutputs || tx.vout?.length > 0)) {
+    return 'z2t';
+  }
+  // z->z: Fully shielded (shielded spends and outputs, no transparent)
+  if ((hasShieldedSpends || hasVJoinSplit) && (hasShieldedOutputs || hasVJoinSplit) && !hasTransparentInputs && !hasTransparentOutputs) {
+    return 'z2z';
+  }
+  // t->t: Fully transparent
+  if (hasTransparentInputs && hasTransparentOutputs && !hasShieldedSpends && !hasShieldedOutputs && !hasVJoinSplit && !hasValueBalance) {
+    return 't2t';
+  }
+  // Fallback
+  return 'other';
+};
 
 const TransactionCard = ({ transaction }) => {
   const {
@@ -13,29 +48,86 @@ const TransactionCard = ({ transaction }) => {
     blockhash
   } = transaction;
   
-  // Check if this is a coinbase transaction (newly mined coins)
-  const isCoinbase = vin && vin.length > 0 && vin.some(input => input.coinbase);
+  // Classify transaction type
+  const txType = classifyTxType(transaction);
+  const isCoinbase = txType === 'coinbase';
+  
+  // Style map for different transaction types
+  const styleMap = {
+    coinbase: {
+      bgColor: 'bg-yellow-100',
+      textColor: 'text-yellow-600',
+      borderColor: 'border-yellow-200',
+      icon: <FaCoins size={16} className="text-yellow-600" />,
+      label: 'Coinbase',
+      description: 'Mining Reward'
+    },
+    t2z: {
+      bgColor: 'bg-purple-100',
+      textColor: 'text-purple-600',
+      borderColor: 'border-purple-200',
+      icon: <FaLock size={16} className="text-purple-600" />,
+      label: 't→z',
+      description: 'Shielding'
+    },
+    z2t: {
+      bgColor: 'bg-teal-100',
+      textColor: 'text-teal-600',
+      borderColor: 'border-teal-200',
+      icon: <FaLockOpen size={16} className="text-teal-600" />,
+      label: 'z→t',
+      description: 'Deshielding'
+    },
+    z2z: {
+      bgColor: 'bg-blue-100',
+      textColor: 'text-blue-700',
+      borderColor: 'border-blue-200',
+      icon: <FaLock size={16} className="text-blue-700" />,
+      label: 'z→z',
+      description: 'Shielded'
+    },
+    t2t: {
+      bgColor: 'bg-blue-50',
+      textColor: 'text-blue-500',
+      borderColor: 'border-blue-100',
+      icon: <FaExchangeAlt size={16} className="text-blue-500" />,
+      label: 't→t',
+      description: 'Transparent'
+    },
+    other: {
+      bgColor: 'bg-gray-100',
+      textColor: 'text-gray-600',
+      borderColor: 'border-gray-200',
+      icon: <FaExclamationTriangle size={16} className="text-gray-600" />,
+      label: '?',
+      description: 'Other'
+    }
+  };
+  
+  // Get style for current transaction type
+  const style = styleMap[txType] || styleMap.other;
   
   return (
     <Link 
       to={`/tx/${txid}`} 
-      className="block card hover:shadow-lg transition-shadow duration-200 hover:border-bitcoinz-200 max-w-5xl mx-auto"
+      className={`block card hover:shadow-lg transition-shadow duration-200 border-l-4 ${style.borderColor} hover:border-bitcoinz-200 max-w-5xl mx-auto`}
     >
       <div className="flex flex-col md:flex-row md:items-center justify-between">
         <div className="flex items-center">
-          <div className={`${isCoinbase ? 'bg-yellow-100' : 'bg-green-100'} p-2 rounded-full mr-3 flex-shrink-0`}>
-            {isCoinbase ? 
-              <FaCoins className="text-yellow-600" size={16} /> : 
-              <FaExchangeAlt className="text-green-600" size={16} />
-            }
+          <div className={`${style.bgColor} p-2 rounded-full mr-3 flex-shrink-0`}>
+            {style.icon}
           </div>
           <div className="min-w-0">
             <h3 className="text-base font-semibold flex items-center">
               {isCoinbase ? 'Coinbase Transaction (Newly Mined)' : 'Transaction'}
+              <span className={`ml-2 text-xs px-2 py-0.5 rounded-full ${style.bgColor} ${style.textColor}`}>
+                {style.label}
+              </span>
             </h3>
             <p className="text-xs text-gray-500 flex items-center">
               <FaClock className="mr-1 flex-shrink-0" size={10} />
               {formatRelativeTime(time)}
+              <span className="ml-2 text-xs text-gray-500">{style.description}</span>
             </p>
           </div>
         </div>
@@ -90,8 +182,8 @@ const TransactionCard = ({ transaction }) => {
         </div>
         
         <div className="hidden md:flex items-center justify-center">
-          <div className="bg-blue-100 rounded-full p-2">
-            <FaArrowRight className="text-blue-600" size={16} />
+          <div className={`${style.bgColor} rounded-full p-2`}>
+            <FaArrowRight className={style.textColor} size={16} />
           </div>
         </div>
         

@@ -8,13 +8,15 @@ import {
   FaDatabase,
   FaClock,
   FaCogs,
-  FaInfoCircle
+  FaInfoCircle,
+  FaHashtag
 } from 'react-icons/fa';
 import { Line } from 'react-chartjs-2';
-import { Chart, CategoryScale, LinearScale, PointElement, LineElement, Title, Tooltip, Legend } from 'chart.js';
+import { Chart, CategoryScale, LinearScale, PointElement, LineElement, Title, Tooltip, Legend, Filler } from 'chart.js';
+import { motion } from 'framer-motion';
 
 // Register Chart.js components
-Chart.register(CategoryScale, LinearScale, PointElement, LineElement, Title, Tooltip, Legend);
+Chart.register(CategoryScale, LinearScale, PointElement, LineElement, Title, Tooltip, Legend, Filler);
 
 // Components
 import Spinner from '../components/Spinner';
@@ -78,15 +80,23 @@ const Stats = () => {
     if (!historicalStats) return null;
     
     return {
-      labels: historicalStats.map(stat => stat.date),
+      labels: historicalStats.map(stat => {
+        const date = new Date(stat.date);
+        return timeRange === 'day' 
+          ? date.toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})
+          : date.toLocaleDateString([], {month: 'short', day: 'numeric'});
+      }),
       datasets: [
         {
           label,
           data: historicalStats.map(stat => stat[dataKey]),
           borderColor: color,
           backgroundColor: `${color}33`,
-          tension: 0.3,
-          fill: true
+          tension: 0.4,
+          fill: true,
+          pointRadius: 3,
+          pointHoverRadius: 5,
+          borderWidth: 2
         }
       ]
     };
@@ -116,29 +126,60 @@ const Stats = () => {
       y: {
         beginAtZero: false,
         grid: {
-          color: 'rgba(200, 200, 200, 0.1)'
+          color: 'rgba(0, 0, 0, 0.05)',
+          drawBorder: false
+        },
+        ticks: {
+          font: {
+            size: 11
+          }
         }
       },
       x: {
         grid: {
           display: false
+        },
+        ticks: {
+          font: {
+            size: 11
+          },
+          maxRotation: 45,
+          minRotation: 45
         }
       }
+    },
+    animation: {
+      duration: 1500,
+      easing: 'easeOutQuart'
+    },
+    interaction: {
+      mode: 'index',
+      intersect: false
     }
   };
   
   if (loading) {
-    return <Spinner message="Loading network statistics..." />;
+    return (
+      <div className="flex items-center justify-center min-h-[60vh]">
+        <Spinner message="Loading network statistics..." />
+      </div>
+    );
   }
   
   if (!networkStats) {
     return (
-      <div className="bg-white dark:bg-gray-800 rounded-xl shadow-lg p-8 text-center">
+      <div className="card text-center py-8 shadow-lg border border-red-100 bg-red-50">
         <FaInfoCircle className="text-red-500 text-4xl mx-auto mb-4" />
-        <h2 className="text-2xl font-bold mb-4">Error Loading Statistics</h2>
-        <p className="text-gray-500 dark:text-gray-400">
+        <h2 className="text-2xl font-bold mb-4 text-red-700">Error Loading Statistics</h2>
+        <p className="text-gray-600">
           Unable to load network statistics. Please try again later.
         </p>
+        <button 
+          onClick={() => window.location.reload()} 
+          className="mt-4 px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors"
+        >
+          Retry
+        </button>
       </div>
     );
   }
@@ -178,233 +219,298 @@ const Stats = () => {
     { label: 'Pooled Transactions', value: formatNumber(miningInfo.pooledtx) }
   ];
   
+  // Animation variants for staggered animations
+  const containerVariants = {
+    hidden: { opacity: 0 },
+    visible: {
+      opacity: 1,
+      transition: {
+        staggerChildren: 0.1
+      }
+    }
+  };
+  
+  const itemVariants = {
+    hidden: { y: 20, opacity: 0 },
+    visible: {
+      y: 0,
+      opacity: 1,
+      transition: {
+        duration: 0.5,
+        ease: "easeOut"
+      }
+    }
+  };
+  
   return (
-    <div className="pb-12">
-      <div className="flex items-center justify-between mb-8">
-        <h1 className="text-3xl font-bold flex items-center">
+    <div className="max-w-7xl mx-auto px-4 py-6">
+      <motion.div 
+        initial={{ opacity: 0, y: -20 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ duration: 0.5 }}
+        className="flex flex-col md:flex-row justify-between items-start md:items-center mb-8"
+      >
+        <h1 className="text-3xl font-bold flex items-center mb-4 md:mb-0">
           <FaChartLine className="text-bitcoinz-600 mr-3" />
-          Network Status
+          <span className="bg-gradient-to-r from-bitcoinz-600 to-blue-600 bg-clip-text text-transparent">
+            Network Statistics
+          </span>
         </h1>
         
-        <div className="flex bg-gray-100 dark:bg-gray-700 rounded-lg p-1">
-          <button 
+        <div className="flex space-x-1 bg-gray-100 p-1 rounded-lg">
+          <button
             onClick={() => setActiveTab('overview')}
-            className={`px-4 py-2 rounded-md text-sm font-medium transition-all duration-200 ${
-              activeTab === 'overview' 
-                ? 'bg-white dark:bg-gray-800 text-bitcoinz-600 shadow-sm' 
-                : 'text-gray-600 dark:text-gray-300 hover:text-bitcoinz-600 dark:hover:text-white'
+            className={`px-4 py-2 rounded-md text-sm font-medium transition-all ${
+              activeTab === 'overview'
+                ? 'bg-white text-bitcoinz-600 shadow-sm'
+                : 'text-gray-600 hover:text-gray-900'
             }`}
           >
             Overview
           </button>
-          <button 
+          <button
             onClick={() => setActiveTab('details')}
-            className={`px-4 py-2 rounded-md text-sm font-medium transition-all duration-200 ${
-              activeTab === 'details' 
-                ? 'bg-white dark:bg-gray-800 text-bitcoinz-600 shadow-sm' 
-                : 'text-gray-600 dark:text-gray-300 hover:text-bitcoinz-600 dark:hover:text-white'
+            className={`px-4 py-2 rounded-md text-sm font-medium transition-all ${
+              activeTab === 'details'
+                ? 'bg-white text-bitcoinz-600 shadow-sm'
+                : 'text-gray-600 hover:text-gray-900'
             }`}
           >
             Details
           </button>
-          <button 
+          <button
             onClick={() => setActiveTab('charts')}
-            className={`px-4 py-2 rounded-md text-sm font-medium transition-all duration-200 ${
-              activeTab === 'charts' 
-                ? 'bg-white dark:bg-gray-800 text-bitcoinz-600 shadow-sm' 
-                : 'text-gray-600 dark:text-gray-300 hover:text-bitcoinz-600 dark:hover:text-white'
+            className={`px-4 py-2 rounded-md text-sm font-medium transition-all ${
+              activeTab === 'charts'
+                ? 'bg-white text-bitcoinz-600 shadow-sm'
+                : 'text-gray-600 hover:text-gray-900'
             }`}
           >
             Charts
           </button>
         </div>
-      </div>
+      </motion.div>
       
-      {/* Overview Tab */}
       {activeTab === 'overview' && (
         <>
           {/* Stats Cards */}
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
-            <StatCard 
-              title="Current Block Height" 
-              value={formatNumber(blockchainInfo.blocks)} 
-              icon={<FaCube className="text-blue-600" size={24} />}
-              color="blue"
-            />
-            <StatCard 
-              title="Network Difficulty" 
-              value={formatDifficulty(blockchainInfo.difficulty)} 
-              icon={<FaNetworkWired className="text-green-600" size={24} />}
-              color="green"
-            />
-            <StatCard 
-              title="Active Connections" 
-              value={formatNumber(networkInfo.connections)} 
-              icon={<FaServer className="text-purple-600" size={24} />}
-              color="purple"
-            />
-            <StatCard 
-              title="Mempool Size" 
-              value={formatNumber(miningInfo.pooledtx)} 
-              icon={<FaDatabase className="text-red-600" size={24} />}
-              color="red"
-            />
-          </div>
+          <motion.div 
+            variants={containerVariants}
+            initial="hidden"
+            animate="visible"
+            className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6 mb-8"
+          >
+            <motion.div variants={itemVariants}>
+              <StatCard 
+                title="Current Block Height" 
+                value={formatNumber(blockchainInfo.blocks)} 
+                icon={<FaCube className="text-blue-600" size={24} />}
+                color="blue"
+                change={{
+                  positive: true,
+                  value: "+1",
+                  period: "last 10 min"
+                }}
+              />
+            </motion.div>
+            <motion.div variants={itemVariants}>
+              <StatCard 
+                title="Network Difficulty" 
+                value={formatDifficulty(blockchainInfo.difficulty)} 
+                icon={<FaNetworkWired className="text-green-600" size={24} />}
+                color="green"
+                change={{
+                  positive: blockchainInfo.difficulty > 0,
+                  value: "0.05%",
+                  period: "24h"
+                }}
+              />
+            </motion.div>
+            <motion.div variants={itemVariants}>
+              <StatCard 
+                title="Active Connections" 
+                value={formatNumber(networkInfo.connections)} 
+                icon={<FaServer className="text-purple-600" size={24} />}
+                color="purple"
+              />
+            </motion.div>
+            <motion.div variants={itemVariants}>
+              <StatCard 
+                title="Mempool Size" 
+                value={formatNumber(miningInfo.pooledtx)} 
+                icon={<FaDatabase className="text-red-600" size={24} />}
+                color="red"
+              />
+            </motion.div>
+          </motion.div>
           
-          {/* Network Status Summary */}
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-8">
-            <div className="bg-gradient-to-br from-white to-gray-50 dark:from-gray-800 dark:to-gray-900 rounded-xl shadow-lg overflow-hidden">
-              <div className="bg-blue-600 px-6 py-4">
-                <h3 className="text-xl font-bold text-white flex items-center">
-                  <FaCube className="mr-2" /> Blockchain Information
-                </h3>
-              </div>
-              <div className="p-6">
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  <div className="bg-white dark:bg-gray-800 rounded-lg p-4 shadow-sm">
-                    <p className="text-gray-500 dark:text-gray-400 text-sm">Current Block Height</p>
-                    <p className="text-2xl font-bold mt-1">{formatNumber(blockchainInfo.blocks)}</p>
-                  </div>
-                  <div className="bg-white dark:bg-gray-800 rounded-lg p-4 shadow-sm">
-                    <p className="text-gray-500 dark:text-gray-400 text-sm">Difficulty</p>
-                    <p className="text-2xl font-bold mt-1">{formatDifficulty(blockchainInfo.difficulty)}</p>
-                  </div>
-                  <div className="bg-white dark:bg-gray-800 rounded-lg p-4 shadow-sm">
-                    <p className="text-gray-500 dark:text-gray-400 text-sm">Median Time</p>
-                    <p className="text-2xl font-bold mt-1">{new Date(blockchainInfo.mediantime * 1000).toLocaleString()}</p>
-                  </div>
-                  <div className="bg-white dark:bg-gray-800 rounded-lg p-4 shadow-sm">
-                    <p className="text-gray-500 dark:text-gray-400 text-sm">Sync Progress</p>
-                    <p className="text-2xl font-bold mt-1">{(blockchainInfo.verificationprogress * 100).toFixed(2)}%</p>
-                  </div>
+          {/* Quick Charts */}
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: 0.4, duration: 0.5 }}
+            className="mb-8"
+          >
+            <div className="card p-6">
+              <div className="flex justify-between items-center mb-6">
+                <h2 className="text-xl font-bold flex items-center">
+                  <FaHashtag className="text-bitcoinz-600 mr-2" />
+                  Network Hashrate
+                </h2>
+                
+                <div className="flex space-x-2 bg-gray-100 p-1 rounded-lg">
+                  <button 
+                    onClick={() => handleTimeRangeChange('day')}
+                    className={`px-3 py-1 text-xs font-medium rounded-md transition-colors ${
+                      timeRange === 'day' 
+                        ? 'bg-white text-bitcoinz-600 shadow-sm' 
+                        : 'text-gray-600 hover:text-gray-900'
+                    }`}
+                  >
+                    24h
+                  </button>
+                  <button 
+                    onClick={() => handleTimeRangeChange('week')}
+                    className={`px-3 py-1 text-xs font-medium rounded-md transition-colors ${
+                      timeRange === 'week' 
+                        ? 'bg-white text-bitcoinz-600 shadow-sm' 
+                        : 'text-gray-600 hover:text-gray-900'
+                    }`}
+                  >
+                    7d
+                  </button>
+                  <button 
+                    onClick={() => handleTimeRangeChange('month')}
+                    className={`px-3 py-1 text-xs font-medium rounded-md transition-colors ${
+                      timeRange === 'month' 
+                        ? 'bg-white text-bitcoinz-600 shadow-sm' 
+                        : 'text-gray-600 hover:text-gray-900'
+                    }`}
+                  >
+                    30d
+                  </button>
                 </div>
               </div>
-            </div>
-            
-            <div className="bg-gradient-to-br from-white to-gray-50 dark:from-gray-800 dark:to-gray-900 rounded-xl shadow-lg overflow-hidden">
-              <div className="bg-purple-600 px-6 py-4">
-                <h3 className="text-xl font-bold text-white flex items-center">
-                  <FaNetworkWired className="mr-2" /> Network Information
-                </h3>
-              </div>
-              <div className="p-6">
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  <div className="bg-white dark:bg-gray-800 rounded-lg p-4 shadow-sm">
-                    <p className="text-gray-500 dark:text-gray-400 text-sm">Network Hashrate</p>
-                    <p className="text-2xl font-bold mt-1">{formatNumber(miningInfo.networkhashps)} H/s</p>
-                  </div>
-                  <div className="bg-white dark:bg-gray-800 rounded-lg p-4 shadow-sm">
-                    <p className="text-gray-500 dark:text-gray-400 text-sm">Connections</p>
-                    <p className="text-2xl font-bold mt-1">{formatNumber(networkInfo.connections)}</p>
-                  </div>
-                  <div className="bg-white dark:bg-gray-800 rounded-lg p-4 shadow-sm">
-                    <p className="text-gray-500 dark:text-gray-400 text-sm">Version</p>
-                    <p className="text-2xl font-bold mt-1">{networkInfo.version}</p>
-                  </div>
-                  <div className="bg-white dark:bg-gray-800 rounded-lg p-4 shadow-sm">
-                    <p className="text-gray-500 dark:text-gray-400 text-sm">Protocol Version</p>
-                    <p className="text-2xl font-bold mt-1">{networkInfo.protocolversion}</p>
-                  </div>
-                </div>
+              
+              <div className="h-64">
+                {historicalStats && createChartData('Network Hashrate', 'hashrate', '#3B82F6') && (
+                  <Line 
+                    data={createChartData('Network Hashrate', 'hashrate', '#3B82F6')} 
+                    options={chartOptions} 
+                  />
+                )}
               </div>
             </div>
-          </div>
+          </motion.div>
           
-          {/* Mining Information */}
-          <div className="bg-gradient-to-br from-white to-gray-50 dark:from-gray-800 dark:to-gray-900 rounded-xl shadow-lg overflow-hidden mb-8">
-            <div className="bg-green-600 px-6 py-4">
-              <h3 className="text-xl font-bold text-white flex items-center">
-                <FaCogs className="mr-2" /> Mining Information
-              </h3>
+          {/* Summary Card */}
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: 0.6, duration: 0.5 }}
+            className="card p-6 mb-8"
+          >
+            <h3 className="text-xl font-bold mb-4 flex items-center">
+              <FaInfoCircle className="text-bitcoinz-600 mr-2" />
+              Network Summary
+            </h3>
+            <div className="prose max-w-none text-gray-700">
+              <p>
+                The BitcoinZ network is currently at block height <span className="font-semibold">{formatNumber(blockchainInfo.blocks)}</span> with 
+                a network difficulty of <span className="font-semibold">{formatDifficulty(blockchainInfo.difficulty)}</span>. 
+                There are <span className="font-semibold">{formatNumber(networkInfo.connections)}</span> active connections 
+                to the network, and <span className="font-semibold">{formatNumber(miningInfo.pooledtx)}</span> transactions 
+                are waiting in the mempool.
+              </p>
+              <p className="mt-4">
+                The blockchain verification progress is at <span className="font-semibold">{(blockchainInfo.verificationprogress * 100).toFixed(2)}%</span> and 
+                the current size on disk is <span className="font-semibold">{formatNumber(blockchainInfo.size_on_disk)}</span> bytes.
+              </p>
             </div>
-            <div className="p-6">
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                <div className="bg-white dark:bg-gray-800 rounded-lg p-4 shadow-sm">
-                  <p className="text-gray-500 dark:text-gray-400 text-sm">Network Difficulty</p>
-                  <p className="text-2xl font-bold mt-1">{formatDifficulty(miningInfo.difficulty)}</p>
-                  <p className="text-xs text-gray-500 mt-1">The current mining difficulty</p>
-                </div>
-                <div className="bg-white dark:bg-gray-800 rounded-lg p-4 shadow-sm">
-                  <p className="text-gray-500 dark:text-gray-400 text-sm">Network Hashrate</p>
-                  <p className="text-2xl font-bold mt-1">{formatNumber(miningInfo.networkhashps)} H/s</p>
-                  <p className="text-xs text-gray-500 mt-1">Estimated network hashing power</p>
-                </div>
-                <div className="bg-white dark:bg-gray-800 rounded-lg p-4 shadow-sm">
-                  <p className="text-gray-500 dark:text-gray-400 text-sm">Pooled Transactions</p>
-                  <p className="text-2xl font-bold mt-1">{formatNumber(miningInfo.pooledtx)}</p>
-                  <p className="text-xs text-gray-500 mt-1">Transactions waiting in mempool</p>
-                </div>
-              </div>
-            </div>
-          </div>
+          </motion.div>
         </>
       )}
       
-      {/* Details Tab */}
       {activeTab === 'details' && (
-        <div className="grid grid-cols-1 gap-6">
-          <DetailCard 
-            title={
-              <div className="flex items-center text-blue-600">
-                <FaCube className="mr-2" /> Blockchain Details
-              </div>
-            } 
-            items={blockchainDetails} 
-            copyable={['Best Block Hash', 'Chain Work']} 
-          />
-          
-          <DetailCard 
-            title={
-              <div className="flex items-center text-purple-600">
-                <FaNetworkWired className="mr-2" /> Network Details
-              </div>
-            } 
-            items={networkDetails} 
-            copyable={['Local Services']} 
-          />
-          
-          <DetailCard 
-            title={
-              <div className="flex items-center text-green-600">
-                <FaCogs className="mr-2" /> Mining Details
-              </div>
-            } 
-            items={miningDetails} 
-          />
-        </div>
+        <motion.div 
+          variants={containerVariants}
+          initial="hidden"
+          animate="visible"
+          className="grid grid-cols-1 lg:grid-cols-2 gap-6"
+        >
+          <motion.div variants={itemVariants}>
+            <DetailCard 
+              title={
+                <div className="flex items-center">
+                  <FaCube className="text-blue-600 mr-2" />
+                  <span>Blockchain Information</span>
+                </div>
+              } 
+              items={blockchainDetails} 
+              copyable={['Best Block Hash', 'Chain Work']} 
+            />
+          </motion.div>
+          <motion.div variants={itemVariants}>
+            <DetailCard 
+              title={
+                <div className="flex items-center">
+                  <FaNetworkWired className="text-green-600 mr-2" />
+                  <span>Network Information</span>
+                </div>
+              } 
+              items={networkDetails} 
+              copyable={['Local Services']} 
+            />
+          </motion.div>
+          <motion.div variants={itemVariants} className="lg:col-span-2">
+            <DetailCard 
+              title={
+                <div className="flex items-center">
+                  <FaCogs className="text-purple-600 mr-2" />
+                  <span>Mining Information</span>
+                </div>
+              } 
+              items={miningDetails} 
+            />
+          </motion.div>
+        </motion.div>
       )}
       
-      {/* Charts Tab */}
       {activeTab === 'charts' && (
-        <>
+        <motion.div
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          transition={{ duration: 0.5 }}
+          className="space-y-8"
+        >
           <div className="flex justify-end mb-4">
-            <div className="inline-flex bg-gray-100 dark:bg-gray-700 rounded-lg p-1">
+            <div className="flex space-x-2 bg-gray-100 p-1 rounded-lg">
               <button 
                 onClick={() => handleTimeRangeChange('day')}
-                className={`px-3 py-1 rounded-md text-sm font-medium transition-all duration-200 ${
+                className={`px-3 py-1 text-xs font-medium rounded-md transition-colors ${
                   timeRange === 'day' 
-                    ? 'bg-white dark:bg-gray-800 text-bitcoinz-600 shadow-sm' 
-                    : 'text-gray-600 dark:text-gray-300 hover:text-bitcoinz-600 dark:hover:text-white'
+                    ? 'bg-white text-bitcoinz-600 shadow-sm' 
+                    : 'text-gray-600 hover:text-gray-900'
                 }`}
               >
                 24h
               </button>
               <button 
                 onClick={() => handleTimeRangeChange('week')}
-                className={`px-3 py-1 rounded-md text-sm font-medium transition-all duration-200 ${
+                className={`px-3 py-1 text-xs font-medium rounded-md transition-colors ${
                   timeRange === 'week' 
-                    ? 'bg-white dark:bg-gray-800 text-bitcoinz-600 shadow-sm' 
-                    : 'text-gray-600 dark:text-gray-300 hover:text-bitcoinz-600 dark:hover:text-white'
+                    ? 'bg-white text-bitcoinz-600 shadow-sm' 
+                    : 'text-gray-600 hover:text-gray-900'
                 }`}
               >
                 7d
               </button>
               <button 
                 onClick={() => handleTimeRangeChange('month')}
-                className={`px-3 py-1 rounded-md text-sm font-medium transition-all duration-200 ${
+                className={`px-3 py-1 text-xs font-medium rounded-md transition-colors ${
                   timeRange === 'month' 
-                    ? 'bg-white dark:bg-gray-800 text-bitcoinz-600 shadow-sm' 
-                    : 'text-gray-600 dark:text-gray-300 hover:text-bitcoinz-600 dark:hover:text-white'
+                    ? 'bg-white text-bitcoinz-600 shadow-sm' 
+                    : 'text-gray-600 hover:text-gray-900'
                 }`}
               >
                 30d
@@ -412,64 +518,51 @@ const Stats = () => {
             </div>
           </div>
           
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-8">
-            <div className="bg-white dark:bg-gray-800 rounded-xl shadow-lg p-6">
-              <h3 className="text-xl font-bold mb-4 text-blue-600 flex items-center">
-                <FaChartLine className="mr-2" /> Difficulty
-              </h3>
-              <div className="h-64">
-                {historicalStats && (
-                  <Line 
-                    data={createChartData('Difficulty', 'difficulty', '#3B82F6')} 
-                    options={chartOptions} 
-                  />
-                )}
-              </div>
-            </div>
-            
-            <div className="bg-white dark:bg-gray-800 rounded-xl shadow-lg p-6">
-              <h3 className="text-xl font-bold mb-4 text-green-600 flex items-center">
-                <FaChartLine className="mr-2" /> Hashrate
-              </h3>
-              <div className="h-64">
-                {historicalStats && (
-                  <Line 
-                    data={createChartData('Hashrate', 'hashrate', '#10B981')} 
-                    options={chartOptions} 
-                  />
-                )}
-              </div>
-            </div>
-            
-            <div className="bg-white dark:bg-gray-800 rounded-xl shadow-lg p-6">
-              <h3 className="text-xl font-bold mb-4 text-purple-600 flex items-center">
-                <FaChartLine className="mr-2" /> Transactions
-              </h3>
-              <div className="h-64">
-                {historicalStats && (
-                  <Line 
-                    data={createChartData('Transactions', 'transactions', '#8B5CF6')} 
-                    options={chartOptions} 
-                  />
-                )}
-              </div>
-            </div>
-            
-            <div className="bg-white dark:bg-gray-800 rounded-xl shadow-lg p-6">
-              <h3 className="text-xl font-bold mb-4 text-red-600 flex items-center">
-                <FaChartLine className="mr-2" /> Avg. Block Time
-              </h3>
-              <div className="h-64">
-                {historicalStats && (
-                  <Line 
-                    data={createChartData('Avg. Block Time', 'avgBlockTime', '#EF4444')} 
-                    options={chartOptions} 
-                  />
-                )}
-              </div>
+          <div className="card p-6">
+            <h3 className="text-xl font-bold mb-4 flex items-center">
+              <FaHashtag className="text-blue-600 mr-2" />
+              Network Hashrate
+            </h3>
+            <div className="h-80">
+              {historicalStats && createChartData('Network Hashrate', 'hashrate', '#3B82F6') && (
+                <Line 
+                  data={createChartData('Network Hashrate', 'hashrate', '#3B82F6')} 
+                  options={chartOptions} 
+                />
+              )}
             </div>
           </div>
-        </>
+          
+          <div className="card p-6">
+            <h3 className="text-xl font-bold mb-4 flex items-center">
+              <FaNetworkWired className="text-green-600 mr-2" />
+              Difficulty
+            </h3>
+            <div className="h-80">
+              {historicalStats && createChartData('Difficulty', 'difficulty', '#10B981') && (
+                <Line 
+                  data={createChartData('Difficulty', 'difficulty', '#10B981')} 
+                  options={chartOptions} 
+                />
+              )}
+            </div>
+          </div>
+          
+          <div className="card p-6">
+            <h3 className="text-xl font-bold mb-4 flex items-center">
+              <FaExchangeAlt className="text-purple-600 mr-2" />
+              Transactions
+            </h3>
+            <div className="h-80">
+              {historicalStats && createChartData('Transactions', 'transactions', '#8B5CF6') && (
+                <Line 
+                  data={createChartData('Transactions', 'transactions', '#8B5CF6')} 
+                  options={chartOptions} 
+                />
+              )}
+            </div>
+          </div>
+        </motion.div>
       )}
     </div>
   );

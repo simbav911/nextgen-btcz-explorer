@@ -145,7 +145,7 @@ const Block = () => {
   }
   
   return (
-    <div>
+    <div className="container-custom max-w-6xl mx-auto px-4">
       <div className="flex items-center justify-between mb-6">
         <h1 className="text-3xl font-bold flex items-center">
           <FaCube className="text-bitcoinz-600 mr-3" />
@@ -156,14 +156,14 @@ const Block = () => {
           <button
             onClick={() => navigateToBlock(block.height - 1)}
             disabled={block.height === 0}
-            className={`btn ${block.height === 0 ? 'bg-gray-100 text-gray-400 cursor-not-allowed' : 'btn-secondary'}`}
+            className={`btn btn-sm ${block.height === 0 ? 'bg-gray-100 text-gray-400 cursor-not-allowed' : 'btn-secondary'}`}
           >
             <FaArrowLeft className="mr-2" /> Previous Block
           </button>
           <button
             onClick={() => navigateToBlock(block.height + 1)}
             disabled={!block.nextblockhash}
-            className={`btn ${!block.nextblockhash ? 'bg-gray-100 text-gray-400 cursor-not-allowed' : 'btn-secondary'}`}
+            className={`btn btn-sm ${!block.nextblockhash ? 'bg-gray-100 text-gray-400 cursor-not-allowed' : 'btn-secondary'}`}
           >
             Next Block <FaArrowRight className="ml-2" />
           </button>
@@ -194,7 +194,7 @@ const Block = () => {
             />
           </>
         ) : (
-          <div className="card text-center py-8">
+          <div className="card text-center py-8 max-w-5xl mx-auto">
             <p className="text-gray-500">No transactions available</p>
           </div>
         )}

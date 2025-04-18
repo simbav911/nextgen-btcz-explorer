@@ -10,8 +10,9 @@ import { formatHash } from '../utils/formatting';
  * @param {string} type - The type of hash (block, tx, address)
  * @param {number} length - Number of characters to show before truncation
  * @param {boolean} showCopy - Whether to show copy button
+ * @param {string} className - Optional custom className for link styling
  */
-const HashLink = ({ hash, type = 'tx', length = 10, showCopy = true }) => {
+const HashLink = ({ hash, type = 'tx', length = 10, showCopy = true, className = '' }) => {
   if (!hash) return null;
   
   const getUrl = () => {
@@ -34,12 +35,30 @@ const HashLink = ({ hash, type = 'tx', length = 10, showCopy = true }) => {
     maxWidth: '100%',
     display: 'inline-block'
   };
+
+  // Determine default class based on type
+  let defaultClass = "font-mono hover:underline mr-1 overflow-hidden flex-1";
+  
+  // Add type-specific styling
+  switch (type) {
+    case 'tx':
+      defaultClass += " text-blue-700 font-medium";
+      break;
+    case 'block':
+      defaultClass += " text-green-700 font-medium";
+      break;
+    case 'address':
+      defaultClass += " text-purple-700 font-medium";
+      break;
+    default:
+      defaultClass += " text-bitcoinz-600";
+  }
   
   return (
     <div className="flex items-center w-full overflow-hidden group">
       <Link 
         to={getUrl()} 
-        className="font-mono text-bitcoinz-600 hover:underline mr-1 overflow-hidden flex-1"
+        className={`${defaultClass} ${className}`}
         title={hash}
       >
         <span style={truncateStyle}>{formatHash(hash, length)}</span>
@@ -48,7 +67,7 @@ const HashLink = ({ hash, type = 'tx', length = 10, showCopy = true }) => {
       {showCopy && (
         <CopyToClipboard text={hash}>
           <button 
-            className="text-gray-400 hover:text-gray-600 opacity-0 group-hover:opacity-100 transition-opacity focus:outline-none flex-shrink-0" 
+            className="bg-white text-blue-600 hover:text-blue-800 p-1 rounded-full shadow-sm transition-colors focus:outline-none flex-shrink-0" 
             title="Copy to clipboard"
           >
             <FaCopy size={14} />

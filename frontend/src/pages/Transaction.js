@@ -162,12 +162,12 @@ const Transaction = () => {
       
       {/* Transaction Summary Card - Redesigned for better space usage */}
       <div className="bg-white rounded-lg shadow-md overflow-hidden mb-6">
-        <div className="px-6 py-4 bg-gradient-to-r from-blue-500 via-bitcoinz-500 to-blue-400">
-          <h2 className="text-xl font-semibold text-white flex justify-between items-center">
+        <div className="px-6 py-4 bg-gradient-to-r from-blue-600 via-bitcoinz-600 to-blue-500">
+          <h2 className="text-xl font-semibold text-white flex justify-between items-center" style={{ textShadow: '0 1px 2px rgba(0,0,0,0.3)' }}>
             <span>Transaction Summary</span>
           </h2>
-          <div className="mt-2 flex items-center">
-            <HashLink hash={transaction.txid} type="tx" showCopy={true} className="text-white opacity-90 hover:opacity-100" />
+          <div className="mt-2 flex items-center bg-black bg-opacity-30 rounded px-3 py-2 border border-white border-opacity-20">
+            <HashLink hash={transaction.txid} type="tx" showCopy={true} className="text-white font-mono text-sm hover:text-yellow-300 transition-colors" style={{ textShadow: '0 1px 1px rgba(0,0,0,0.5)' }} />
           </div>
         </div>
         
@@ -260,8 +260,8 @@ const Transaction = () => {
       {hasShieldedComponents && (
         <div className="mb-6">
           <div className="bg-white rounded-lg shadow-md overflow-hidden">
-            <div className="px-6 py-4 bg-gradient-to-r from-indigo-500 to-purple-500">
-              <h2 className="text-xl font-semibold text-white">
+            <div className="px-6 py-4 bg-gradient-to-r from-indigo-600 to-purple-600">
+              <h2 className="text-xl font-semibold text-white" style={{ textShadow: '0 1px 2px rgba(0,0,0,0.3)' }}>
                 Shielded Components
               </h2>
             </div>
@@ -416,8 +416,8 @@ const Transaction = () => {
       {/* Inputs - Modernized */}
       <div className="mb-6">
         <div className="bg-white rounded-lg shadow-md overflow-hidden">
-          <div className="px-6 py-4 bg-gradient-to-r from-green-500 to-teal-500">
-            <h2 className="text-xl font-semibold text-white flex justify-between items-center">
+          <div className="px-6 py-4 bg-gradient-to-r from-green-600 to-teal-600">
+            <h2 className="text-xl font-semibold text-white flex justify-between items-center" style={{ textShadow: '0 1px 2px rgba(0,0,0,0.3)' }}>
               <span>Inputs ({transaction.vin ? transaction.vin.length : 0})</span>
               {transaction.vin && transaction.vin.length === 0 && (
                 <span className="text-sm bg-white bg-opacity-20 px-2 py-1 rounded">No Inputs</span>
@@ -489,8 +489,8 @@ const Transaction = () => {
       {/* Outputs - Modernized */}
       <div className="mb-6">
         <div className="bg-white rounded-lg shadow-md overflow-hidden">
-          <div className="px-6 py-4 bg-gradient-to-r from-amber-500 to-orange-500">
-            <h2 className="text-xl font-semibold text-white flex justify-between items-center">
+          <div className="px-6 py-4 bg-gradient-to-r from-amber-600 to-orange-600">
+            <h2 className="text-xl font-semibold text-white flex justify-between items-center" style={{ textShadow: '0 1px 2px rgba(0,0,0,0.3)' }}>
               <span>Outputs ({transaction.vout ? transaction.vout.length : 0})</span>
               {transaction.vout && transaction.vout.length === 0 && (
                 <span className="text-sm bg-white bg-opacity-20 px-2 py-1 rounded">No Outputs</span>

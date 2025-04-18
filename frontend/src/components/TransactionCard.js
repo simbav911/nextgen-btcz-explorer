@@ -47,7 +47,9 @@ const TransactionCard = ({ transaction }) => {
           </div>
           {blockhash && (
             <div className="text-xs text-gray-500">
-              Block: <Link to={`/blocks/${blockhash}`} className="text-bitcoinz-600 hover:underline" onClick={(e) => e.stopPropagation()}>{formatNumber(transaction.blockheight)}</Link>
+              Block: <Link to={`/blocks/${blockhash}`} className="text-bitcoinz-600 hover:underline" onClick={(e) => e.stopPropagation()}>
+                {transaction.height || blockhash.substring(0, 8)}...
+              </Link>
             </div>
           )}
           <div className="flex items-center justify-end mt-1">

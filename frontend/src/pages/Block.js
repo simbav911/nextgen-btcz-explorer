@@ -30,7 +30,7 @@ const Block = () => {
   const txsPerPage = 10;
   
   // Fetch block data
-  useEffect(() => {=
+  useEffect(() => {
     const fetchBlock = async () => {
       try {
         setLoading(true);

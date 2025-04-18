@@ -128,7 +128,64 @@ const getTransaction = async (txid, includeWatchonly = true) => {
  * Get raw transaction details
  */
 const getRawTransaction = async (txid, verbose = 1) => {
-  return executeRpcCommand('getrawtransaction', [txid, verbose]);
+  try {
+    const transaction = await executeRpcCommand('getrawtransaction', [txid, verbose]);
+    
+    // For shielded transactions, ensure we properly process all components
+    if (verbose === 1 && transaction) {
+      // Process valueBalance for shielded transactions
+      if (transaction.valueBalance !== undefined) {
+        logger.debug(`Processing shielded transaction: ${txid}`);
+        
+        // Ensure vShieldedSpend and vShieldedOutput are properly formatted
+        if (!transaction.vShieldedSpend) {
+          transaction.vShieldedSpend = [];
+        }
+        
+        if (!transaction.vShieldedOutput) {
+          transaction.vShieldedOutput = [];
+        }
+        
+        // Log shielded transaction details for debugging
+        logger.debug(`Shielded transaction details: valueBalance=${transaction.valueBalance}, spends=${transaction.vShieldedSpend.length}, outputs=${transaction.vShieldedOutput.length}`);
+      }
+      
+      // Process transparent inputs (vin) to extract addresses and values when possible
+      if (transaction.vin && transaction.vin.length > 0) {
+        for (const input of transaction.vin) {
+          // Skip coinbase inputs
+          if (input.coinbase) continue;
+          
+          // If input doesn't have address or value, try to get them from the previous output
+          if (input.txid && input.vout !== undefined && (!input.address || input.value === undefined)) {
+            try {
+              const prevTx = await executeRpcCommand('getrawtransaction', [input.txid, 1]);
+              if (prevTx && prevTx.vout && prevTx.vout[input.vout]) {
+                const prevOutput = prevTx.vout[input.vout];
+                
+                // Extract address from previous output
+                if (prevOutput.scriptPubKey && prevOutput.scriptPubKey.addresses && prevOutput.scriptPubKey.addresses.length > 0) {
+                  input.address = prevOutput.scriptPubKey.addresses[0];
+                }
+                
+                // Extract value from previous output
+                if (prevOutput.value !== undefined) {
+                  input.value = prevOutput.value;
+                }
+              }
+            } catch (err) {
+              logger.error(`Failed to fetch previous transaction ${input.txid}: ${err.message}`);
+            }
+          }
+        }
+      }
+    }
+    
+    return transaction;
+  } catch (error) {
+    logger.error(`Failed to get raw transaction ${txid}:`, error.message);
+    throw error;
+  }
 };
 
 /**

@@ -127,8 +127,18 @@ const Transaction = () => {
   ];
   
   // Add overwintered info if available
-  if (transaction.fOverwintered) {
-    txDetails.push({ label: 'Overwintered', value: 'Yes' });
+  if (transaction.fOverwintered !== undefined) {
+    txDetails.push({ label: 'Overwintered', value: transaction.fOverwintered ? 'true' : 'false' });
+  }
+
+  // Add versiongroupid if available
+  if (transaction.versiongroupid) {
+    txDetails.push({ label: 'VersionGroupId', value: transaction.versiongroupid });
+  }
+
+  // Add expiryheight if available
+  if (transaction.expiryheight) {
+    txDetails.push({ label: 'Expiry Height', value: transaction.expiryheight });
   }
   
   // Style for content containers
@@ -136,204 +146,414 @@ const Transaction = () => {
     maxHeight: '300px',
     overflowY: 'auto'
   };
+
+  // Check if this is a shielded transaction
+  const hasShieldedComponents = 
+    (transaction.vShieldedSpend && transaction.vShieldedSpend.length > 0) || 
+    (transaction.vShieldedOutput && transaction.vShieldedOutput.length > 0) || 
+    (transaction.valueBalance !== undefined && transaction.valueBalance !== 0);
   
   return (
-    <div>
+    <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pb-12">
       <h1 className="text-3xl font-bold flex items-center mb-6">
         <FaExchangeAlt className="text-bitcoinz-600 mr-3" />
         Transaction Details
       </h1>
       
-      <DetailCard
-        title="Transaction Information"
-        items={txDetails}
-        copyable={['Transaction ID']}
-      />
-      
-      {/* Inputs */}
-      <div className="mt-8">
-        <h2 className="text-2xl font-bold mb-4">
-          Inputs ({transaction.vin ? transaction.vin.length : 0})
-        </h2>
-        
-        <div className="card">
-          {transaction.vin && transaction.vin.length > 0 ? (
-            <div className="divide-y divide-gray-200" style={contentStyle}>
-              {transaction.vin.map((input, index) => (
-                <div key={index} className="py-4 first:pt-0 last:pb-0">
-                  {input.coinbase ? (
-                    <div>
-                      <p className="font-medium">Coinbase (New Coins)</p>
-                      <p className="text-sm font-mono text-gray-500 mt-1 break-all">
-                        {input.coinbase}
-                      </p>
-                    </div>
-                  ) : (
-                    <div>
-                      <div className="flex flex-wrap justify-between">
-                        <div className="w-full md:w-1/2 break-words">
-                          <p className="font-medium">
-                            {input.address ? (
-                              <HashLink hash={input.address} type="address" length={24} />
-                            ) : (
-                              'Unknown Address'
-                            )}
-                          </p>
-                          {input.value && (
-                            <p className="text-sm text-gray-500 mt-1">
-                              {formatBTCZ(input.value)}
-                            </p>
-                          )}
-                        </div>
-                        <div className="text-sm text-gray-500 w-full md:w-1/2 mt-2 md:mt-0">
-                          <p className="truncate">
-                            <span className="font-medium">Outpoint:</span> {input.txid}:{input.vout}
-                          </p>
-                          <p>
-                            <span className="font-medium">Sequence:</span> {input.sequence}
-                          </p>
-                        </div>
-                      </div>
-                      
-                      {input.scriptSig && (
-                        <div className="mt-3">
-                          <p className="text-sm font-medium">Script</p>
-                          <div className="mt-1 p-2 bg-gray-50 rounded-md">
-                            <p className="text-sm font-mono text-gray-500 break-all">
-                              {input.scriptSig.hex}
-                            </p>
-                          </div>
-                        </div>
-                      )}
-                    </div>
-                  )}
-                </div>
-              ))}
-            </div>
-          ) : (
-            <p className="text-gray-500 text-center py-4">No inputs available</p>
-          )}
+      {/* Transaction Summary Card - Redesigned for better space usage */}
+      <div className="bg-white rounded-lg shadow-md overflow-hidden mb-6">
+        <div className="px-6 py-4 bg-gradient-to-r from-blue-500 via-bitcoinz-500 to-blue-400">
+          <h2 className="text-xl font-semibold text-white flex justify-between items-center">
+            <span>Transaction Summary</span>
+          </h2>
+          <div className="mt-2 flex items-center">
+            <HashLink hash={transaction.txid} type="tx" showCopy={true} className="text-white opacity-90 hover:opacity-100" />
+          </div>
         </div>
-      </div>
-      
-      {/* Outputs */}
-      <div className="mt-8">
-        <h2 className="text-2xl font-bold mb-4">
-          Outputs ({transaction.vout ? transaction.vout.length : 0})
-        </h2>
         
-        <div className="card">
-          {transaction.vout && transaction.vout.length > 0 ? (
-            <div className="divide-y divide-gray-200" style={contentStyle}>
-              {transaction.vout.map((output, index) => (
-                <div key={index} className="py-4 first:pt-0 last:pb-0">
-                  <div className="flex flex-wrap justify-between">
-                    <div className="w-full md:w-1/2 break-words">
-                      <p className="font-medium">
-                        {output.scriptPubKey && output.scriptPubKey.addresses ? (
-                          <HashLink 
-                            hash={output.scriptPubKey.addresses[0]} 
-                            type="address" 
-                            length={24} 
-                          />
-                        ) : (
-                          `${output.scriptPubKey ? output.scriptPubKey.type : 'Unknown'}`
-                        )}
-                      </p>
-                      <p className="text-sm font-medium text-gray-700 mt-1">
-                        {formatBTCZ(output.value)}
-                      </p>
-                    </div>
-                    <div className="text-sm text-gray-500 w-full md:w-1/2 mt-2 md:mt-0">
-                      <p><span className="font-medium">Output Index:</span> {output.n}</p>
-                      <p><span className="font-medium">Type:</span> {output.scriptPubKey ? output.scriptPubKey.type : 'Unknown'}</p>
-                    </div>
-                  </div>
-                  
-                  {output.scriptPubKey && (
-                    <div className="mt-3">
-                      <p className="text-sm font-medium">Script</p>
-                      <div className="mt-1 p-2 bg-gray-50 rounded-md">
-                        <p className="text-sm font-mono text-gray-500 break-all">
-                          {output.scriptPubKey.hex}
-                        </p>
-                      </div>
-                    </div>
-                  )}
-                  
-                  {output.spentTxid && (
-                    <div className="mt-2 text-sm bg-red-50 p-2 rounded-md">
-                      <span className="font-medium text-red-600 mr-1">Spent</span> in transaction{' '}
-                      <HashLink hash={output.spentTxid} type="tx" length={20} />
-                    </div>
-                  )}
-                </div>
-              ))}
-            </div>
-          ) : (
-            <p className="text-gray-500 text-center py-4">No outputs available</p>
-          )}
-        </div>
-      </div>
-      
-      {/* Sapling Features */}
-      {transaction.fOverwintered && transaction.version >= 4 && (
-        <div className="mt-8">
-          <h2 className="text-2xl font-bold mb-4">Sapling Features</h2>
-          
-          <div className="card">
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-              <div>
-                <h3 className="text-lg font-medium mb-3">Value Balance</h3>
-                <p>{formatBTCZ(transaction.valueBalance || 0)}</p>
-              </div>
+        <div className="p-6">
+          {/* Two-column layout for transaction details */}
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            {/* Left column - Basic Information */}
+            <div>
+              <h3 className="text-lg font-medium mb-4 text-gray-700 border-b pb-2">Basic Information</h3>
               
-              <div>
-                <h3 className="text-lg font-medium mb-3">Binding Signature</h3>
-                <p className="font-mono text-sm break-all">
-                  {transaction.bindingSig || 'None'}
-                </p>
+              <div className="space-y-3">
+                <div className="flex justify-between">
+                  <span className="text-gray-600">Status</span>
+                  <span className={`badge ${confirmationInfo.class} inline-flex items-center`}>
+                    {transaction.confirmations > 0 ? 
+                      <FaCheckCircle className="mr-1" /> : 
+                      <FaClock className="mr-1" />
+                    }
+                    {confirmationInfo.text}
+                  </span>
+                </div>
+                
+                <div className="flex justify-between">
+                  <span className="text-gray-600">Timestamp</span>
+                  <span className="text-right">
+                    {transaction.time ? 
+                      `${formatTimestamp(transaction.time)} (${formatRelativeTime(transaction.time)})` : 
+                      'Pending'}
+                  </span>
+                </div>
+                
+                <div className="flex justify-between">
+                  <span className="text-gray-600">Size</span>
+                  <span>{formatNumber(transaction.size || 0)} bytes</span>
+                </div>
+                
+                <div className="flex justify-between">
+                  <span className="text-gray-600">Fee</span>
+                  <span>{calculateFee()}</span>
+                </div>
               </div>
             </div>
             
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mt-6">
-              <div>
-                <h3 className="text-lg font-medium mb-3">
-                  Shielded Spends ({transaction.spendDescs ? transaction.spendDescs.length : 0})
-                </h3>
-                {transaction.spendDescs && transaction.spendDescs.length > 0 ? (
-                  <div className="space-y-3 max-h-40 overflow-y-auto p-2 bg-gray-50 rounded">
-                    {transaction.spendDescs.map((desc, index) => (
-                      <div key={index} className="text-sm font-mono text-gray-600 break-all p-2 bg-white rounded shadow-sm">
-                        Spend {index + 1}: {JSON.stringify(desc)}
-                      </div>
-                    ))}
-                  </div>
-                ) : (
-                  <p className="text-gray-500">No shielded spends</p>
-                )}
-              </div>
+            {/* Right column - Technical Details */}
+            <div>
+              <h3 className="text-lg font-medium mb-4 text-gray-700 border-b pb-2">Technical Details</h3>
               
-              <div>
-                <h3 className="text-lg font-medium mb-3">
-                  Shielded Outputs ({transaction.outputDescs ? transaction.outputDescs.length : 0})
-                </h3>
-                {transaction.outputDescs && transaction.outputDescs.length > 0 ? (
-                  <div className="space-y-3 max-h-40 overflow-y-auto p-2 bg-gray-50 rounded">
-                    {transaction.outputDescs.map((desc, index) => (
-                      <div key={index} className="text-sm font-mono text-gray-600 break-all p-2 bg-white rounded shadow-sm">
-                        Output {index + 1}: {JSON.stringify(desc)}
-                      </div>
-                    ))}
+              <div className="space-y-3">
+                <div className="flex justify-between">
+                  <span className="text-gray-600">Block</span>
+                  <span className="text-right">
+                    {transaction.blockhash ? (
+                      <HashLink hash={transaction.blockhash} type="block" length={10} />
+                    ) : 'Pending'}
+                  </span>
+                </div>
+                
+                <div className="flex justify-between">
+                  <span className="text-gray-600">Version</span>
+                  <span>{transaction.version}</span>
+                </div>
+                
+                {transaction.fOverwintered !== undefined && (
+                  <div className="flex justify-between">
+                    <span className="text-gray-600">Overwintered</span>
+                    <span>{transaction.fOverwintered ? 'true' : 'false'}</span>
                   </div>
-                ) : (
-                  <p className="text-gray-500">No shielded outputs</p>
+                )}
+                
+                {transaction.versiongroupid && (
+                  <div className="flex justify-between">
+                    <span className="text-gray-600">VersionGroupId</span>
+                    <span>{transaction.versiongroupid}</span>
+                  </div>
+                )}
+                
+                {transaction.expiryheight && (
+                  <div className="flex justify-between">
+                    <span className="text-gray-600">Expiry Height</span>
+                    <span>{transaction.expiryheight}</span>
+                  </div>
                 )}
               </div>
             </div>
           </div>
         </div>
+      </div>
+      
+      {/* Shielded Transaction Components - Modernized */}
+      {hasShieldedComponents && (
+        <div className="mb-6">
+          <div className="bg-white rounded-lg shadow-md overflow-hidden">
+            <div className="px-6 py-4 bg-gradient-to-r from-indigo-500 to-purple-500">
+              <h2 className="text-xl font-semibold text-white">
+                Shielded Components
+              </h2>
+            </div>
+            
+            <div className="p-6">
+              {/* Add simplified explanation of the transaction */}
+              <div className="bg-blue-50 p-4 mb-6 rounded-md border-l-4 border-blue-400">
+                <h3 className="font-bold text-blue-700 mb-2">What's happening in this transaction?</h3>
+                <p className="text-sm text-gray-700">
+                  {transaction.vShieldedSpend && transaction.vShieldedSpend.length > 0 && 
+                   transaction.vout && transaction.vout.length > 0 && (
+                    <>
+                      This is a <strong>deshielding transaction</strong> where funds are being moved from the private (shielded) pool to the public (transparent) pool.
+                      <br />
+                      <span className="text-xs mt-1 block">Funds are being taken from a shielded address and sent to a transparent address.</span>
+                    </>
+                  )}
+                  {transaction.vin && transaction.vin.length > 0 && 
+                   transaction.vShieldedOutput && transaction.vShieldedOutput.length > 0 && (
+                    <>
+                      This is a <strong>shielding transaction</strong> where funds are being moved from the public (transparent) pool to the private (shielded) pool.
+                      <br />
+                      <span className="text-xs mt-1 block">Funds are being taken from a transparent address and sent to a shielded address.</span>
+                    </>
+                  )}
+                  {transaction.vShieldedSpend && transaction.vShieldedSpend.length > 0 && 
+                   transaction.vShieldedOutput && transaction.vShieldedOutput.length > 0 && (
+                    <>
+                      This is a <strong>shielded-to-shielded transaction</strong> where funds are being transferred entirely within the private (shielded) pool.
+                      <br />
+                      <span className="text-xs mt-1 block">Both the sender and recipient addresses are private.</span>
+                    </>
+                  )}
+                </p>
+              </div>
+              
+              {/* Visual flow indicator */}
+              <div className="flex items-center justify-center py-4 mb-6 bg-gray-50 rounded-lg">
+                <div className="w-1/3 text-center">
+                  {transaction.vin && transaction.vin.length > 0 ? (
+                    <div className="bg-gray-100 rounded-md p-3 mx-2 shadow-sm">
+                      <p className="font-medium">Transparent Input</p>
+                      <p className="text-sm text-gray-500">Public</p>
+                    </div>
+                  ) : transaction.vShieldedSpend && transaction.vShieldedSpend.length > 0 ? (
+                    <div className="bg-blue-100 rounded-md p-3 mx-2 shadow-sm">
+                      <p className="font-medium">Shielded Input</p>
+                      <p className="text-sm text-gray-500">Private</p>
+                    </div>
+                  ) : (
+                    <div className="bg-gray-50 rounded-md p-3 mx-2 border border-dashed border-gray-300">
+                      <p className="font-medium text-gray-400">No Inputs</p>
+                    </div>
+                  )}
+                </div>
+                
+                <div className="w-1/3 flex justify-center">
+                  <div className="flex items-center">
+                    <div className="h-0.5 w-12 bg-gray-300"></div>
+                    <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M14 5l7 7m0 0l-7 7m7-7H3" />
+                    </svg>
+                    <div className="h-0.5 w-12 bg-gray-300"></div>
+                  </div>
+                </div>
+                
+                <div className="w-1/3 text-center">
+                  {transaction.vout && transaction.vout.length > 0 ? (
+                    <div className="bg-gray-100 rounded-md p-3 mx-2 shadow-sm">
+                      <p className="font-medium">Transparent Output</p>
+                      <p className="text-sm text-gray-500">Public</p>
+                    </div>
+                  ) : transaction.vShieldedOutput && transaction.vShieldedOutput.length > 0 ? (
+                    <div className="bg-blue-100 rounded-md p-3 mx-2 shadow-sm">
+                      <p className="font-medium">Shielded Output</p>
+                      <p className="text-sm text-gray-500">Private</p>
+                    </div>
+                  ) : (
+                    <div className="bg-gray-50 rounded-md p-3 mx-2 border border-dashed border-gray-300">
+                      <p className="font-medium text-gray-400">No Outputs</p>
+                    </div>
+                  )}
+                </div>
+              </div>
+              
+              {transaction.valueBalance !== undefined && (
+                <div className="mb-6 p-4 bg-gray-50 rounded-lg">
+                  <div className="flex justify-between items-center">
+                    <div>
+                      <p className="font-medium">Value Balance:</p>
+                      <p className="text-xs text-gray-500">Amount moving between shielded and transparent pools</p>
+                    </div>
+                    <div className="text-right">
+                      <p className="text-lg font-semibold text-bitcoinz-600">{formatBTCZ(transaction.valueBalance)}</p>
+                    </div>
+                  </div>
+                </div>
+              )}
+              
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <div className="bg-gray-50 p-4 rounded-lg">
+                  <p className="font-medium">Shielded Spends ({transaction.vShieldedSpend ? transaction.vShieldedSpend.length : 0})</p>
+                  <p className="text-xs text-gray-500 mb-2">Funds taken from the shielded pool</p>
+                  {transaction.vShieldedSpend && transaction.vShieldedSpend.length > 0 ? (
+                    <div className="mt-2 p-3 bg-white rounded-md shadow-sm">
+                      {transaction.vShieldedSpend.map((spend, index) => (
+                        <div key={index} className="text-sm text-gray-500 mb-2">
+                          <p className="font-medium text-gray-700">Spend {index + 1}</p>
+                          {spend.cv && <p className="truncate"><span className="font-medium">CV:</span> {spend.cv}</p>}
+                          {spend.anchor && <p className="truncate"><span className="font-medium">Anchor:</span> {spend.anchor}</p>}
+                        </div>
+                      ))}
+                    </div>
+                  ) : (
+                    <p className="text-sm text-gray-500 mt-1">No shielded spends</p>
+                  )}
+                </div>
+                
+                <div className="bg-gray-50 p-4 rounded-lg">
+                  <p className="font-medium">Shielded Outputs ({transaction.vShieldedOutput ? transaction.vShieldedOutput.length : 0})</p>
+                  <p className="text-xs text-gray-500 mb-2">Funds sent to the shielded pool</p>
+                  {transaction.vShieldedOutput && transaction.vShieldedOutput.length > 0 ? (
+                    <div className="mt-2 p-3 bg-white rounded-md shadow-sm">
+                      {transaction.vShieldedOutput.map((output, index) => (
+                        <div key={index} className="text-sm text-gray-500 mb-2">
+                          <p className="font-medium text-gray-700">Output {index + 1}</p>
+                          {output.cv && <p className="truncate"><span className="font-medium">CV:</span> {output.cv}</p>}
+                          {output.cmu && <p className="truncate"><span className="font-medium">CMU:</span> {output.cmu}</p>}
+                        </div>
+                      ))}
+                    </div>
+                  ) : (
+                    <p className="text-sm text-gray-500 mt-1">No shielded outputs</p>
+                  )}
+                </div>
+              </div>
+              
+              {transaction.bindingSig && (
+                <div className="mt-6 p-4 bg-gray-50 rounded-lg">
+                  <p className="font-medium">Binding Signature:</p>
+                  <p className="text-xs text-gray-500 mb-1">Cryptographic proof that the transaction balances correctly</p>
+                  <p className="text-sm font-mono text-gray-500 mt-1 break-all bg-white p-3 rounded-md">
+                    {transaction.bindingSig}
+                  </p>
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
       )}
+      
+      {/* Inputs - Modernized */}
+      <div className="mb-6">
+        <div className="bg-white rounded-lg shadow-md overflow-hidden">
+          <div className="px-6 py-4 bg-gradient-to-r from-green-500 to-teal-500">
+            <h2 className="text-xl font-semibold text-white flex justify-between items-center">
+              <span>Inputs ({transaction.vin ? transaction.vin.length : 0})</span>
+              {transaction.vin && transaction.vin.length === 0 && (
+                <span className="text-sm bg-white bg-opacity-20 px-2 py-1 rounded">No Inputs</span>
+              )}
+            </h2>
+          </div>
+          
+          <div className="p-6">
+            {transaction.vin && transaction.vin.length > 0 ? (
+              <div className="divide-y divide-gray-200" style={contentStyle}>
+                {transaction.vin.map((input, index) => (
+                  <div key={index} className="py-4 first:pt-0 last:pb-0">
+                    {input.coinbase ? (
+                      <div className="bg-yellow-50 p-4 rounded-lg">
+                        <p className="font-medium text-yellow-800">Coinbase (New Coins)</p>
+                        <p className="text-sm font-mono text-gray-500 mt-1 break-all">
+                          {input.coinbase}
+                        </p>
+                      </div>
+                    ) : (
+                      <div>
+                        <div className="flex flex-wrap justify-between">
+                          <div className="w-full md:w-1/2 break-words">
+                            <p className="font-medium">
+                              {input.address ? (
+                                <HashLink hash={input.address} type="address" length={24} />
+                              ) : (
+                                'Unknown Address'
+                              )}
+                            </p>
+                            {input.value && (
+                              <p className="text-sm text-gray-500 mt-1">
+                                {formatBTCZ(input.value)}
+                              </p>
+                            )}
+                          </div>
+                          <div className="text-sm text-gray-500 w-full md:w-1/2 mt-2 md:mt-0">
+                            <p className="truncate">
+                              <span className="font-medium">Outpoint:</span> {input.txid}:{input.vout}
+                            </p>
+                            <p>
+                              <span className="font-medium">Sequence:</span> {input.sequence}
+                            </p>
+                          </div>
+                        </div>
+                        
+                        {input.scriptSig && (
+                          <div className="mt-3">
+                            <p className="text-sm font-medium">Script</p>
+                            <div className="mt-1 p-2 bg-gray-50 rounded-md">
+                              <p className="text-xs font-mono break-all">{input.scriptSig.hex}</p>
+                            </div>
+                          </div>
+                        )}
+                      </div>
+                    )}
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <div className="text-center py-6 text-gray-500">
+                <p>No inputs available for this transaction</p>
+              </div>
+            )}
+          </div>
+        </div>
+      </div>
+      
+      {/* Outputs - Modernized */}
+      <div className="mb-6">
+        <div className="bg-white rounded-lg shadow-md overflow-hidden">
+          <div className="px-6 py-4 bg-gradient-to-r from-amber-500 to-orange-500">
+            <h2 className="text-xl font-semibold text-white flex justify-between items-center">
+              <span>Outputs ({transaction.vout ? transaction.vout.length : 0})</span>
+              {transaction.vout && transaction.vout.length === 0 && (
+                <span className="text-sm bg-white bg-opacity-20 px-2 py-1 rounded">No Outputs</span>
+              )}
+            </h2>
+          </div>
+          
+          <div className="p-6">
+            {transaction.vout && transaction.vout.length > 0 ? (
+              <div className="divide-y divide-gray-200" style={contentStyle}>
+                {transaction.vout.map((output, index) => (
+                  <div key={index} className="py-4 first:pt-0 last:pb-0">
+                    <div className="flex flex-wrap justify-between">
+                      <div className="w-full md:w-1/2 break-words">
+                        <div className="flex items-center">
+                          <span className="bg-gray-200 text-gray-700 text-xs px-2 py-1 rounded mr-2">
+                            #{output.n}
+                          </span>
+                          <p className="font-medium">
+                            {output.scriptPubKey && output.scriptPubKey.addresses && output.scriptPubKey.addresses.length > 0 ? (
+                              <HashLink hash={output.scriptPubKey.addresses[0]} type="address" length={24} />
+                            ) : (
+                              <span className="text-gray-500">{output.scriptPubKey.type || 'Unknown'}</span>
+                            )}
+                          </p>
+                        </div>
+                        {output.value && (
+                          <p className="text-sm text-gray-500 mt-1">
+                            {formatBTCZ(output.value)}
+                          </p>
+                        )}
+                      </div>
+                      <div className="text-sm text-gray-500 w-full md:w-1/2 mt-2 md:mt-0">
+                        <p>
+                          <span className="font-medium">Type:</span> {output.scriptPubKey.type || 'Unknown'}
+                        </p>
+                        {output.scriptPubKey.reqSigs && (
+                          <p>
+                            <span className="font-medium">Required Signatures:</span> {output.scriptPubKey.reqSigs}
+                          </p>
+                        )}
+                      </div>
+                    </div>
+                    
+                    {output.scriptPubKey && output.scriptPubKey.hex && (
+                      <div className="mt-3">
+                        <p className="text-sm font-medium">Script</p>
+                        <div className="mt-1 p-2 bg-gray-50 rounded-md">
+                          <p className="text-xs font-mono break-all">{output.scriptPubKey.hex}</p>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <div className="text-center py-6 text-gray-500">
+                <p>No outputs available for this transaction</p>
+              </div>
+            )}
+          </div>
+        </div>
+      </div>
     </div>
   );
 };

@@ -7,27 +7,42 @@ import reportWebVitals from './reportWebVitals';
 
 // Wrap the entire app in a static header component
 const AppWithStaticHeader = () => {
-  // Create static header directly in HTML without React components
+  // Create a modern, sleek header directly in HTML without React components
   const headerHtml = `
-    <header class="bg-white shadow-md" style="position: static; z-index: 1000;">
-      <div class="max-w-7xl mx-auto px-4 py-4 flex justify-between items-center">
-        <div class="flex items-center">
-          <img 
-            src="https://bitcoinz.global/wp-content/uploads/branding/btcz-website-logo.png" 
-            alt="BitcoinZ" 
-            class="h-10 w-auto mr-3"
-          />
-          <div class="flex flex-col">
-            <span class="font-bold text-xl text-gray-900">BitcoinZ</span>
-            <span class="text-sm text-gray-600">Explorer</span>
+    <header class="bg-gradient-to-r from-blue-900 to-blue-700 shadow-lg" style="position: static; z-index: 1000;">
+      <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+        <div class="flex justify-between items-center h-16">
+          <!-- Logo and Title -->
+          <div class="flex items-center">
+            <div class="flex-shrink-0 w-10">
+              <img 
+                src="/logo.png" 
+                alt="BitcoinZ" 
+                class="h-10 w-10"
+                onerror="this.onerror=null; this.src='https://bitcoinz.global/wp-content/uploads/branding/btcz-website-logo.png';"
+              />
+            </div>
+            <div class="ml-3 flex flex-col">
+              <span class="font-bold text-xl text-white tracking-wide">BitcoinZ</span>
+              <span class="text-xs text-blue-200 tracking-wider">Explorer</span>
+            </div>
           </div>
-        </div>
 
-        <div class="flex space-x-8">
-          <a href="/" class="text-gray-700">Home</a>
-          <a href="/blocks" class="text-gray-700">Blocks</a>
-          <a href="/transactions" class="text-gray-700">Transactions</a>
-          <a href="/stats" class="text-gray-700">Statistics</a>
+          <!-- Navigation Links -->
+          <nav class="flex space-x-8">
+            <a href="/" class="text-blue-100 hover:text-white px-3 py-2 rounded-md text-sm font-medium transition hover:bg-blue-800">
+              Home
+            </a>
+            <a href="/blocks" class="text-blue-100 hover:text-white px-3 py-2 rounded-md text-sm font-medium transition hover:bg-blue-800">
+              Blocks
+            </a>
+            <a href="/transactions" class="text-blue-100 hover:text-white px-3 py-2 rounded-md text-sm font-medium transition hover:bg-blue-800">
+              Transactions
+            </a>
+            <a href="/stats" class="text-blue-100 hover:text-white px-3 py-2 rounded-md text-sm font-medium transition hover:bg-blue-800">
+              Statistics
+            </a>
+          </nav>
         </div>
       </div>
     </header>

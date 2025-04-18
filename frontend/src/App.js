@@ -24,30 +24,48 @@ import { ToastContext } from './contexts/ToastContext';
 // API Configuration
 const SOCKET_URL = process.env.REACT_APP_SOCKET_URL || 'http://localhost:3000';
 
-// This is a pure static HTML header component - no state, no props, no context
-const StaticHeader = () => (
+// Modern Header component - no state, no props, no context
+const ModernHeader = () => (
   <header 
-    className="bg-white shadow-md" 
-    style={{ position: "static" }} // Force static positioning
+    className="bg-gradient-to-r from-blue-900 to-blue-700 shadow-lg" 
+    style={{ position: "static", zIndex: 1000 }} 
   >
-    <div className="max-w-7xl mx-auto px-4 py-4 flex justify-between items-center">
-      <div className="flex items-center">
-        <img 
-          src="https://bitcoinz.global/wp-content/uploads/branding/btcz-website-logo.png" 
-          alt="BitcoinZ" 
-          className="h-10 w-auto mr-3"
-        />
-        <div className="flex flex-col">
-          <span className="font-bold text-xl text-gray-900">BitcoinZ</span>
-          <span className="text-sm text-gray-600">Explorer</span>
+    <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+      <div className="flex justify-between items-center h-16">
+        {/* Logo and Title */}
+        <div className="flex items-center">
+          <div className="flex-shrink-0 w-10">
+            <img 
+              src="/logo.png" 
+              alt="BitcoinZ" 
+              className="h-10 w-10"
+              onError={(e) => {
+                e.target.onerror = null;
+                e.target.src = 'https://bitcoinz.global/wp-content/uploads/branding/btcz-website-logo.png';
+              }}
+            />
+          </div>
+          <div className="ml-3 flex flex-col">
+            <span className="font-bold text-xl text-white tracking-wide">BitcoinZ</span>
+            <span className="text-xs text-blue-200 tracking-wider">Explorer</span>
+          </div>
         </div>
-      </div>
 
-      <div className="flex space-x-8">
-        <a href="/" className="text-gray-700">Home</a>
-        <a href="/blocks" className="text-gray-700">Blocks</a>
-        <a href="/transactions" className="text-gray-700">Transactions</a>
-        <a href="/stats" className="text-gray-700">Statistics</a>
+        {/* Navigation Links */}
+        <nav className="flex space-x-8">
+          <a href="/" className="text-blue-100 hover:text-white px-3 py-2 rounded-md text-sm font-medium hover:bg-blue-800 transition-colors">
+            Home
+          </a>
+          <a href="/blocks" className="text-blue-100 hover:text-white px-3 py-2 rounded-md text-sm font-medium hover:bg-blue-800 transition-colors">
+            Blocks
+          </a>
+          <a href="/transactions" className="text-blue-100 hover:text-white px-3 py-2 rounded-md text-sm font-medium hover:bg-blue-800 transition-colors">
+            Transactions
+          </a>
+          <a href="/stats" className="text-blue-100 hover:text-white px-3 py-2 rounded-md text-sm font-medium hover:bg-blue-800 transition-colors">
+            Statistics
+          </a>
+        </nav>
       </div>
     </div>
   </header>
@@ -113,7 +131,7 @@ function App({ skipHeader = false }) {
   return (
     <div className="flex flex-col min-h-screen">
       {/* Only include the header if skipHeader is false */}
-      {!skipHeader && <StaticHeader />}
+      {!skipHeader && <ModernHeader />}
       
       {/* Main content with WebSocket context */}
       <SocketContext.Provider value={socketRef.current}>

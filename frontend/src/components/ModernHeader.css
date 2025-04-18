@@ -1,0 +1,77 @@
+/* Modern Header Styles */
+.modern-header {
+  background: linear-gradient(to right, #0c2e5c, #1e72c3);
+  box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
+  position: static !important;
+  z-index: 1000;
+  transition: none !important;
+  animation: none !important;
+}
+
+.modern-header * {
+  transition: none !important;
+  animation: none !important;
+}
+
+.modern-logo {
+  width: 40px;
+  height: 40px;
+  object-fit: contain;
+}
+
+.modern-logo-text {
+  color: white;
+  font-weight: 700;
+  font-size: 1.25rem;
+  letter-spacing: 0.025em;
+}
+
+.modern-logo-subtext {
+  color: rgba(191, 219, 254, 1);
+  font-size: 0.75rem;
+  letter-spacing: 0.05em;
+}
+
+.modern-nav-link {
+  color: rgba(219, 234, 254, 1);
+  padding: 0.5rem 0.75rem;
+  border-radius: 0.375rem;
+  font-size: 0.875rem;
+  font-weight: 500;
+}
+
+.modern-nav-link:hover {
+  color: white;
+  background-color: rgba(30, 64, 175, 0.5);
+}
+
+/* Make sure header doesn't cause rendering issues */
+.modern-header-container {
+  max-width: 80rem;
+  margin-left: auto;
+  margin-right: auto;
+  padding-left: 1rem;
+  padding-right: 1rem;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  height: 4rem;
+}
+
+/* Ensure crisp rendering of logo */
+.logo-container {
+  display: flex;
+  align-items: center;
+}
+
+.logo-text-container {
+  margin-left: 0.75rem;
+  display: flex;
+  flex-direction: column;
+}
+
+/* Make nav links more clickable */
+.nav-container {
+  display: flex;
+  gap: 2rem;
+}

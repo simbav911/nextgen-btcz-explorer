@@ -40,8 +40,8 @@ const MOCK_TOTAL_SUPPLY = 21000000;
 // Mock total addresses
 const MOCK_TOTAL_ADDRESSES = 272485;
 
-// API base URL - use the correct backend port
-const API_BASE_URL = 'http://localhost:3001/api';
+// API base URL - use relative URLs for proxy to work
+const API_BASE_URL = '/api';
 
 const WealthDistribution = () => {
   const [topHolders, setTopHolders] = useState([]);

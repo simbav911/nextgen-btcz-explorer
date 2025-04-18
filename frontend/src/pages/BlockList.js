@@ -239,7 +239,7 @@ const BlockList = () => {
                         <th className="py-4 px-6 text-left font-bold text-slate-600 w-1/6">Timestamp</th>
                         <th className="py-4 px-6 text-left font-bold text-slate-600 w-1/12">Transactions</th>
                         <th className="py-4 px-6 text-left font-bold text-slate-600 w-1/6">Size</th>
-                        <th className="py-4 px-6 text-left font-bold text-slate-600 w-1/5">Mining Pool</th>
+                        <th className="py-4 px-6 text-center font-bold text-slate-600 w-1/5">Mining Pool</th>
                         <th className="py-4 px-6 text-left font-bold text-slate-600 w-1/4">Hash</th>
                       </tr>
                     </thead>
@@ -269,7 +269,7 @@ const BlockList = () => {
                           </td>
                           <td className="py-3 px-6">{formatNumber(block.tx.length)}</td>
                           <td className="py-3 px-6">{formatNumber(block.size)} bytes</td>
-                          <td className="py-3 px-6">
+                          <td className="py-3 px-6 text-center">
                             {block.miningPoolName || block.poolName || block.pool || 'Unknown Pool'}
                           </td>
                           <td className="py-3 px-6 font-mono text-xs">

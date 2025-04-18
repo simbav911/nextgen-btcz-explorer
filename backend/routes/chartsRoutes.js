@@ -2,16 +2,7 @@ const express = require('express');
 const router = express.Router();
 const logger = require('../utils/logger');
 
-console.log('Loading charts routes module...');
 
-// Test endpoint directly on charts router
-router.get('/test', (req, res) => {
-  console.log('Charts test endpoint hit!');
-  return res.json({
-    success: true,
-    message: 'Charts test endpoint is working'
-  });
-});
 
 // Very simple mined-block endpoint
 router.get('/mined-block', (req, res) => {

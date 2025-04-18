@@ -27,7 +27,7 @@ const Block = () => {
   const [currentPage, setCurrentPage] = useState(1);
   const [totalPages, setTotalPages] = useState(1);
   
-  const txsPerPage = 10;
+  const txsPerPage = 20;
   
   // Fetch block data
   useEffect(() => {
@@ -245,7 +245,7 @@ const Block = () => {
   }
   
   return (
-    <div className="container-custom max-w-6xl mx-auto px-4">
+    <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pb-12">
       <div className="flex items-center justify-between mb-6">
         <h1 className="text-3xl font-bold flex items-center">
           <FaCube className="text-bitcoinz-600 mr-3" />

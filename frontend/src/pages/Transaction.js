@@ -62,30 +62,72 @@ const Transaction = () => {
   
   // Calculate fee if available
   const calculateFee = () => {
-    if (transaction.fee) {
+    // If fee is directly provided in the transaction data
+    if (transaction.fee !== undefined) {
       return formatBTCZ(transaction.fee);
+    }
+    
+    // For coinbase transactions, fee is 0
+    if (transaction.vin && transaction.vin.some(input => input.coinbase)) {
+      return formatBTCZ(0);
     }
     
     // Calculate fee from inputs and outputs if not available directly
     if (transaction.vin && transaction.vout && !transaction.isCoinbase) {
       let inputValue = 0;
+      let hasAllInputValues = true;
+      
       transaction.vin.forEach(input => {
-        if (input.value) inputValue += input.value;
+        if (input.value !== undefined) {
+          inputValue += input.value;
+        } else {
+          hasAllInputValues = false;
+        }
       });
       
-      let outputValue = 0;
-      transaction.vout.forEach(output => {
-        if (output.value) outputValue += output.value;
-      });
-      
-      const fee = inputValue - outputValue;
-      
-      if (fee >= 0) {
-        return formatBTCZ(fee);
+      // Only calculate if we have all input values
+      if (hasAllInputValues) {
+        let outputValue = 0;
+        transaction.vout.forEach(output => {
+          if (output.value !== undefined) {
+            outputValue += output.value;
+          }
+        });
+        
+        const fee = inputValue - outputValue;
+        
+        if (fee >= 0) {
+          return formatBTCZ(fee);
+        }
       }
     }
     
-    return 'Unknown';
+    // For transactions with only one input and one output, and the output value is less than input
+    // This is a special case for simple transactions where we can infer the fee
+    if (transaction.vin && transaction.vin.length === 1 && 
+        transaction.vout && transaction.vout.length >= 1 && 
+        transaction.vin[0].value !== undefined) {
+      
+      const inputValue = transaction.vin[0].value;
+      let outputValue = 0;
+      
+      transaction.vout.forEach(output => {
+        if (output.value !== undefined) {
+          outputValue += output.value;
+        }
+      });
+      
+      if (outputValue < inputValue) {
+        return formatBTCZ(inputValue - outputValue);
+      }
+    }
+    
+    // For newly mined coins (coinbase transactions)
+    if (transaction.vin && transaction.vin.some(input => input.coinbase)) {
+      return formatBTCZ(0);
+    }
+    
+    return '0.00 BTCZ';
   };
   
   // Format confirmation status

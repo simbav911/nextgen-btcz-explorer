@@ -46,19 +46,21 @@ const TimeFilter = ({ date, setDate, applyFilter, showTodayDefault = false, acti
   // Check if this is a single-day chart (Pool Distribution or Mined Block)
   const isSingleDayChart = activeChart === chartTypes.POOL_STAT || activeChart === chartTypes.MINED_BLOCK;
   
-  // Update timeRange when showTodayDefault changes
+  // Update timeRange when showTodayDefault changes, but only on initial mount or when activeChart changes
   useEffect(() => {
-    if (showTodayDefault) {
+    if (showTodayDefault && timeRange !== 'custom') {
       setTimeRange('1d');
-      // Set today's date
-      const today = formatDate(new Date());
-      setDate(today);
-      applyFilter(today, '1d', {
-        startDate: today,
-        endDate: today
-      });
+      // Only set today's date if we're not in custom mode
+      if (timeRange !== 'custom') {
+        const today = formatDate(new Date());
+        setDate(today);
+        applyFilter(today, '1d', {
+          startDate: today,
+          endDate: today
+        });
+      }
     }
-  }, [showTodayDefault, setDate, applyFilter]);
+  }, [showTodayDefault, activeChart]); // Only run when showTodayDefault or activeChart changes
   
   // Predefined time ranges
   const timeRanges = isSingleDayChart 
@@ -205,7 +207,10 @@ const TimeFilter = ({ date, setDate, applyFilter, showTodayDefault = false, acti
   };
 
   // Store the selected date range
-  const [dateRange, setDateRange] = useState({ startDate: null, endDate: null });
+  const [dateRange, setDateRange] = useState({ 
+    startDate: date, 
+    endDate: isSingleDayChart ? date : null 
+  });
 
   // Format date in a human-readable way
   const formatDisplayDate = (date) => {
@@ -219,9 +224,9 @@ const TimeFilter = ({ date, setDate, applyFilter, showTodayDefault = false, acti
   // Get a human-readable date range description with specific from/to dates
   const getDateRangeDescription = () => {
     // If we're in custom mode and have a date range, show that
-    if (timeRange === 'custom' && dateRange.startDate && dateRange.endDate) {
+    if (timeRange === 'custom' && dateRange.startDate) {
       const start = formatDisplayDate(dateRange.startDate);
-      const end = formatDisplayDate(dateRange.endDate);
+      const end = dateRange.endDate ? formatDisplayDate(dateRange.endDate) : start;
       
       if (start === end || isSingleDayChart) {
         return `${start}`;

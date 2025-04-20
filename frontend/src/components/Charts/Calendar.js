@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import PropTypes from 'prop-types';
 import { formatDate } from './chartUtils';
 
@@ -13,11 +13,22 @@ const Calendar = ({ selectedDate, onDateChange, onApply, minDate, maxDate, singl
   
   // Date range selection states
   const [startDate, setStartDate] = useState(selectedDate);
-  const [endDate, setEndDate] = useState(null);
+  const [endDate, setEndDate] = useState(singleDateMode ? selectedDate : null);
   const [selectingStart, setSelectingStart] = useState(true); // true = selecting start date, false = selecting end date
   
+  // Update the month and year when selectedDate changes
+  useEffect(() => {
+    const newDateObj = new Date(selectedDate);
+    setMonth(newDateObj.getMonth());
+    setYear(newDateObj.getFullYear());
+    setStartDate(selectedDate);
+    if (singleDateMode) {
+      setEndDate(selectedDate);
+    }
+  }, [selectedDate, singleDateMode]);
+  
   // Reset selection state when calendar opens or re-renders
-  React.useEffect(() => {
+  useEffect(() => {
     // If no dates are selected, ensure we're in "select start date" mode
     if (!startDate && !endDate) {
       setSelectingStart(true);

@@ -123,8 +123,40 @@ const TimeFilter = ({ date, setDate, applyFilter }) => {
     };
   };
 
+  // Get a human-readable date range description
+  const getDateRangeDescription = () => {
+    switch(timeRange) {
+      case '1d':
+        return 'Last 24 hours';
+      case '7d':
+        return 'Last 7 days';
+      case '30d':
+        return 'Last 30 days';
+      case '90d':
+        return 'Last 90 days';
+      case '1y':
+        return 'Last year';
+      case 'all':
+        return 'All time';
+      case 'custom':
+        // Format the custom date to a readable format
+        const customDate = new Date(date);
+        return `Custom: ${customDate.toLocaleDateString('en-US', {
+          year: 'numeric',
+          month: 'short',
+          day: 'numeric'
+        })}`;
+      default:
+        return 'Selected period';
+    }
+  };
+
   return (
     <div className="chart-time-filter">
+      <div className="date-range-description">
+        {getDateRangeDescription()}
+      </div>
+      
       <div className="time-filter-buttons">
         {timeRanges.map(range => (
           <button 
@@ -137,64 +169,67 @@ const TimeFilter = ({ date, setDate, applyFilter }) => {
         ))}
       </div>
       
-      <div className="chart-date-selector">
-        <span>{getCurrentRangeLabel()}</span>
-        <button 
-          className="date-button"
-          onClick={() => setShowDatePicker(!showDatePicker)}
-          aria-label="Open date picker"
-          ref={dateButtonRef}
-        >
-          <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-            <rect x="3" y="4" width="18" height="18" rx="2" ry="2"></rect>
-            <line x1="16" y1="2" x2="16" y2="6"></line>
-            <line x1="8" y1="2" x2="8" y2="6"></line>
-            <line x1="3" y1="10" x2="21" y2="10"></line>
-          </svg>
-        </button>
-        
-        {showDatePicker && (
-          <DatePickerPortal>
-            <div 
-              className="date-picker-container" 
-              ref={datePickerRef}
-              style={getDatePickerPosition()}
-            >
-              <div className="date-picker-header">
-                <span>Select Date Range</span>
-                <button 
-                  className="close-button"
-                  onClick={() => setShowDatePicker(false)}
-                  aria-label="Close date picker"
-                >
-                  <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                    <line x1="18" y1="6" x2="6" y2="18"></line>
-                    <line x1="6" y1="6" x2="18" y2="18"></line>
-                  </svg>
-                </button>
-              </div>
-              
-              <div className="active-range-display">
-                <div className="range-label">Selected range:</div>
-                <div className="range-value">{timeRange === 'custom' ? 'Custom' : timeRanges.find(r => r.value === timeRange)?.label}</div>
-              </div>
-              
-              <Calendar
-                selectedDate={date}
-                onDateChange={newDate => setDate(newDate)}
-                onApply={(newDate) => {
-                  setDate(newDate);
-                  applyFilter(newDate, 'custom');
-                  setTimeRange('custom');
-                  setShowDatePicker(false);
-                }}
-                minDate="2017-09-09"
-                maxDate={formatDate(new Date())}
-              />
+      {/* Only show the date selector button when not in Custom mode or when in the top filter bar */}
+      {(timeRange !== 'custom' || !showDatePicker) && (
+        <div className="chart-date-selector">
+          <span>{getCurrentRangeLabel()}</span>
+          <button 
+            className="date-button"
+            onClick={() => setShowDatePicker(!showDatePicker)}
+            aria-label="Open date picker"
+            ref={dateButtonRef}
+          >
+            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+              <rect x="3" y="4" width="18" height="18" rx="2" ry="2"></rect>
+              <line x1="16" y1="2" x2="16" y2="6"></line>
+              <line x1="8" y1="2" x2="8" y2="6"></line>
+              <line x1="3" y1="10" x2="21" y2="10"></line>
+            </svg>
+          </button>
+        </div>
+      )}
+      
+      {showDatePicker && (
+        <DatePickerPortal>
+          <div 
+            className="date-picker-container" 
+            ref={datePickerRef}
+            style={getDatePickerPosition()}
+          >
+            <div className="date-picker-header">
+              <span>Select Date Range</span>
+              <button 
+                className="close-button"
+                onClick={() => setShowDatePicker(false)}
+                aria-label="Close date picker"
+              >
+                <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <line x1="18" y1="6" x2="6" y2="18"></line>
+                  <line x1="6" y1="6" x2="18" y2="18"></line>
+                </svg>
+              </button>
             </div>
-          </DatePickerPortal>
-        )}
-      </div>
+            
+            <div className="active-range-display">
+              <div className="range-label">Selected range:</div>
+              <div className="range-value">{timeRange === 'custom' ? 'Custom' : timeRanges.find(r => r.value === timeRange)?.label}</div>
+            </div>
+            
+            <Calendar
+              selectedDate={date}
+              onDateChange={newDate => setDate(newDate)}
+              onApply={(newDate) => {
+                setDate(newDate);
+                applyFilter(newDate, 'custom');
+                setTimeRange('custom');
+                setShowDatePicker(false);
+              }}
+              minDate="2017-09-09"
+              maxDate={formatDate(new Date())}
+            />
+          </div>
+        </DatePickerPortal>
+      )}
     </div>
   );
 };

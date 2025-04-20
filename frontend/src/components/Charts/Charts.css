@@ -278,6 +278,31 @@
   opacity: 0.7;
 }
 
+/* Chart Date Range Banner */
+.chart-date-range-banner {
+  display: flex;
+  align-items: center;
+  background: linear-gradient(90deg, rgba(59, 130, 246, 0.1), rgba(59, 130, 246, 0));
+  border-left: 3px solid #3b82f6;
+  padding: 10px 16px;
+  margin-bottom: 20px;
+  border-radius: 8px;
+  box-shadow: 0 2px 6px rgba(59, 130, 246, 0.05);
+}
+
+.date-range-icon {
+  color: #3b82f6;
+  margin-right: 12px;
+  display: flex;
+  align-items: center;
+}
+
+.date-range-text {
+  font-size: 15px;
+  font-weight: 600;
+  color: #3b82f6;
+}
+
 /* Chart header */
 .chart-header {
   display: flex;
@@ -315,6 +340,19 @@
   display: flex;
   flex-direction: column;
   gap: 15px;
+}
+
+.date-range-description {
+  font-size: 16px;
+  font-weight: 600;
+  color: #1f2937;
+  padding: 6px 10px;
+  background: rgba(59, 130, 246, 0.1);
+  border-radius: 8px;
+  display: inline-block;
+  margin-bottom: 5px;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05);
+  border-left: 3px solid #3b82f6;
 }
 
 .time-filter-buttons {
@@ -648,73 +686,6 @@
   box-shadow: 0 2px 5px rgba(37, 99, 235, 0.2);
 }
 
-.date-picker-header {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  padding: 15px;
-  background: linear-gradient(to right, #3b82f6, #2563eb);
-  color: white;
-  font-weight: 600;
-}
-
-.close-button {
-  background: rgba(255, 255, 255, 0.2);
-  border: none;
-  width: 28px;
-  height: 28px;
-  border-radius: 50%;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  cursor: pointer;
-  transition: all 0.2s;
-  color: white;
-}
-
-.close-button:hover {
-  background: rgba(255, 255, 255, 0.3);
-  transform: scale(1.05);
-}
-
-.date-picker-container input {
-  font-family: 'Inter', 'Segoe UI', Roboto, sans-serif;
-  border: 1px solid #e5e7eb;
-  border-radius: 8px;
-  margin: 15px;
-  padding: 12px;
-  font-size: 14px;
-  outline: none;
-  color: #1f2937;
-  transition: all 0.2s;
-  display: block;
-  width: calc(100% - 30px);
-}
-
-.date-picker-container input:focus {
-  border-color: #3b82f6;
-  box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.2);
-}
-
-.date-picker-container .apply-button {
-  background: linear-gradient(to right, #3b82f6, #2563eb);
-  color: white;
-  border: none;
-  border-radius: 8px;
-  padding: 12px;
-  font-weight: 600;
-  cursor: pointer;
-  transition: all 0.2s;
-  margin: 0 15px 15px;
-  width: calc(100% - 30px);
-  box-shadow: 0 4px 10px rgba(37, 99, 235, 0.25);
-}
-
-.date-picker-container .apply-button:hover {
-  transform: translateY(-2px);
-  box-shadow: 0 6px 15px rgba(37, 99, 235, 0.3);
-}
-
 /* Chart display */
 .chart-display {
   height: 550px; /* Taller for better visualization */
@@ -739,6 +710,31 @@
   perspective: 1200px;
   width: 100%;
   height: 100%;
+}
+
+.date-range-info {
+  position: absolute;
+  top: -40px;
+  right: 10px;
+  display: flex;
+  align-items: center;
+  padding: 8px 12px;
+  background: rgba(255, 255, 255, 0.9);
+  border-radius: 8px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+  font-size: 13px;
+  z-index: 10;
+}
+
+.date-range-label {
+  font-weight: 600;
+  color: #6b7280;
+  margin-right: 8px;
+}
+
+.date-range-value {
+  color: #3b82f6;
+  font-weight: 500;
 }
 
 .chart-3d-inner {
@@ -838,7 +834,7 @@
   text-align: center;
   padding: 40px;
   border-radius: 16px;
-  background: linear-gradient(145deg, #fff1f2, #fee2e2);
+  background: linear-gradient(145deg, #fee2e2, #fecaca);
   border: 1px solid #fca5a5;
   max-width: 80%;
   margin: 0 auto;
@@ -848,15 +844,11 @@
 
 .chart-error svg {
   margin-bottom: 20px;
-  color: #dc2626;
 }
 
 .chart-error p {
-  margin-bottom: 25px;
+  margin-bottom: 15px;
   font-weight: 500;
-  font-size: 16px;
-  line-height: 1.5;
-  color: #b91c1c;
 }
 
 .retry-button {
@@ -866,18 +858,18 @@
   background: linear-gradient(to right, #3b82f6, #2563eb);
   color: white;
   border: none;
-  border-radius: 10px;
-  padding: 12px 24px;
-  font-weight: 600;
-  font-size: 15px;
+  border-radius: 8px;
+  padding: 10px 20px;
+  margin-top: 10px;
   cursor: pointer;
-  transition: all 0.3s;
-  box-shadow: 0 4px 10px rgba(37, 99, 235, 0.25);
+  transition: all 0.2s;
+  font-weight: 600;
+  box-shadow: 0 4px 6px rgba(37, 99, 235, 0.2);
 }
 
 .retry-button:hover {
-  transform: translateY(-3px);
-  box-shadow: 0 8px 15px rgba(37, 99, 235, 0.3);
+  transform: translateY(-2px);
+  box-shadow: 0 6px 12px rgba(37, 99, 235, 0.25);
 }
 
 /* Placeholder */
@@ -895,6 +887,64 @@
   font-size: 18px;
   color: #4b5563;
   line-height: 1.6;
+}
+
+/* No data state */
+.chart-no-data {
+  max-width: 80%;
+  padding: 40px;
+  border-radius: 16px;
+  background: linear-gradient(145deg, #f9fafb, #f3f4f6);
+  box-shadow: 0 8px 20px rgba(0, 0, 0, 0.05);
+  text-align: center;
+  margin: 0 auto;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+
+.chart-no-data svg {
+  color: #3b82f6;
+  margin-bottom: 20px;
+}
+
+.chart-no-data h3 {
+  font-size: 20px;
+  font-weight: 600;
+  color: #1f2937;
+  margin-bottom: 10px;
+}
+
+.chart-no-data p {
+  font-size: 16px;
+  color: #6b7280;
+  line-height: 1.6;
+  margin-bottom: 20px;
+  max-width: 400px;
+}
+
+.chart-no-data .suggestion {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 14px;
+  color: #6b7280;
+}
+
+.chart-no-data .suggestion button {
+  background: #3b82f6;
+  color: white;
+  border: none;
+  border-radius: 6px;
+  padding: 6px 12px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.chart-no-data .suggestion button:hover {
+  background: #2563eb;
+  transform: translateY(-1px);
 }
 
 /* Pool stat summary */
@@ -915,10 +965,30 @@
   text-align: center;
 }
 
+.pool-stats-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 20px;
+  padding-bottom: 15px;
+  border-bottom: 1px solid #e5e7eb;
+}
+
+.stats-period, .stats-total {
+  font-size: 14px;
+  color: #6b7280;
+  font-weight: 500;
+}
+
+.stats-total {
+  color: #3b82f6;
+  font-weight: 600;
+}
+
 .pool-stat-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
-  gap: 15px;
+  grid-template-columns: repeat(auto-fill, minmax(250px, 1fr));
+  gap: 20px;
 }
 
 .pool-stat-item {
@@ -926,47 +996,85 @@
   flex-direction: column;
   background: white;
   border-radius: 12px;
-  padding: 15px;
-  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.03);
+  padding: 16px;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.03);
   border: 1px solid #f3f4f6;
   position: relative;
   overflow: hidden;
+  transition: transform 0.2s, box-shadow 0.2s;
 }
 
-.pool-stat-item::before {
-  content: '';
-  position: absolute;
-  top: 0;
-  left: 0;
-  height: 4px;
-  width: 100%;
-  background: var(--pool-color, #3b82f6);
+.pool-stat-item:hover {
+  transform: translateY(-3px);
+  box-shadow: 0 8px 16px rgba(0, 0, 0, 0.06);
+}
+
+.pool-stat-header {
+  display: flex;
+  align-items: center;
+  margin-bottom: 12px;
 }
 
 .pool-color {
-  width: 12px;
-  height: 12px;
+  width: 16px;
+  height: 16px;
   border-radius: 50%;
-  margin-bottom: 8px;
+  margin-right: 10px;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
 }
 
 .pool-name {
   font-weight: 600;
   color: #374151;
   font-size: 16px;
-  margin-bottom: 5px;
+}
+
+.pool-stat-details {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.pool-percentage-container {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
 }
 
 .pool-percentage {
-  font-size: 20px;
+  font-size: 24px;
   font-weight: 700;
   color: #111827;
-  margin-bottom: 5px;
 }
 
-.pool-count {
+.pool-percentage-bar-bg {
+  height: 6px;
+  background: #e5e7eb;
+  border-radius: 3px;
+  overflow: hidden;
+  width: 100%;
+}
+
+.pool-percentage-bar {
+  height: 100%;
+  border-radius: 3px;
+  transition: width 1s ease-out;
+}
+
+.pool-count, .pool-last-block {
+  display: flex;
+  justify-content: space-between;
   font-size: 14px;
   color: #6b7280;
+}
+
+.pool-count-label, .pool-last-block-label {
+  font-weight: 500;
+}
+
+.pool-count-value, .pool-last-block-value {
+  font-weight: 600;
+  color: #4b5563;
 }
 
 /* Pie chart specific styles */

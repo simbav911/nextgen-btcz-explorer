@@ -6,6 +6,9 @@ const { executeRpcCommand, getBlockByHeight, getRawTransaction } = require('../s
 // In-memory cache for pool data
 const poolDataCache = {};
 
+// Cache for pool signatures to avoid repeating the same detection work
+const poolSignatureCache = {};
+
 /**
  * Extract text from coinbase transaction
  * @param {Object} coinbaseTx - Coinbase transaction object
@@ -64,16 +67,59 @@ const extractBitcoinZAddress = (coinbaseTx) => {
 };
 
 /**
- * Identify mining pool from coinbase text
+ * Extract pool information from coinbase text using pattern recognition
+ * @param {string} coinbaseText - Text extracted from coinbase transaction
+ * @returns {string|null} Pool name or null if not detected
+ */
+const extractPoolFromText = (coinbaseText) => {
+  if (!coinbaseText) return null;
+  
+  // Common patterns to extract pool information
+  const patterns = [
+    // URL patterns
+    { regex: /https?:\/\/([a-zA-Z0-9.-]+\.[a-zA-Z]{2,})/i, group: 1 },
+    { regex: /([a-zA-Z0-9.-]+\.[a-zA-Z]{2,})\/?/i, group: 1 },
+    
+    // Common pool naming patterns
+    { regex: /([a-zA-Z0-9.-]+)[- ]pool/i, group: 1 },
+    { regex: /pool[.:]([a-zA-Z0-9.-]+)/i, group: 1 },
+    { regex: /pool[- ]?([a-zA-Z0-9.-]+)/i, group: 1 },
+    { regex: /([a-zA-Z0-9.-]+)[- ]?miner/i, group: 1 },
+    { regex: /mined[- ]by[- ]([a-zA-Z0-9.-]+)/i, group: 1 },
+    
+    // Extract anything that looks like a service name
+    { regex: /^([a-zA-Z0-9][a-zA-Z0-9.-]{2,})$/i, group: 1 },
+  ];
+  
+  // Try to extract pool name using patterns
+  for (const pattern of patterns) {
+    const match = coinbaseText.match(pattern.regex);
+    if (match && match[pattern.group]) {
+      // Clean up the pool name
+      let poolName = match[pattern.group];
+      
+      // Remove common TLDs
+      poolName = poolName.replace(/\.(com|org|net|io|app|us|ca)$/, '');
+      
+      return poolName;
+    }
+  }
+  
+  return null;
+};
+
+/**
+ * Identify mining pool from coinbase text and transaction
  * @param {string} coinbaseText - Text extracted from coinbase transaction
  * @param {Object} coinbaseTx - Full coinbase transaction object (optional)
  * @returns {Object} Pool information with name and address (if available)
  */
 const identifyPool = (coinbaseText, coinbaseTx = null) => {
-  // Convert to lowercase for case-insensitive matching
-  const lowerText = coinbaseText.toLowerCase();
+  // Check if we've already identified this signature
+  if (poolSignatureCache[coinbaseText]) {
+    return poolSignatureCache[coinbaseText];
+  }
   
-  // Extract pool name based on known patterns
   let poolName = 'Unknown';
   let address = null;
   
@@ -82,68 +128,21 @@ const identifyPool = (coinbaseText, coinbaseTx = null) => {
     address = extractBitcoinZAddress(coinbaseTx);
   }
   
-  // Check for zpool
-  if (lowerText.includes('zpool.ca') || lowerText.includes('/zpool/')) {
-    poolName = 'Zpool';
-  }
-  // Check for zergpool
-  else if (lowerText.includes('zergpool.com') || lowerText.includes('zergpool')) {
-    poolName = 'Zergpool';
-  }
-  // Check for darkfibermines
-  else if (lowerText.includes('darkfibermines') || lowerText.includes('dark fiber')) {
-    poolName = 'Btcz.Darkfibermines';
-  }
-  // Check for 2mars
-  else if (lowerText.includes('2mars') || lowerText.includes('2mars.biz')) {
-    poolName = 'Btcz.2mars.Biz';
-  }
-  // Check for z-nomp
-  else if (lowerText.includes('z-nomp')) {
-    poolName = 'Z-NOMP';
-  }
-  // Check for zeropool
-  else if (lowerText.includes('zeropool')) {
-    if (lowerText.includes('solo')) {
-      poolName = 'Solo.Zeropool';
-    } else {
-      poolName = 'Zeropool';
-    }
-  }
-  // Check for suprnova
-  else if (lowerText.includes('suprnova')) {
-    poolName = 'Suprnova';
-  }
-  // Check for equipool
-  else if (lowerText.includes('equipool')) {
-    poolName = 'Equipool.1ds';
-  }
-  // Check for 2miners
-  else if (lowerText.includes('2miners')) {
-    poolName = '2miners';
-  }
-  // Check for github
-  else if (lowerText.includes('github')) {
-    poolName = 'Github';
-  }
-  // Check for swgroupe
-  else if (lowerText.includes('swgroupe')) {
-    poolName = 'Swgroupe.Fr';
-  }
-  // Check for miningspeed
-  else if (lowerText.includes('miningspeed')) {
-    poolName = 'Miningspeed';
-  }
-  // Check for solopool
-  else if (lowerText.includes('solopool')) {
-    poolName = 'Solopool.org';
-  }
-  // For unknown pools, append address if available
-  else if (address) {
+  // Try to extract pool name from coinbase text
+  const extractedPool = extractPoolFromText(coinbaseText);
+  if (extractedPool) {
+    // Format the pool name properly
+    poolName = extractedPool.charAt(0).toUpperCase() + extractedPool.slice(1);
+  } else if (address) {
+    // If we couldn't extract a pool name but have an address, use that
     poolName = `Unknown (${address})`;
   }
   
-  return { name: poolName, address };
+  // Cache the result
+  const result = { name: poolName, address };
+  poolSignatureCache[coinbaseText] = result;
+  
+  return result;
 };
 
 /**
@@ -302,6 +301,7 @@ const getRealPoolDistribution = async (date) => {
     let unknownCount = 0;
     const coinbaseTextSamples = {}; // Store samples of coinbase text for unknown pools
     const unknownPoolAddresses = {}; // Track addresses of unknown pools
+    const poolSignatures = {}; // Track coinbase signatures by pool
     
     for (const block of blocks) {
       try {
@@ -313,6 +313,14 @@ const getRealPoolDistribution = async (date) => {
         const coinbaseText = extractCoinbaseText(coinbaseTx);
         const poolInfo = identifyPool(coinbaseText, coinbaseTx);
         const poolName = poolInfo.name;
+        
+        // Store coinbase signature for this pool for future analysis
+        if (!poolSignatures[poolName]) {
+          poolSignatures[poolName] = [];
+        }
+        if (!poolSignatures[poolName].includes(coinbaseText) && poolSignatures[poolName].length < 5) {
+          poolSignatures[poolName].push(coinbaseText);
+        }
         
         if (poolName.startsWith('Unknown')) {
           unknownCount++;
@@ -353,6 +361,15 @@ const getRealPoolDistribution = async (date) => {
       logger.info('Addresses of unknown pools:');
       for (const [address, count] of Object.entries(unknownPoolAddresses)) {
         logger.info(`Address ${address}: ${count} blocks (${((count / unknownCount) * 100).toFixed(1)}% of unknown)`);
+      }
+    }
+    
+    // Log pool signatures for future pattern recognition improvement
+    logger.info('Pool signatures:');
+    for (const [pool, signatures] of Object.entries(poolSignatures)) {
+      if (signatures.length > 0) {
+        logger.info(`${pool} signatures:`);
+        signatures.forEach(sig => logger.info(`  - ${sig.substring(0, 100)}`));
       }
     }
     

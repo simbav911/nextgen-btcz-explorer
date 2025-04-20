@@ -69,6 +69,15 @@
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
+  font-family: 'Inter', 'Segoe UI', Roboto, sans-serif;
+  cursor: help; /* Show help cursor to indicate tooltip is available */
+}
+
+.pool-name[title^="Unknown (t1"], 
+.pool-name[title^="Unknown (t3"] {
+  font-family: 'Roboto Mono', monospace;
+  font-size: 13px;
+  color: #444;
 }
 
 .block-count {
@@ -77,40 +86,73 @@
 }
 
 .x-axis {
-  position: relative;
-  height: 40px;
-  margin-top: 10px;
+  display: none;
 }
 
 .tick-marks {
-  display: flex;
-  position: relative;
-  height: 20px;
+  display: none;
 }
 
 .tick {
+  display: none;
+}
+
+.tick-line {
+  display: none;
+}
+
+.axis-label {
+  display: none;
+}
+
+/* X-axis ruler styles */
+.x-axis-ruler {
+  position: relative;
+  height: 40px;
+  margin-top: 10px;
+  padding-left: 10px;
+}
+
+.ruler-container {
+  position: relative;
+  height: 20px;
+  width: calc(100% - 220px); /* Account for the label width on the right */
+}
+
+.ruler-line {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 1px;
+  background-color: #ccc;
+}
+
+.ruler-tick {
   position: absolute;
   display: flex;
   flex-direction: column;
   align-items: center;
+  transform: translateX(-50%);
 }
 
-.tick-line {
+.tick-mark {
   width: 1px;
   height: 6px;
   background-color: #aaa;
+  margin-bottom: 4px;
 }
 
 .tick-label {
-  font-size: 12px;
+  font-size: 11px;
   color: #666;
-  margin-top: 4px;
+  white-space: nowrap;
 }
 
-.axis-label {
+.ruler-label {
   position: absolute;
-  right: 0;
-  bottom: 0;
+  right: 20px;
+  top: 0;
   font-size: 14px;
   font-weight: 500;
   color: #333;
@@ -124,7 +166,8 @@
   padding: 10px;
   z-index: 1000;
   pointer-events: none;
-  min-width: 150px;
+  min-width: 200px;
+  max-width: 350px;
 }
 
 .tooltip-title {
@@ -148,6 +191,17 @@
 .tooltip-pool {
   font-weight: bold;
   margin-right: 8px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  max-width: 250px;
+  display: inline-block;
+}
+
+.tooltip-content:has(.tooltip-pool:first-child:contains("Unknown (t")) .tooltip-pool {
+  font-family: 'Roboto Mono', monospace;
+  font-size: 13px;
+  max-width: 280px;
 }
 
 .tooltip-count {
@@ -177,4 +231,134 @@
   background-color: rgba(37, 99, 235, 0.1);
   color: rgba(37, 99, 235, 1);
   font-weight: 600;
+}
+
+/* Date badge in top-left corner */
+.chart-date-badge {
+  position: absolute;
+  top: 20px;
+  left: 20px;
+  z-index: 5;
+}
+
+.date-pill {
+  display: inline-block;
+  padding: 6px 12px;
+  border-radius: 20px;
+  background-color: #f5f5f5;
+  font-size: 14px;
+  font-weight: 500;
+  color: #333;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+}
+
+/* Unknown pool styling */
+.unknown-pool {
+  cursor: pointer;
+}
+
+.unknown-pool:hover {
+  background-color: rgba(0, 0, 0, 0.05);
+  border-radius: 4px;
+}
+
+.toggle-addresses {
+  font-size: 12px;
+  color: #2563eb;
+  margin-left: 6px;
+  font-weight: normal;
+}
+
+/* Unknown addresses list */
+.unknown-addresses-list {
+  margin-top: 20px;
+  margin-bottom: 20px;
+  background-color: white;
+  border-radius: 8px;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+  overflow: hidden;
+  max-height: 400px;
+  display: flex;
+  flex-direction: column;
+}
+
+.addresses-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 12px 16px;
+  background-color: #f8f9fa;
+  border-bottom: 1px solid #e9ecef;
+}
+
+.addresses-header h3 {
+  margin: 0;
+  font-size: 16px;
+  font-weight: 600;
+  color: #333;
+}
+
+.close-button {
+  background: none;
+  border: none;
+  font-size: 20px;
+  color: #666;
+  cursor: pointer;
+  padding: 0 4px;
+  line-height: 1;
+}
+
+.close-button:hover {
+  color: #333;
+}
+
+.addresses-content {
+  padding: 8px 0;
+  overflow-y: auto;
+  max-height: 340px;
+}
+
+.address-item {
+  display: flex;
+  align-items: center;
+  padding: 8px 16px;
+  border-bottom: 1px solid #f0f0f0;
+}
+
+.address-item:last-child {
+  border-bottom: none;
+}
+
+.address-color {
+  width: 10px;
+  height: 10px;
+  border-radius: 2px;
+  margin-right: 12px;
+  flex-shrink: 0;
+}
+
+.address-text {
+  flex: 1;
+  font-family: 'Roboto Mono', monospace;
+  font-size: 13px;
+  color: #333;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.address-count {
+  margin-left: 12px;
+  font-weight: bold;
+  color: #333;
+  min-width: 30px;
+  text-align: right;
+}
+
+/* Tooltip action */
+.tooltip-action {
+  margin-top: 6px;
+  font-size: 12px;
+  color: #2563eb;
+  font-style: italic;
 }

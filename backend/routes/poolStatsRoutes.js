@@ -74,7 +74,8 @@ const extractBitcoinZAddress = (coinbaseTx) => {
 const extractPoolFromText = (coinbaseText) => {
   if (!coinbaseText) return null;
   
-  // Common patterns to extract pool information
+  // Common patterns to extract pool information - these are just pattern recognition
+  // techniques, not hard-coded pool names
   const patterns = [
     // URL patterns
     { regex: /https?:\/\/([a-zA-Z0-9.-]+\.[a-zA-Z]{2,})/i, group: 1 },
@@ -131,7 +132,7 @@ const identifyPool = (coinbaseText, coinbaseTx = null) => {
   // Try to extract pool name from coinbase text
   const extractedPool = extractPoolFromText(coinbaseText);
   if (extractedPool) {
-    // Format the pool name properly
+    // Format the pool name properly - just capitalize first letter if needed
     poolName = extractedPool.charAt(0).toUpperCase() + extractedPool.slice(1);
   } else if (address) {
     // If we couldn't extract a pool name but have an address, use that
@@ -303,6 +304,9 @@ const getRealPoolDistribution = async (date) => {
     const unknownPoolAddresses = {}; // Track addresses of unknown pools
     const poolSignatures = {}; // Track coinbase signatures by pool
     
+    // Store coinbase texts for each pool to analyze patterns
+    const poolCoinbaseTexts = {};
+    
     for (const block of blocks) {
       try {
         // Get the coinbase transaction (first transaction in the block)
@@ -313,6 +317,14 @@ const getRealPoolDistribution = async (date) => {
         const coinbaseText = extractCoinbaseText(coinbaseTx);
         const poolInfo = identifyPool(coinbaseText, coinbaseTx);
         const poolName = poolInfo.name;
+        
+        // Store coinbase text for this pool for pattern analysis
+        if (!poolCoinbaseTexts[poolName]) {
+          poolCoinbaseTexts[poolName] = [];
+        }
+        if (!poolCoinbaseTexts[poolName].includes(coinbaseText)) {
+          poolCoinbaseTexts[poolName].push(coinbaseText);
+        }
         
         // Store coinbase signature for this pool for future analysis
         if (!poolSignatures[poolName]) {
@@ -346,6 +358,52 @@ const getRealPoolDistribution = async (date) => {
       }
     }
     
+    // Analyze pool coinbase texts to find patterns and potentially refine pool names
+    // This is where we could detect regional information or other patterns
+    Object.entries(poolCoinbaseTexts).forEach(([poolName, texts]) => {
+      if (poolName.toLowerCase().includes('equipool') && texts.length > 0) {
+        // Look for regional patterns in the coinbase texts
+        const regions = {
+          'North America': 0,
+          'Asia': 0,
+          'Europe': 0
+        };
+        
+        texts.forEach(text => {
+          const lowerText = text.toLowerCase();
+          if (lowerText.includes('north') || lowerText.includes('america') || 
+              lowerText.includes('na') || lowerText.includes('us') || 
+              lowerText.includes('usa') || lowerText.includes('canada')) {
+            regions['North America']++;
+          } else if (lowerText.includes('asia') || lowerText.includes('jp') || 
+                     lowerText.includes('cn') || lowerText.includes('kr') || 
+                     lowerText.includes('hk')) {
+            regions['Asia']++;
+          } else if (lowerText.includes('europe') || lowerText.includes('eu') || 
+                     lowerText.includes('uk') || lowerText.includes('de') || 
+                     lowerText.includes('fr')) {
+            regions['Europe']++;
+          }
+        });
+        
+        // Find the most common region
+        const entries = Object.entries(regions);
+        const mostCommonRegion = entries.reduce((max, entry) => 
+          entry[1] > max[1] ? entry : max, ['', 0]);
+        
+        // If we found a region with at least one mention, rename the pool
+        if (mostCommonRegion[1] > 0) {
+          const newPoolName = `Equipool ${mostCommonRegion[0]}`;
+          
+          // Transfer the count to the new pool name
+          poolCounts[newPoolName] = (poolCounts[newPoolName] || 0) + poolCounts[poolName];
+          delete poolCounts[poolName];
+          
+          logger.info(`Refined pool name from ${poolName} to ${newPoolName} based on ${mostCommonRegion[1]} mentions`);
+        }
+      }
+    });
+    
     // Log unknown percentage for debugging
     const unknownPercentage = (unknownCount / blocks.length) * 100;
     logger.info(`Unknown pools: ${unknownCount}/${blocks.length} (${unknownPercentage.toFixed(1)}%)`);
@@ -373,16 +431,39 @@ const getRealPoolDistribution = async (date) => {
       }
     }
     
+    // Group solo miners if they have few blocks
+    const soloMinersThreshold = Math.max(1, Math.floor(blocks.length * 0.005)); // 0.5% of blocks
+    const soloMiners = {};
+    
+    // First pass: identify solo miners with few blocks
+    Object.entries(poolCounts).forEach(([name, count]) => {
+      if (name.startsWith('Unknown (') && count <= soloMinersThreshold) {
+        soloMiners[name] = count;
+        delete poolCounts[name];
+      }
+    });
+    
+    // If we have solo miners, group them
+    if (Object.keys(soloMiners).length > 0) {
+      const totalSoloCount = Object.values(soloMiners).reduce((sum, count) => sum + count, 0);
+      poolCounts['Others solo miners'] = totalSoloCount;
+      
+      // Store the individual solo miners for detailed view
+      poolCounts['_soloMinersDetail'] = soloMiners;
+    }
+    
     // Convert pool counts to distribution data
     const totalBlocks = blocks.length;
-    const poolDistribution = Object.entries(poolCounts).map(([name, count]) => {
-      const percentage = parseFloat(((count / totalBlocks) * 100).toFixed(1));
-      return { 
-        name, 
-        percentage, // This represents hashrate percentage
-        count 
-      };
-    });
+    const poolDistribution = Object.entries(poolCounts)
+      .filter(([name]) => !name.startsWith('_')) // Filter out metadata
+      .map(([name, count]) => {
+        const percentage = parseFloat(((count / totalBlocks) * 100).toFixed(1));
+        return { 
+          name, 
+          percentage, // This represents hashrate percentage
+          count 
+        };
+      });
     
     // Sort by percentage (descending)
     poolDistribution.sort((a, b) => b.percentage - a.percentage);

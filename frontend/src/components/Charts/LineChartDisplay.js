@@ -1,7 +1,15 @@
 import React, { useRef, useEffect } from 'react';
 import PropTypes from 'prop-types';
 import { Line } from 'react-chartjs-2';
-import { getChartTitle, getYAxisTitle, getChartValue, getChartColors } from './chartUtils';
+import { 
+  getChartTitle, 
+  getYAxisTitle, 
+  getChartValue, 
+  getChartColors, 
+  chartTypes,
+  formatDisplayDate,
+  isToday
+} from './chartUtils';
 import './chartConfig'; // Import chart configuration to ensure all elements are registered
 
 /**
@@ -63,8 +71,23 @@ const LineChartDisplay = ({ chartData, activeChart }) => {
     };
   };
 
+  // Check if the data is for today
+  const dataDate = chartData.date ? new Date(chartData.date) : new Date();
+  const isTodayData = isToday(dataDate);
+  const dateDisplay = formatDisplayDate(dataDate);
+  const isMinedBlockChart = activeChart === chartTypes.MINED_BLOCK;
+
   return (
     <div className="chart-3d-container">
+      {/* Add date indicator for Mined Block chart */}
+      {isMinedBlockChart && (
+        <div className="chart-date-indicator">
+          <span className={`date-badge ${isTodayData ? 'today' : ''}`}>
+            {isTodayData ? 'Today' : dateDisplay}
+          </span>
+        </div>
+      )}
+      
       <div className="chart-3d-inner">
         <Line
           ref={chartRef}
@@ -112,6 +135,12 @@ const LineChartDisplay = ({ chartData, activeChart }) => {
                   title: function(tooltipItems) {
                     if (chartData.data && tooltipItems[0].dataIndex < chartData.data.length) {
                       const item = chartData.data[tooltipItems[0].dataIndex];
+                      
+                      // For Mined Block chart, show the date in the tooltip
+                      if (isMinedBlockChart) {
+                        return `Block ${item.blockHeight} - ${isTodayData ? 'Today' : dateDisplay}`;
+                      }
+                      
                       return `Block ${item.blockHeight}`;
                     }
                     return '';
@@ -124,6 +153,15 @@ const LineChartDisplay = ({ chartData, activeChart }) => {
                     if (context.parsed.y !== null) {
                       label += context.parsed.y.toLocaleString();
                     }
+                    
+                    // For Mined Block chart, show the pool name
+                    if (isMinedBlockChart && chartData.data[context.dataIndex]) {
+                      const item = chartData.data[context.dataIndex];
+                      if (item.pool) {
+                        label += ` (${item.pool})`;
+                      }
+                    }
+                    
                     return label;
                   }
                 }

@@ -14,8 +14,8 @@ const Charts = () => {
   const [activeChart, setActiveChart] = useState(chartTypes.BLOCK_SIZE);
   const [chartData, setChartData] = useState(null);
   const [loading, setLoading] = useState(true);
-  const [date, setDate] = useState(formatDate(new Date()));
-  const [timeRange, setTimeRange] = useState('30d');
+  const [date, setDate] = useState(formatDate(new Date())); // Today's date by default
+  const [timeRange, setTimeRange] = useState('1d'); // Default to 1 day (today) instead of 30d
   const [error, setError] = useState(null);
 
   // Generate mock data for when API fails (keeping this from original)
@@ -146,6 +146,12 @@ const Charts = () => {
   // Handle chart type change
   const handleChartTypeChange = (chartType) => {
     setActiveChart(chartType);
+    
+    // When switching to Pool Stat or Mined Block, always reset to today's data
+    if (chartType === chartTypes.POOL_STAT || chartType === chartTypes.MINED_BLOCK) {
+      setDate(formatDate(new Date()));
+      setTimeRange('1d'); // Default to today for these charts
+    }
   };
 
   // Handle time filter change
@@ -175,6 +181,7 @@ const Charts = () => {
             date={date} 
             setDate={setDate} 
             applyFilter={handleTimeFilterChange} 
+            showTodayDefault={activeChart === chartTypes.POOL_STAT || activeChart === chartTypes.MINED_BLOCK}
           />
         </div>
         

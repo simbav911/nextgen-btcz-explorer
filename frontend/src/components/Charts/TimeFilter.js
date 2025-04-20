@@ -37,15 +37,29 @@ const DatePickerPortal = ({ children }) => {
 /**
  * Time filter component for chart data
  */
-const TimeFilter = ({ date, setDate, applyFilter }) => {
+const TimeFilter = ({ date, setDate, applyFilter, showTodayDefault = false }) => {
   const [showDatePicker, setShowDatePicker] = useState(false);
-  const [timeRange, setTimeRange] = useState('30d'); // Default to 30 days
+  const [timeRange, setTimeRange] = useState(showTodayDefault ? '1d' : '30d'); // Default to 1 day if showTodayDefault is true
   const datePickerRef = useRef(null);
   const dateButtonRef = useRef(null);
   
+  // Update timeRange when showTodayDefault changes
+  useEffect(() => {
+    if (showTodayDefault) {
+      setTimeRange('1d');
+      // Set today's date
+      const today = formatDate(new Date());
+      setDate(today);
+      applyFilter(today, '1d', {
+        startDate: today,
+        endDate: today
+      });
+    }
+  }, [showTodayDefault, setDate, applyFilter]);
+  
   // Predefined time ranges
   const timeRanges = [
-    { label: '24 Hours', value: '1d' },
+    { label: 'Today', value: '1d' }, // Changed from "24 Hours" to "Today" for clarity
     { label: '7 Days', value: '7d' },
     { label: '30 Days', value: '30d' },
     { label: '90 Days', value: '90d' },
@@ -108,7 +122,7 @@ const TimeFilter = ({ date, setDate, applyFilter }) => {
     
     switch (range) {
       case '1d':
-        startDate.setDate(endDate.getDate() - 1);
+        startDate = new Date(); // Today
         break;
       case '7d':
         startDate.setDate(endDate.getDate() - 7);
@@ -126,8 +140,10 @@ const TimeFilter = ({ date, setDate, applyFilter }) => {
         // Set to earliest BitcoinZ data (approx. 2017-09-09)
         startDate = new Date('2017-09-09');
         break;
+      case 'custom':
+        return `Custom: ${formatDisplayDate(date)}`;
       default:
-        break;
+        startDate.setDate(endDate.getDate() - 30); // Default to 30 days
     }
     
     const formattedDate = formatDate(startDate);
@@ -208,8 +224,8 @@ const TimeFilter = ({ date, setDate, applyFilter }) => {
     
     switch(timeRange) {
       case '1d':
-        startDate.setDate(endDate.getDate() - 1);
-        break;
+        // For today, just show today's date
+        return `Today (${formatDisplayDate(new Date())})`;
       case '7d':
         startDate.setDate(endDate.getDate() - 7);
         break;
@@ -326,6 +342,7 @@ TimeFilter.propTypes = {
   date: PropTypes.string.isRequired,
   setDate: PropTypes.func.isRequired,
   applyFilter: PropTypes.func.isRequired,
+  showTodayDefault: PropTypes.bool
 };
 
 export default TimeFilter;

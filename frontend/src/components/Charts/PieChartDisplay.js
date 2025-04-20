@@ -1,7 +1,7 @@
 import React, { useRef, useEffect } from 'react';
 import PropTypes from 'prop-types';
 import { Pie } from 'react-chartjs-2';
-import { getChartColors, formatNumber } from './chartUtils';
+import { getChartColors, formatNumber, formatDisplayDate, isToday } from './chartUtils';
 import './chartConfig'; // Import chart configuration to ensure all elements are registered
 import './pie3d.css'; // Import enhanced 3D pie chart styles
 
@@ -59,8 +59,20 @@ const PieChartDisplay = ({ chartData }) => {
     };
   };
 
+  // Check if the data is for today
+  const dataDate = chartData.date ? new Date(chartData.date) : new Date();
+  const isTodayData = isToday(dataDate);
+  const dateDisplay = formatDisplayDate(dataDate);
+
   return (
     <div className="chart-3d-container pie-chart-container">
+      {/* Add date indicator */}
+      <div className="chart-date-indicator">
+        <span className={`date-badge ${isTodayData ? 'today' : ''}`}>
+          {isTodayData ? 'Today' : dateDisplay}
+        </span>
+      </div>
+      
       <div className="pie3d-chart">
         <Pie
           ref={chartRef}
@@ -139,6 +151,12 @@ const PieChartDisplay = ({ chartData }) => {
                 padding: 15,
                 cornerRadius: 10,
                 callbacks: {
+                  title: function(tooltipItems) {
+                    // Add date to tooltip title
+                    const dataIndex = tooltipItems[0].dataIndex;
+                    const label = tooltipItems[0].label;
+                    return `${label} - ${isTodayData ? 'Today' : dateDisplay}`;
+                  },
                   label: function(tooltipItem) {
                     const dataset = tooltipItem.dataset;
                     const count = chartData.data[tooltipItem.dataIndex].count;

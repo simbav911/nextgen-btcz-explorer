@@ -45,14 +45,42 @@ export const formatDate = (date) => {
 // Get days from time range
 export const getDaysFromRange = (range) => {
   switch (range) {
-    case '1d': return 1;
+    case '1d': return 1; // Today
     case '7d': return 7;
     case '30d': return 30;
     case '90d': return 90;
     case '1y': return 365;
     case 'all': return 3000; // A large number to get all data
+    case 'custom': return 1; // Default to 1 day for custom range if not specified
     default: return 30; // Default to 30 days
   }
+};
+
+// Check if a chart should default to today's data
+export const shouldShowTodayDefault = (chartType) => {
+  return chartType === chartTypes.POOL_STAT || chartType === chartTypes.MINED_BLOCK;
+};
+
+// Format date for display in a human-readable way
+export const formatDisplayDate = (date) => {
+  if (!date) return '';
+  
+  const dateObj = typeof date === 'string' ? new Date(date) : date;
+  return dateObj.toLocaleDateString('en-US', {
+    year: 'numeric',
+    month: 'short',
+    day: 'numeric'
+  });
+};
+
+// Check if a date is today
+export const isToday = (date) => {
+  const today = new Date();
+  const compareDate = typeof date === 'string' ? new Date(date) : date;
+  
+  return compareDate.getDate() === today.getDate() &&
+         compareDate.getMonth() === today.getMonth() &&
+         compareDate.getFullYear() === today.getFullYear();
 };
 
 // Get chart data value based on chart type

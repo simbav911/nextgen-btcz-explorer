@@ -1,6 +1,27 @@
 import React, { useState, useRef, useEffect } from 'react';
 import PropTypes from 'prop-types';
+import ReactDOM from 'react-dom';
+import Calendar from './Calendar';
 import { formatDate } from './chartUtils';
+
+// Portal component for rendering date picker outside the DOM hierarchy
+const DatePickerPortal = ({ children }) => {
+  const el = document.createElement('div');
+  el.style.position = 'relative';
+  el.style.zIndex = '9999';
+  
+  useEffect(() => {
+    // Try to use portal-root if available, otherwise use body
+    const portalRoot = document.getElementById('portal-root') || document.body;
+    portalRoot.appendChild(el);
+    
+    return () => {
+      portalRoot.removeChild(el);
+    };
+  }, [el]);
+  
+  return ReactDOM.createPortal(children, el);
+};
 
 /**
  * Time filter component for chart data
@@ -9,6 +30,7 @@ const TimeFilter = ({ date, setDate, applyFilter }) => {
   const [showDatePicker, setShowDatePicker] = useState(false);
   const [timeRange, setTimeRange] = useState('30d'); // Default to 30 days
   const datePickerRef = useRef(null);
+  const dateButtonRef = useRef(null);
   
   // Predefined time ranges
   const timeRanges = [
@@ -86,6 +108,20 @@ const TimeFilter = ({ date, setDate, applyFilter }) => {
     const range = timeRanges.find(r => r.value === timeRange);
     return range ? range.label : 'Custom Range';
   };
+  
+  // Calculate position for date picker
+  const getDatePickerPosition = () => {
+    if (!dateButtonRef.current) return {};
+    
+    const buttonRect = dateButtonRef.current.getBoundingClientRect();
+    
+    // Calculate position to ensure it's visible
+    return {
+      position: 'fixed',
+      top: `${buttonRect.bottom + 10}px`,
+      right: `${window.innerWidth - buttonRect.right + 10}px`,
+    };
+  };
 
   return (
     <div className="chart-time-filter">
@@ -107,6 +143,7 @@ const TimeFilter = ({ date, setDate, applyFilter }) => {
           className="date-button"
           onClick={() => setShowDatePicker(!showDatePicker)}
           aria-label="Open date picker"
+          ref={dateButtonRef}
         >
           <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
             <rect x="3" y="4" width="18" height="18" rx="2" ry="2"></rect>
@@ -117,37 +154,45 @@ const TimeFilter = ({ date, setDate, applyFilter }) => {
         </button>
         
         {showDatePicker && (
-          <div className="date-picker-container" ref={datePickerRef}>
-            <div className="date-picker-header">
-              <span>Select Date</span>
-              <button 
-                className="close-button"
-                onClick={() => setShowDatePicker(false)}
-                aria-label="Close date picker"
-              >
-                <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                  <line x1="18" y1="6" x2="6" y2="18"></line>
-                  <line x1="6" y1="6" x2="18" y2="18"></line>
-                </svg>
-              </button>
-            </div>
-            <input 
-              type="date" 
-              value={date}
-              onChange={handleDateChange}
-              min="2017-09-09"
-              max={formatDate(new Date())}
-            />
-            <button 
-              className="apply-button"
-              onClick={() => {
-                applyFilter(date, 'custom');
-                setShowDatePicker(false);
-              }}
+          <DatePickerPortal>
+            <div 
+              className="date-picker-container" 
+              ref={datePickerRef}
+              style={getDatePickerPosition()}
             >
-              Apply
-            </button>
-          </div>
+              <div className="date-picker-header">
+                <span>Select Date Range</span>
+                <button 
+                  className="close-button"
+                  onClick={() => setShowDatePicker(false)}
+                  aria-label="Close date picker"
+                >
+                  <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                    <line x1="18" y1="6" x2="6" y2="18"></line>
+                    <line x1="6" y1="6" x2="18" y2="18"></line>
+                  </svg>
+                </button>
+              </div>
+              
+              <div className="active-range-display">
+                <div className="range-label">Selected range:</div>
+                <div className="range-value">{timeRange === 'custom' ? 'Custom' : timeRanges.find(r => r.value === timeRange)?.label}</div>
+              </div>
+              
+              <Calendar
+                selectedDate={date}
+                onDateChange={newDate => setDate(newDate)}
+                onApply={(newDate) => {
+                  setDate(newDate);
+                  applyFilter(newDate, 'custom');
+                  setTimeRange('custom');
+                  setShowDatePicker(false);
+                }}
+                minDate="2017-09-09"
+                maxDate={formatDate(new Date())}
+              />
+            </div>
+          </DatePickerPortal>
         )}
       </div>
     </div>

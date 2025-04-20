@@ -179,16 +179,23 @@ router.get('/pool-stat', (req, res) => {
   try {
     const date = req.query.date || new Date().toISOString().split('T')[0];
     
-    // Static pool data
+    // Generate random block counts
+    const zpoolCount = Math.floor(Math.random() * 200) + 800;
+    const zergpoolCount = Math.floor(Math.random() * 300) + 1200;
+    const othersCount = Math.floor(Math.random() * 100) + 300;
+    const darkFiberCount = Math.floor(Math.random() * 50) + 150;
+    const twoMarsCount = Math.floor(Math.random() * 30) + 50;
+    
+    // Static pool data with block counts
     const data = {
       date,
       chartType: 'pool-stat',
       data: [
-        { name: 'Zpool', percentage: 31.8 },
-        { name: 'Zergpool', percentage: 49.0 },
-        { name: 'Others', percentage: 11.1 },
-        { name: 'DarkFiberMines', percentage: 6.1 },
-        { name: '2Mars', percentage: 2.0 }
+        { name: 'Zpool', percentage: 31.8, count: zpoolCount },
+        { name: 'Zergpool', percentage: 49.0, count: zergpoolCount },
+        { name: 'Others', percentage: 11.1, count: othersCount },
+        { name: 'DarkFiberMines', percentage: 6.1, count: darkFiberCount },
+        { name: '2Mars', percentage: 2.0, count: twoMarsCount }
       ]
     };
     

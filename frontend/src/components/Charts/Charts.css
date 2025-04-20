@@ -883,7 +883,7 @@
   justify-content: center;
   position: relative;
   z-index: 1;
-  overflow: hidden;
+  overflow: visible; /* Changed from hidden to prevent clipping of 3D chart */
   transform-style: preserve-3d;
 }
 
@@ -922,34 +922,96 @@
 }
 
 .chart-3d-inner {
-  transform: rotateX(6deg) scale(0.98);
-  transform-origin: center bottom;
+  /* No extreme perspective transform on the container */
+  transform: scale(0.98);
+  transform-origin: center center;
   transition: transform 0.5s ease;
   height: 100%;
-  width: 100%;
-  padding: 10px;
+  width: 90%; /* Slightly narrower for better display */
+  margin: 0 auto; /* Center the chart */
+  padding: 20px;
   border-radius: 16px;
   background: white;
-  box-shadow: 0 30px 60px rgba(0, 0, 0, 0.1);
+  box-shadow: 0 15px 30px rgba(0, 0, 0, 0.1), 
+              0 5px 15px rgba(0, 0, 50, 0.05),
+              inset 0 1px 3px rgba(255, 255, 255, 0.7);
+  position: relative;
+  overflow: visible;
 }
 
+/* Subtle hover effect */
 .chart-3d-inner:hover {
-  transform: rotateX(3deg) scale(0.99);
+  transform: scale(0.99);
+  box-shadow: 0 20px 40px rgba(0, 0, 0, 0.15), 
+              0 10px 20px rgba(0, 0, 50, 0.1),
+              inset 0 1px 3px rgba(255, 255, 255, 0.7);
+}
+
+/* Add realistic lighting effect to chart */
+.chart-3d-inner::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 60%;
+  background: linear-gradient(to bottom, 
+              rgba(255, 255, 255, 0.3) 0%, 
+              rgba(255, 255, 255, 0) 100%);
+  border-radius: 16px 16px 0 0;
+  pointer-events: none;
 }
 
 .chart-3d-shadow {
   position: absolute;
-  bottom: -15px;
+  bottom: -25px;
   left: 5%;
   right: 5%;
-  height: 30px;
-  background: radial-gradient(ellipse at center, rgba(0, 0, 0, 0.15) 0%, rgba(0, 0, 0, 0) 80%);
+  height: 40px;
+  background: radial-gradient(ellipse at center, rgba(0, 0, 0, 0.25) 0%, rgba(0, 0, 0, 0) 80%);
   border-radius: 50%;
-  filter: blur(8px);
-  transform: rotateX(90deg);
+  filter: blur(10px);
+  transform: rotateX(90deg) scale(0.9, 0.4); /* Make shadow more elliptical */
   transform-origin: center top;
   z-index: -1;
-  opacity: 0.6;
+  opacity: 0.7;
+  transition: all 0.5s ease;
+}
+
+/* Enhance shadow on hover for 3D effect */
+.chart-3d-container:hover .chart-3d-shadow {
+  bottom: -20px;
+  height: 45px;
+  opacity: 0.8;
+  filter: blur(12px);
+}
+
+/* Make the pie chart container simple and clean */
+.pie-chart-container {
+  height: 450px;
+  margin: 20px 0;
+  position: relative;
+  overflow: visible !important;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+/* Style legend area for better readability with more mining pools */
+canvas + .chartjs-legend {
+  padding: 15px !important;
+  margin-left: 20px !important;
+  background: rgba(255, 255, 255, 0.7) !important;
+  border-radius: 12px !important;
+  box-shadow: 0 5px 15px rgba(0, 0, 0, 0.05) !important;
+  max-height: 400px !important; /* Set max height */
+  overflow-y: auto !important; /* Add scrolling if needed */
+}
+
+/* Make sure legend items have enough spacing for new pools */
+.chartjs-legend li {
+  margin-bottom: 10px !important;
+  padding: 5px !important;
 }
 
 /* Loading state */
@@ -1171,7 +1233,7 @@
 
 .pool-stat-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(250px, 1fr));
+  grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
   gap: 20px;
 }
 
@@ -1186,6 +1248,7 @@
   position: relative;
   overflow: hidden;
   transition: transform 0.2s, box-shadow 0.2s;
+  margin-bottom: 5px;
 }
 
 .pool-stat-item:hover {
@@ -1326,6 +1389,19 @@
   }
 }
 
+/* Make pool stat grid more robust for additional entries */
+.pool-stat-summary {
+  margin-top: 40px;
+  border-radius: 16px;
+  padding: 25px;
+  background: #f9fafb;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.03);
+  border: 1px solid #f3f4f6;
+  max-height: 600px;
+  overflow-y: auto;
+}
+
+/* Media queries for responsive design */
 @media (max-width: 576px) {
   .charts-container {
     padding: 16px;
@@ -1363,5 +1439,19 @@
   
   .pool-stat-grid {
     grid-template-columns: 1fr;
+  }
+  
+  /* Smaller pool stat items on mobile */
+  .pool-stat-item {
+    padding: 12px;
+    margin-bottom: 10px;
+  }
+  
+  .pool-name {
+    font-size: 14px;
+  }
+  
+  .pool-percentage {
+    font-size: 20px;
   }
 }

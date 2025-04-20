@@ -1,0 +1,29 @@
+/**
+ * Custom styles for the 3D pie chart
+ */
+
+/* Apply 3D effect to the pie chart canvas element */
+.pie-chart-container canvas {
+  transform: perspective(1000px) rotateX(10deg) rotateY(-5deg);
+  transform-origin: center center;
+  transition: all 0.5s ease;
+}
+
+.pie-chart-container canvas:hover {
+  transform: perspective(1000px) rotateX(8deg) rotateY(-3deg);
+}
+
+/* Enhanced shadow for 3D effect */
+.chart-3d-shadow-enhanced {
+  position: absolute;
+  bottom: -30px;
+  left: 10%;
+  right: 10%;
+  height: 40px;
+  background: radial-gradient(ellipse at center, rgba(0, 0, 0, 0.25) 0%, rgba(0, 0, 0, 0) 80%);
+  border-radius: 50%;
+  filter: blur(15px);
+  transform: rotateX(60deg);
+  z-index: -1;
+  opacity: 0.6;
+}

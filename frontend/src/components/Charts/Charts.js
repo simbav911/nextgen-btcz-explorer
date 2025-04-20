@@ -4,6 +4,7 @@ import ChartSidebar from './ChartSidebar';
 import TimeFilter from './TimeFilter';
 import ChartContainer from './ChartContainer';
 import { chartTypes, getChartTitle, formatDate, getDaysFromRange } from './chartUtils';
+import { removeUnwantedText } from '../../utils/removeText';
 import './Charts.css';
 
 /**
@@ -135,7 +136,12 @@ const Charts = () => {
   // Fetch data when active chart or date changes
   useEffect(() => {
     fetchChartData();
-  }, [fetchChartData]);
+    
+    // Call the cleanup function when the chart type is pool stat
+    if (activeChart === chartTypes.POOL_STAT) {
+      // removeUnwantedText(); // Commented out: Potential conflict with chart styles/rendering
+    }
+  }, [fetchChartData, activeChart]);
 
   // Handle chart type change
   const handleChartTypeChange = (chartType) => {

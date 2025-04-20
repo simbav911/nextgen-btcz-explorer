@@ -67,32 +67,40 @@ export const getChartValue = (item, activeChart) => {
   }
 };
 
-// Get chart colors
+// Get chart colors with enhanced 3D-friendly colors
 export const getChartColors = () => {
   const gradientColors = {
     primary: {
-      start: 'rgba(37, 99, 235, 0.8)',
-      end: 'rgba(59, 130, 246, 0.2)'
+      start: 'rgba(37, 99, 235, 0.9)',
+      end: 'rgba(59, 130, 246, 0.3)'
     },
     secondary: {
-      start: 'rgba(79, 70, 229, 0.8)',
-      end: 'rgba(129, 140, 248, 0.2)'
+      start: 'rgba(79, 70, 229, 0.9)',
+      end: 'rgba(129, 140, 248, 0.3)'
     },
     accent: {
-      start: 'rgba(16, 185, 129, 0.8)',
-      end: 'rgba(52, 211, 153, 0.2)'
+      start: 'rgba(16, 185, 129, 0.9)',
+      end: 'rgba(52, 211, 153, 0.3)'
     }
   };
   
+  // Solid colors for 3D pie chart effect
   const poolColors = [
-    'rgba(37, 99, 235, 0.8)',   // Blue
-    'rgba(245, 158, 11, 0.8)',  // Amber
-    'rgba(16, 185, 129, 0.8)',  // Green
-    'rgba(239, 68, 68, 0.8)',   // Red
-    'rgba(139, 92, 246, 0.8)',  // Purple
-    'rgba(249, 115, 22, 0.8)',  // Orange
-    'rgba(6, 182, 212, 0.8)',   // Cyan
-    'rgba(236, 72, 153, 0.8)'   // Pink
+    'rgb(59, 130, 246)',     // Blue
+    'rgb(245, 158, 11)',     // Amber
+    'rgb(16, 185, 129)',     // Green
+    'rgb(239, 68, 68)',      // Red
+    'rgb(139, 92, 246)',     // Purple
+    'rgb(249, 115, 22)',     // Orange
+    'rgb(6, 182, 212)',      // Cyan
+    'rgb(236, 72, 153)',     // Pink
+    'rgb(79, 70, 229)',      // Indigo
+    'rgb(20, 184, 166)',     // Teal
+    'rgb(217, 119, 6)',      // Amber darker
+    'rgb(5, 150, 105)',      // Emerald
+    'rgb(124, 58, 237)',     // Violet
+    'rgb(220, 38, 38)',      // Red darker
+    'rgb(8, 145, 178)'       // Cyan darker
   ];
   
   return {

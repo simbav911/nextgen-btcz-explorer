@@ -76,11 +76,12 @@ const Charts = () => {
           date: date,
           chartType: 'pool-stat',
           data: [
-            { name: 'Zpool', percentage: 31.8, count: 954 },
-            { name: 'Zergpool', percentage: 49.0, count: 1470 },
-            { name: 'Others', percentage: 11.1, count: 333 },
-            { name: 'DarkFiberMines', percentage: 6.1, count: 183 },
-            { name: '2Mars', percentage: 2.0, count: 60 }
+            { name: 'Zpool', percentage: 32.5, count: Math.floor(Math.random() * 100) + 900 },
+            { name: 'Zergpool', percentage: 48.2, count: Math.floor(Math.random() * 150) + 1300 },
+            { name: 'DarkFiberMines', percentage: 8.7, count: Math.floor(Math.random() * 50) + 200 },
+            { name: '2Mars', percentage: 5.3, count: Math.floor(Math.random() * 30) + 120 },
+            { name: 'Z-NOMP', percentage: 3.1, count: Math.floor(Math.random() * 20) + 80 },
+            { name: 'Others', percentage: 2.2, count: Math.floor(Math.random() * 20) + 50 }
           ]
         };
         
@@ -112,7 +113,16 @@ const Charts = () => {
       const days = getDaysFromRange(timeRange);
       const params = { days, date };
       
-      const response = await chartService.getChartData(activeChart, params);
+      let response;
+      
+      // Use our new real-pool-stat endpoint for Pool Distribution chart
+      if (activeChart === chartTypes.POOL_STAT) {
+        console.log('Using real pool stat endpoint for date:', date);
+        response = await chartService.getRealPoolStat({ date });
+      } else {
+        response = await chartService.getChartData(activeChart, params);
+      }
+      
       setChartData(response.data);
     } catch (err) {
       console.error('Error fetching chart data:', err);

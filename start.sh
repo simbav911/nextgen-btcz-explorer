@@ -87,7 +87,7 @@ fi
 
 # Start the backend in the background
 echo -e "${BLUE}[6/7]${NC} Starting backend service..."
-npm start &
+npm run dev &
 BACKEND_PID=$!
 
 # Wait for backend to start
@@ -133,14 +133,26 @@ echo -e "${GREEN}* Backend API is available at:${NC} http://localhost:$BACKEND_P
 echo -e "${GREEN}* Frontend will be available at:${NC} http://localhost:3000"
 echo -e "${GREEN}* Press Ctrl+C to stop both services when finished${NC}"
 echo -e "${GREEN}=========================================================${NC}"
-DISABLE_ESLINT_PLUGIN=true npm start
+DISABLE_ESLINT_PLUGIN=true npm start &
+FRONTEND_PID=$!
 
-# Capture ctrl+c to stop both services
-trap "echo -e '${YELLOW}Stopping services...${NC}'; kill $BACKEND_PID; echo -e '${GREEN}Services stopped.${NC}'; exit" INT TERM
+# Function to clean up processes
+cleanup() {
+    echo -e "${YELLOW}Gracefully stopping services...${NC}"
+    echo -e "${BLUE}Stopping frontend (PID: $FRONTEND_PID)...${NC}"
+    kill $FRONTEND_PID 2>/dev/null
+    echo -e "${BLUE}Stopping backend (PID: $BACKEND_PID) and nodemon...${NC}"
+    pkill -P $BACKEND_PID 2>/dev/null  # Kill nodemon child processes
+    kill $BACKEND_PID 2>/dev/null
+    echo -e "${GREEN}All services stopped successfully.${NC}"
+    exit 0
+}
 
-# Wait for the frontend to exit
-wait
+# Capture ctrl+c and term signals
+trap cleanup INT TERM
 
-# Cleanup if we get here
-kill $BACKEND_PID 2>/dev/null
-echo -e "${GREEN}BitcoinZ Explorer stopped.${NC}"
+# Wait for both processes
+wait $FRONTEND_PID $BACKEND_PID
+
+# If we get here naturally (not through ctrl+c), clean up
+cleanup

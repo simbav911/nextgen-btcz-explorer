@@ -21,6 +21,9 @@ export const chartService = {
   getPoolStat: (params) => api.get('/charts/pool-stat', { params }),
   getMinedBlocks: (params) => api.get('/charts/mined-block', { params }),
   
+  // New method to get real historical pool distribution data
+  getRealPoolStat: (params) => api.get('/pool-stats/real-pool-stat', { params }),
+  
   // Generic method to fetch any chart data
   getChartData: (chartType, params) => api.get(`/charts/${chartType}`, { params })
 };

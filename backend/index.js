@@ -7,6 +7,7 @@ const logger = require('./utils/logger');
 const routes = require('./routes');
 const { setupSocket } = require('./services/socketService');
 const { initializeNodeConnection } = require('./services/bitcoinzService');
+const { initializePoolService } = require('./services/poolService');
 const { initializeDatabase } = require('./db');
 const { initializeModels } = require('./models');
 
@@ -48,6 +49,11 @@ const startServer = async () => {
     logger.info('Connecting to BitcoinZ node...');
     await initializeNodeConnection();
     logger.info('Connected to BitcoinZ node');
+    
+    // Initialize Pool Service
+    logger.info('Initializing pool service...');
+    initializePoolService();
+    logger.info('Pool service initialized');
     
     // Try to initialize database connection
     logger.info('Initializing database...');

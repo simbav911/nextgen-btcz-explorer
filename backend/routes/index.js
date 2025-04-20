@@ -9,6 +9,7 @@ const statsRoutes = require('./statsRoutes');
 const searchRoutes = require('./searchRoutes');
 const chartsRoutes = require('./chartsRoutes');
 const wealthRoutes = require('./wealthRoutes');
+const poolStatsRoutes = require('./poolStatsRoutes');
 
 // Use route modules
 router.use('/blocks', blockRoutes);
@@ -18,6 +19,7 @@ router.use('/stats', statsRoutes);
 router.use('/search', searchRoutes);
 router.use('/charts', chartsRoutes);
 router.use('/wealth', wealthRoutes);
+router.use('/pool-stats', poolStatsRoutes);
 
 // Root endpoint - API info
 router.get('/', (req, res) => {
@@ -31,7 +33,8 @@ router.get('/', (req, res) => {
       stats: '/api/stats',
       search: '/api/search',
       charts: '/api/charts',
-      wealth: '/api/wealth'
+      wealth: '/api/wealth',
+      poolStats: '/api/pool-stats'
     }
   });
 });

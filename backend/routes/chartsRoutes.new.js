@@ -405,8 +405,7 @@ router.get('/pool-stat', async (req, res) => {
   try {
     const date = req.query.date || new Date().toISOString().split('T')[0];
     
-    console.log('==== NEW IMPLEMENTATION: Pool-stat endpoint hit for date:', date, '====');
-    logger.info(`NEW IMPLEMENTATION: Pool-stat endpoint hit for date: ${date}`);
+    logger.info(`Pool-stat endpoint hit for date: ${date}`);
     
     // Check if we have cached data for this date
     if (chartDataCache['pool-stat'][date]) {

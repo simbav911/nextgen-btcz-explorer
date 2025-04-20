@@ -2,6 +2,7 @@ import React, { useRef, useEffect } from 'react';
 import PropTypes from 'prop-types';
 import { Pie } from 'react-chartjs-2';
 import { getChartColors, formatNumber } from './chartUtils';
+import './chartConfig'; // Import chart configuration to ensure all elements are registered
 
 /**
  * PieChartDisplay component for rendering pie/doughnut charts
@@ -29,11 +30,16 @@ const PieChartDisplay = ({ chartData }) => {
   }
 
   const prepareChartData = () => {
+    // Ensure data is valid and in correct format
+    const validData = chartData.data.filter(pool => 
+      pool && typeof pool.percentage === 'number' && !isNaN(pool.percentage)
+    );
+    
     return {
-      labels: chartData.data.map(pool => pool.name),
+      labels: validData.map(pool => pool.name || 'Unknown'),
       datasets: [{
-        data: chartData.data.map(pool => pool.percentage),
-        backgroundColor: poolColors,
+        data: validData.map(pool => pool.percentage),
+        backgroundColor: poolColors.slice(0, validData.length),
         borderColor: 'rgba(255, 255, 255, 0.8)',
         borderWidth: 2,
         hoverOffset: 15,
@@ -75,8 +81,11 @@ const PieChartDisplay = ({ chartData }) => {
                     const data = chart.data;
                     if (data.labels.length && data.datasets.length) {
                       return data.labels.map(function(label, i) {
-                        const meta = chart.getDatasetMeta(0);
-                        const style = meta.controller.getStyle(i);
+                        const style = {
+                          backgroundColor: data.datasets[0].backgroundColor[i],
+                          borderColor: data.datasets[0].borderColor,
+                          borderWidth: data.datasets[0].borderWidth
+                        };
                         const value = data.datasets[0].data[i] || 0;
                       
                         return {
@@ -137,14 +146,36 @@ const PieChartDisplay = ({ chartData }) => {
       <div className="pool-stat-summary">
         <h3>Mining Pool Distribution</h3>
         <div className="pool-stat-grid">
-          {chartData.data.map((pool, index) => (
-            <div key={pool.name} className="pool-stat-item">
-              <span className="pool-color" style={{ backgroundColor: poolColors[index % poolColors.length] }}></span>
-              <span className="pool-name">{pool.name}</span>
-              <span className="pool-percentage">{pool.percentage}%</span>
-              {pool.count && <span className="pool-count">{formatNumber(pool.count)} blocks</span>}
-            </div>
-          ))}
+          {chartData.data
+            .filter(pool => pool && typeof pool.percentage === 'number' && !isNaN(pool.percentage))
+            .map((pool, index) => (
+              <div key={pool.name || `pool-${index}`} className="pool-stat-item">
+                <div className="pool-stat-header">
+                  <div className="pool-color" style={{ backgroundColor: poolColors[index % poolColors.length] }}></div>
+                  <div className="pool-name">{pool.name || 'Unknown'}</div>
+                </div>
+                <div className="pool-stat-details">
+                  <span className="pool-percentage">{pool.percentage.toFixed(1)}%</span>
+                  <div className="pool-percentage-container">
+                    <div className="pool-percentage-bar-bg">
+                      <div 
+                        className="pool-percentage-bar" 
+                        style={{ 
+                          width: `${pool.percentage}%`, 
+                          backgroundColor: poolColors[index % poolColors.length] 
+                        }}
+                      ></div>
+                    </div>
+                  </div>
+                  {pool.count !== undefined && (
+                    <div className="pool-count">
+                      <span className="pool-count-label">Blocks:</span>
+                      <span className="pool-count-value">{formatNumber(pool.count)}</span>
+                    </div>
+                  )}
+                </div>
+              </div>
+            ))}
         </div>
       </div>
     </div>

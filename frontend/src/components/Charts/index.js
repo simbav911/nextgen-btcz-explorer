@@ -1,3 +1,6 @@
+// Import chart configuration first to ensure Chart.js is properly initialized
+import './chartConfig';
+
 import Charts from './Charts';
 import ChartSidebar from './ChartSidebar';
 import TimeFilter from './TimeFilter';

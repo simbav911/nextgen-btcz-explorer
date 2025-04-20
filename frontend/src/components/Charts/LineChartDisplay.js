@@ -1,30 +1,8 @@
 import React, { useRef, useEffect } from 'react';
 import PropTypes from 'prop-types';
 import { Line } from 'react-chartjs-2';
-import {
-  Chart as ChartJS,
-  CategoryScale,
-  LinearScale,
-  PointElement,
-  LineElement,
-  Title,
-  Tooltip,
-  Legend,
-  Filler
-} from 'chart.js';
 import { getChartTitle, getYAxisTitle, getChartValue, getChartColors } from './chartUtils';
-
-// Register required Chart.js components for line charts
-ChartJS.register(
-  CategoryScale,
-  LinearScale,
-  PointElement,
-  LineElement,
-  Title,
-  Tooltip,
-  Legend,
-  Filler
-);
+import './chartConfig'; // Import chart configuration to ensure all elements are registered
 
 /**
  * LineChartDisplay component for rendering line charts

@@ -589,6 +589,25 @@
   font-size: 14px;
   color: #1f2937;
   font-weight: 600;
+  transition: all 0.3s ease;
+}
+
+.range-value.selecting {
+  color: #3b82f6;
+  font-weight: 700;
+  background: rgba(59, 130, 246, 0.1);
+  padding: 3px 8px;
+  border-radius: 4px;
+  box-shadow: 0 0 0 2px rgba(59, 130, 246, 0.2);
+}
+
+.instruction-highlight {
+  color: #3b82f6;
+  font-weight: 600;
+  background: rgba(59, 130, 246, 0.1);
+  padding: 4px 8px;
+  border-radius: 4px;
+  display: inline-block;
 }
 
 .reset-button {
@@ -707,6 +726,16 @@
   transform: scale(1.05);
 }
 
+.calendar-day.selecting-start:hover {
+  background: rgba(59, 130, 246, 0.2);
+  box-shadow: 0 0 0 2px rgba(59, 130, 246, 0.4);
+}
+
+.calendar-day.selecting-end:hover {
+  background: rgba(236, 72, 153, 0.15);
+  box-shadow: 0 0 0 2px rgba(236, 72, 153, 0.3);
+}
+
 .calendar-day.start-date, .calendar-day.end-date {
   background: #3b82f6;
   color: white;
@@ -815,11 +844,30 @@
               0 0 0 1px rgba(0, 0, 0, 0.1);
   padding: 0;
   width: 350px;
-  overflow: hidden;
+  overflow: visible; /* Changed from hidden to prevent clipping issues */
   z-index: 9999;
   transform: translateZ(0);
   will-change: transform;
   animation: datepicker-popup 0.3s ease-out;
+  /* Ensure minimum distance from edges of viewport */
+  max-height: 90vh;
+  max-width: 90vw;
+}
+
+/* Position the date picker portal absolutely */
+.date-picker-portal {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  z-index: 9999;
+  pointer-events: none; /* Allow clicks to pass through to underlying elements */
+}
+
+/* But allow interactions with the date picker itself */
+.date-picker-container {
+  pointer-events: auto;
 }
 
 /* Chart display */

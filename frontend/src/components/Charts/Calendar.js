@@ -16,6 +16,14 @@ const Calendar = ({ selectedDate, onDateChange, onApply, minDate, maxDate }) => 
   const [endDate, setEndDate] = useState(null);
   const [selectingStart, setSelectingStart] = useState(true); // true = selecting start date, false = selecting end date
   
+  // Reset selection state when calendar opens or re-renders
+  React.useEffect(() => {
+    // If no dates are selected, ensure we're in "select start date" mode
+    if (!startDate && !endDate) {
+      setSelectingStart(true);
+    }
+  }, [startDate, endDate]);
+  
   // Convert min/max dates to Date objects
   const minDateObj = minDate ? new Date(minDate) : new Date('2017-09-09');
   const maxDateObj = maxDate ? new Date(maxDate) : new Date();
@@ -108,7 +116,8 @@ const Calendar = ({ selectedDate, onDateChange, onApply, minDate, maxDate }) => 
   // Handle day click for range selection
   const handleDayClick = (day) => {
     if (day.isCurrentMonth && !day.isDisabled) {
-      if (selectingStart) {
+      // Fixed logic: Always select start date first, then end date
+      if (selectingStart || (!startDate && !endDate)) {
         // Start new range selection
         setStartDate(day.date);
         setEndDate(null);
@@ -121,6 +130,7 @@ const Calendar = ({ selectedDate, onDateChange, onApply, minDate, maxDate }) => 
         
         // Ensure end date is after start date
         if (clickedDate < newStartDate) {
+          // If user clicked a date before the start date, swap them
           setEndDate(startDate);
           setStartDate(day.date);
           onDateChange({ startDate: day.date, endDate: startDate });
@@ -136,10 +146,12 @@ const Calendar = ({ selectedDate, onDateChange, onApply, minDate, maxDate }) => 
   
   // Reset selection
   const resetSelection = () => {
-    setStartDate(null);
+    // Reset to default date (today) instead of null to avoid undefined states
+    const today = formatDate(new Date());
+    setStartDate(today);
     setEndDate(null);
     setSelectingStart(true);
-    onDateChange({ startDate: null, endDate: null });
+    onDateChange({ startDate: today, endDate: null });
   };
   
   // Get month name
@@ -228,9 +240,12 @@ const Calendar = ({ selectedDate, onDateChange, onApply, minDate, maxDate }) => 
                 ${day.isStartDate ? 'start-date' : ''} 
                 ${day.isEndDate ? 'end-date' : ''} 
                 ${day.isInRange ? 'in-range' : ''} 
-                ${day.isDisabled ? 'disabled' : ''}`
+                ${day.isDisabled ? 'disabled' : ''}
+                ${selectingStart && day.isCurrentMonth && !day.isDisabled ? 'selecting-start' : ''}
+                ${!selectingStart && day.isCurrentMonth && !day.isDisabled ? 'selecting-end' : ''}`
               }
               onClick={() => handleDayClick(day)}
+              title={day.isCurrentMonth ? `${year}-${month+1}-${day.day}` : ''}
             >
               {day.day}
             </div>
@@ -290,12 +305,14 @@ const Calendar = ({ selectedDate, onDateChange, onApply, minDate, maxDate }) => 
         <div className="range-display-row">
           <div className="range-display">
             <div className="range-label">From:</div>
-            <div className="range-value">{startDate ? formatDisplayDate(startDate) : "Select start date"}</div>
+            <div className={`range-value ${selectingStart ? 'selecting' : ''}`}>
+              {startDate ? formatDisplayDate(startDate) : "Select start date"}
+            </div>
           </div>
           
           <div className="range-display">
             <div className="range-label">To:</div>
-            <div className="range-value">
+            <div className={`range-value ${!selectingStart ? 'selecting' : ''}`}>
               {endDate ? formatDisplayDate(endDate) : (startDate ? "Now select end date" : "Select dates")}
             </div>
           </div>
@@ -303,12 +320,12 @@ const Calendar = ({ selectedDate, onDateChange, onApply, minDate, maxDate }) => 
         
         <div className="range-instruction">
           {!startDate && !endDate && (
-            <span>Click on a date to start selection</span>
+            <span className="instruction-highlight">Click on a date to start selection</span>
           )}
           {startDate && !endDate && (
-            <span>Now click another date to complete the range</span>
+            <span className="instruction-highlight">Now click another date to complete the range</span>
           )}
-          {(startDate || endDate) && (
+          {startDate && (
             <button className="reset-button" onClick={resetSelection}>
               Clear
             </button>
@@ -335,7 +352,11 @@ const Calendar = ({ selectedDate, onDateChange, onApply, minDate, maxDate }) => 
           onClick={() => onApply({ startDate, endDate })}
           disabled={!startDate}
         >
-          Apply
+          {startDate && endDate ? 
+            `Apply range: ${formatDisplayDate(startDate)} to ${formatDisplayDate(endDate)}` : 
+            startDate ? 
+              `Apply date: ${formatDisplayDate(startDate)}` : 
+              'Select a date to apply'}
         </button>
       </div>
     </div>

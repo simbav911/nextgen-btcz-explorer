@@ -6,21 +6,32 @@ import { formatDate } from './chartUtils';
 
 // Portal component for rendering date picker outside the DOM hierarchy
 const DatePickerPortal = ({ children }) => {
-  const el = document.createElement('div');
-  el.style.position = 'relative';
-  el.style.zIndex = '9999';
+  // Use a ref to keep track of the element across renders
+  const elRef = useRef(null);
+  
+  // Only create the element once on first render
+  if (!elRef.current) {
+    const newEl = document.createElement('div');
+    newEl.style.position = 'relative';
+    newEl.style.zIndex = '9999';
+    newEl.className = 'date-picker-portal'; // Add a class to help with debugging
+    elRef.current = newEl;
+  }
   
   useEffect(() => {
     // Try to use portal-root if available, otherwise use body
     const portalRoot = document.getElementById('portal-root') || document.body;
-    portalRoot.appendChild(el);
+    portalRoot.appendChild(elRef.current);
     
+    // Only remove on unmount
     return () => {
-      portalRoot.removeChild(el);
+      if (portalRoot.contains(elRef.current)) {
+        portalRoot.removeChild(elRef.current);
+      }
     };
-  }, [el]);
+  }, []); // Empty dependency array - only run on mount and unmount
   
-  return ReactDOM.createPortal(children, el);
+  return ReactDOM.createPortal(children, elRef.current);
 };
 
 /**
@@ -45,22 +56,52 @@ const TimeFilter = ({ date, setDate, applyFilter }) => {
 
   // Close the date picker when clicking outside
   useEffect(() => {
-    const handleClickOutside = (event) => {
-      if (datePickerRef.current && !datePickerRef.current.contains(event.target)) {
-        setShowDatePicker(false);
-      }
-    };
-
-    document.addEventListener('mousedown', handleClickOutside);
-    return () => {
-      document.removeEventListener('mousedown', handleClickOutside);
-    };
-  }, []);
+    // Only add the listener if the date picker is showing
+    if (!showDatePicker) return;
+    
+    // Use a timeout to ensure this runs after the current click event finishes
+    const timeoutId = setTimeout(() => {
+      const handleClickOutside = (event) => {
+        // Make sure we have a ref and the click is outside
+        if (datePickerRef.current && !datePickerRef.current.contains(event.target)) {
+          // Check if the click was on a Custom button (which should open, not close)
+          const customButton = event.target.closest('button');
+          const isCustomButton = customButton && 
+                                 customButton.textContent.trim() === 'Custom';
+          
+          if (!isCustomButton) {
+            setShowDatePicker(false);
+          }
+        }
+      };
+      
+      // Use capture phase to get the event before it reaches other handlers
+      document.addEventListener('mousedown', handleClickOutside, true);
+      
+      return () => {
+        document.removeEventListener('mousedown', handleClickOutside, true);
+      };
+    }, 0);
+    
+    return () => clearTimeout(timeoutId);
+  }, [showDatePicker]); // Re-add the listener whenever showDatePicker changes
 
   const handleTimeRangeChange = (range) => {
     setTimeRange(range);
     
-    // Calculate the date based on the range
+    // Special handling for custom date range
+    if (range === 'custom') {
+      console.log("Custom date range selected"); // Debug log
+      
+      // Force showing the date picker with a slight delay 
+      // to ensure any click events are processed first
+      setTimeout(() => {
+        setShowDatePicker(true);
+      }, 50);
+      return;
+    }
+    
+    // For all other ranges, calculate the date
     let newDate = new Date();
     let endDate = new Date();
     let startDate = new Date();
@@ -85,10 +126,6 @@ const TimeFilter = ({ date, setDate, applyFilter }) => {
         // Set to earliest BitcoinZ data (approx. 2017-09-09)
         startDate = new Date('2017-09-09');
         break;
-      case 'custom':
-        // For custom, just show the date picker without changing the date
-        setShowDatePicker(true);
-        return;
       default:
         break;
     }
@@ -107,6 +144,7 @@ const TimeFilter = ({ date, setDate, applyFilter }) => {
       endDate: formatDate(endDate)
     });
     
+    // Make sure date picker is closed for non-custom ranges
     setShowDatePicker(false);
   };
 
@@ -237,25 +275,35 @@ const TimeFilter = ({ date, setDate, applyFilter }) => {
             <Calendar
               selectedDate={date}
               onDateChange={(dateRange) => {
-                if (dateRange.startDate && dateRange.endDate) {
-                  // Format the date range for display
-                  const startDate = new Date(dateRange.startDate);
-                  const endDate = new Date(dateRange.endDate);
+                console.log("Date selection change:", dateRange); // Debug log
+                
+                // Always update the internal state when a date is selected
+                if (dateRange.startDate) {
+                  // Store the date range for display
+                  setDateRange({
+                    startDate: dateRange.startDate,
+                    endDate: dateRange.endDate
+                  });
                   
-                  // Use the start date for filtering
+                  // Always update the date with at least the start date
                   setDate(dateRange.startDate);
                 }
               }}
               onApply={(dateRange) => {
+                console.log("Applying date range:", dateRange); // Debug log
+                
                 if (dateRange.startDate) {
+                  // Update the date
                   setDate(dateRange.startDate);
-                  
-                  // Create a custom description for the date range
-                  const startDate = new Date(dateRange.startDate);
-                  const endDate = dateRange.endDate ? new Date(dateRange.endDate) : startDate;
                   
                   // Set the custom date range
                   applyFilter(dateRange.startDate, 'custom', {
+                    startDate: dateRange.startDate,
+                    endDate: dateRange.endDate || dateRange.startDate
+                  });
+                  
+                  // Update display range
+                  setDateRange({
                     startDate: dateRange.startDate,
                     endDate: dateRange.endDate || dateRange.startDate
                   });

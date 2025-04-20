@@ -17,7 +17,7 @@ import './chartConfig'; // Import chart configuration to ensure all elements are
  */
 const LineChartDisplay = ({ chartData, activeChart }) => {
   const chartRef = useRef(null);
-  const { gradientColors } = getChartColors();
+  const { gradientColors, poolColors } = getChartColors();
 
   useEffect(() => {
     // Apply 3D effects after chart renders
@@ -47,6 +47,61 @@ const LineChartDisplay = ({ chartData, activeChart }) => {
       gradient.addColorStop(1, gradientColors.primary.end);
     }
     
+    // For mined blocks chart, we want to color points by pool
+    if (activeChart === chartTypes.MINED_BLOCK) {
+      // Get unique pools
+      const uniquePools = [...new Set(chartData.data.map(item => item.pool))];
+      
+      // Create a mapping of pool names to colors
+      const poolColorMap = {};
+      uniquePools.forEach((pool, index) => {
+        poolColorMap[pool] = poolColors[index % poolColors.length];
+      });
+      
+      // Create a dataset for the main chart
+      const mainDataset = {
+        label: getChartTitle(activeChart),
+        data: chartData.data.map(item => getChartValue(item, activeChart)),
+        borderColor: 'rgba(37, 99, 235, 1)',
+        backgroundColor: gradient || gradientColors.primary.end,
+        borderWidth: 3,
+        fill: true,
+        pointRadius: 5,
+        pointBackgroundColor: chartData.data.map(item => 
+          poolColorMap[item.pool] || 'rgba(37, 99, 235, 1)'
+        ),
+        pointBorderColor: 'rgba(255, 255, 255, 1)',
+        pointBorderWidth: 2,
+        pointHoverRadius: 7,
+        pointHoverBackgroundColor: chartData.data.map(item => 
+          poolColorMap[item.pool] || 'rgba(37, 99, 235, 1)'
+        ),
+        pointHoverBorderColor: 'rgba(255, 255, 255, 1)',
+        pointHoverBorderWidth: 3,
+        tension: 0.3
+      };
+      
+      // Create hidden datasets for each pool to show in the legend
+      const poolDatasets = uniquePools.map((pool, index) => ({
+        label: pool,
+        data: [], // Empty data, we just need this for the legend
+        borderColor: poolColors[index % poolColors.length],
+        backgroundColor: poolColors[index % poolColors.length],
+        borderWidth: 2,
+        pointStyle: 'circle',
+        pointRadius: 6,
+        hidden: true // Hide from chart but show in legend
+      }));
+      
+      return {
+        labels: chartData.data.map(item => 
+          item.blockHeight ? `${item.blockHeight}` : ''
+        ),
+        datasets: [mainDataset, ...poolDatasets]
+      };
+    }
+    
+    // Default chart data for other chart types
     return {
       labels: chartData.data.map(item => 
         item.blockHeight ? `${item.blockHeight}` : ''
@@ -114,7 +169,16 @@ const LineChartDisplay = ({ chartData, activeChart }) => {
                   },
                   padding: 20,
                   usePointStyle: true,
-                  pointStyle: 'circle'
+                  pointStyle: 'circle',
+                  filter: function(legendItem, chartData) {
+                    // For mined blocks chart, only show pool datasets in the legend
+                    if (isMinedBlockChart) {
+                      // Show all items except the main dataset (which is the first one)
+                      return legendItem.datasetIndex !== 0;
+                    }
+                    // For other charts, show all datasets
+                    return true;
+                  }
                 }
               },
               tooltip: {

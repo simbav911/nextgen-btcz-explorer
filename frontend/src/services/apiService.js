@@ -19,10 +19,12 @@ export const chartService = {
   getDifficulty: (params) => api.get('/charts/difficulty', { params }),
   getMiningRevenue: (params) => api.get('/charts/mining-revenue', { params }),
   getPoolStat: (params) => api.get('/charts/pool-stat', { params }),
-  getMinedBlocks: (params) => api.get('/charts/mined-block', { params }),
   
   // New method to get real historical pool distribution data
-  getRealPoolStat: (params) => api.get('/pool-stats/real-pool-stat', { params }),
+  getRealPoolStat: ({ date }) => api.get(`/pool-stats/real-pool-stat?date=${date}`),
+  
+  // Get mined blocks data
+  getMinedBlocks: ({ date, days = 1 }) => api.get(`/pool-stats/mined-blocks?date=${date}&days=${days}`),
   
   // Generic method to fetch any chart data
   getChartData: (chartType, params) => api.get(`/charts/${chartType}`, { params })

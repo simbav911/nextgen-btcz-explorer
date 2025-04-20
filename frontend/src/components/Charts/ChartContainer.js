@@ -2,6 +2,7 @@ import React from 'react';
 import PropTypes from 'prop-types';
 import LineChartDisplay from './LineChartDisplay';
 import PieChartDisplay from './PieChartDisplay';
+import HorizontalBarChart from './HorizontalBarChart';
 import { chartTypes } from './chartUtils';
 
 /**
@@ -60,6 +61,8 @@ const ChartContainer = ({
     <div className="chart-display">
       {activeChart === chartTypes.POOL_STAT ? (
         <PieChartDisplay chartData={chartData} />
+      ) : activeChart === chartTypes.MINED_BLOCK ? (
+        <HorizontalBarChart chartData={chartData} />
       ) : (
         <LineChartDisplay chartData={chartData} activeChart={activeChart} />
       )}

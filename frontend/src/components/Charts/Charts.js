@@ -115,10 +115,13 @@ const Charts = () => {
       
       let response;
       
-      // Use our new real-pool-stat endpoint for Pool Distribution chart
+      // Use specialized endpoints for pool distribution and mined blocks
       if (activeChart === chartTypes.POOL_STAT) {
         console.log('Using real pool stat endpoint for date:', date);
         response = await chartService.getRealPoolStat({ date });
+      } else if (activeChart === chartTypes.MINED_BLOCK) {
+        console.log('Using mined blocks endpoint for date:', date, 'days:', days);
+        response = await chartService.getMinedBlocks({ date, days });
       } else {
         response = await chartService.getChartData(activeChart, params);
       }

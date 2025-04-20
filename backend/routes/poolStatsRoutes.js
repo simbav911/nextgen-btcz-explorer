@@ -37,78 +37,113 @@ const extractCoinbaseText = (coinbaseTx) => {
 };
 
 /**
- * Identify mining pool from coinbase text
- * @param {string} coinbaseText - Text extracted from coinbase
- * @returns {string} Pool name or 'Unknown'
+ * Extract BitcoinZ address from coinbase transaction
+ * @param {Object} coinbaseTx - Coinbase transaction object
+ * @returns {string|null} BitcoinZ address or null if not found
  */
-const identifyPool = (coinbaseText) => {
-  if (!coinbaseText) return 'Unknown';
-  
-  // Common patterns in coinbase text that indicate a pool
-  const poolPatterns = [
-    // URL patterns
-    { regex: /https?:\/\/([a-zA-Z0-9.-]+\.[a-zA-Z]{2,})/i, group: 1 },
-    { regex: /([a-zA-Z0-9.-]+\.[a-zA-Z]{2,})\/?/i, group: 1 },
+const extractBitcoinZAddress = (coinbaseTx) => {
+  try {
+    // Check if the transaction has vout (outputs)
+    if (!coinbaseTx.vout || !Array.isArray(coinbaseTx.vout) || coinbaseTx.vout.length === 0) {
+      return null;
+    }
     
-    // Pool name patterns
-    { regex: /@([a-zA-Z0-9.-]+)/i, group: 1 },
-    { regex: /pool[.:]([a-zA-Z0-9.-]+)/i, group: 1 },
-    { regex: /([a-zA-Z0-9.-]+)[- ]pool/i, group: 1 },
-    
-    // Specific pool identifiers
-    { regex: /zergpool/i, name: 'Zergpool' },
-    { regex: /zpool/i, name: 'Zpool' },
-    { regex: /z-?nomp/i, name: 'Z-NOMP' },
-    { regex: /darkfibermines|dfm/i, name: 'DarkFiberMines' },
-    { regex: /2miners/i, name: '2Miners' },
-    { regex: /nicehash|nh/i, name: 'NiceHash' },
-    { regex: /luxor/i, name: 'Luxor' },
-    { regex: /mining-dutch/i, name: 'Mining-Dutch' },
-    { regex: /suprnova/i, name: 'Suprnova' },
-    { regex: /coinmine/i, name: 'Coinmine.pl' },
-    { regex: /miningpoolhub|mph/i, name: 'MiningPoolHub' },
-    { regex: /btcz\.fund|bitcoinz official|btczapppool|mine\.btcz\.app/i, name: 'BitcoinZ Official' },
-    { regex: /solopool/i, name: 'SoloPool' },
-    { regex: /equipool/i, name: 'Equipool' }
-  ];
-  
-  // Check against known pool patterns
-  for (const pattern of poolPatterns) {
-    const match = coinbaseText.match(pattern.regex);
-    if (match) {
-      // If a specific name is provided, use it
-      if (pattern.name) {
-        return pattern.name;
-      }
-      
-      // Otherwise, use the captured group as the pool name
-      if (match[pattern.group]) {
-        // Clean up the pool name
-        let poolName = match[pattern.group];
-        
-        // Remove common TLDs
-        poolName = poolName.replace(/\.(com|org|net|io|app|us|ca)$/, '');
-        
-        // Capitalize first letter of each word
-        poolName = poolName.split('.').map(word => 
-          word.charAt(0).toUpperCase() + word.slice(1).toLowerCase()
-        ).join('.');
-        
-        return poolName;
+    // Look for scriptPubKey with addresses
+    for (const vout of coinbaseTx.vout) {
+      if (vout.scriptPubKey && vout.scriptPubKey.addresses && vout.scriptPubKey.addresses.length > 0) {
+        // Return the first BitcoinZ address (usually the miner's address)
+        return vout.scriptPubKey.addresses[0];
       }
     }
+    
+    return null;
+  } catch (error) {
+    logger.error('Error extracting BitcoinZ address:', error);
+    return null;
+  }
+};
+
+/**
+ * Identify mining pool from coinbase text
+ * @param {string} coinbaseText - Text extracted from coinbase transaction
+ * @param {Object} coinbaseTx - Full coinbase transaction object (optional)
+ * @returns {Object} Pool information with name and address (if available)
+ */
+const identifyPool = (coinbaseText, coinbaseTx = null) => {
+  // Convert to lowercase for case-insensitive matching
+  const lowerText = coinbaseText.toLowerCase();
+  
+  // Extract pool name based on known patterns
+  let poolName = 'Unknown';
+  let address = null;
+  
+  // Try to extract BitcoinZ address for unknown pools
+  if (coinbaseTx) {
+    address = extractBitcoinZAddress(coinbaseTx);
   }
   
-  // Additional heuristics for pool identification
-  if (coinbaseText.includes('/btcz/')) return 'BitcoinZ Pool';
-  
-  // Look for any domain-like strings
-  const domainMatch = coinbaseText.match(/([a-zA-Z0-9][a-zA-Z0-9-]*\.)+[a-zA-Z]{2,}/i);
-  if (domainMatch) {
-    return domainMatch[0];
+  // Check for zpool
+  if (lowerText.includes('zpool.ca') || lowerText.includes('/zpool/')) {
+    poolName = 'Zpool';
+  }
+  // Check for zergpool
+  else if (lowerText.includes('zergpool.com') || lowerText.includes('zergpool')) {
+    poolName = 'Zergpool';
+  }
+  // Check for darkfibermines
+  else if (lowerText.includes('darkfibermines') || lowerText.includes('dark fiber')) {
+    poolName = 'Btcz.Darkfibermines';
+  }
+  // Check for 2mars
+  else if (lowerText.includes('2mars') || lowerText.includes('2mars.biz')) {
+    poolName = 'Btcz.2mars.Biz';
+  }
+  // Check for z-nomp
+  else if (lowerText.includes('z-nomp')) {
+    poolName = 'Z-NOMP';
+  }
+  // Check for zeropool
+  else if (lowerText.includes('zeropool')) {
+    if (lowerText.includes('solo')) {
+      poolName = 'Solo.Zeropool';
+    } else {
+      poolName = 'Zeropool';
+    }
+  }
+  // Check for suprnova
+  else if (lowerText.includes('suprnova')) {
+    poolName = 'Suprnova';
+  }
+  // Check for equipool
+  else if (lowerText.includes('equipool')) {
+    poolName = 'Equipool.1ds';
+  }
+  // Check for 2miners
+  else if (lowerText.includes('2miners')) {
+    poolName = '2miners';
+  }
+  // Check for github
+  else if (lowerText.includes('github')) {
+    poolName = 'Github';
+  }
+  // Check for swgroupe
+  else if (lowerText.includes('swgroupe')) {
+    poolName = 'Swgroupe.Fr';
+  }
+  // Check for miningspeed
+  else if (lowerText.includes('miningspeed')) {
+    poolName = 'Miningspeed';
+  }
+  // Check for solopool
+  else if (lowerText.includes('solopool')) {
+    poolName = 'Solopool.org';
+  }
+  // For unknown pools, append address if available
+  else if (address) {
+    poolName = `Unknown (${address})`;
   }
   
-  return 'Unknown';
+  return { name: poolName, address };
 };
 
 /**
@@ -244,7 +279,6 @@ const getRealPoolDistribution = async (date) => {
       // Try to find the earliest block to provide better feedback
       try {
         const blockchainInfo = await executeRpcCommand('getblockchaininfo');
-        const latestHeight = blockchainInfo.blocks;
         
         // Try to get the earliest block (height 1)
         const earliestBlock = await getBlockByHeight(1);
@@ -267,6 +301,7 @@ const getRealPoolDistribution = async (date) => {
     const poolCounts = {};
     let unknownCount = 0;
     const coinbaseTextSamples = {}; // Store samples of coinbase text for unknown pools
+    const unknownPoolAddresses = {}; // Track addresses of unknown pools
     
     for (const block of blocks) {
       try {
@@ -276,15 +311,22 @@ const getRealPoolDistribution = async (date) => {
         
         // Extract text from coinbase and identify the pool
         const coinbaseText = extractCoinbaseText(coinbaseTx);
-        const poolName = identifyPool(coinbaseText);
+        const poolInfo = identifyPool(coinbaseText, coinbaseTx);
+        const poolName = poolInfo.name;
         
-        if (poolName === 'Unknown') {
+        if (poolName.startsWith('Unknown')) {
           unknownCount++;
+          
+          // Store the address for unknown pools
+          if (poolInfo.address) {
+            unknownPoolAddresses[poolInfo.address] = (unknownPoolAddresses[poolInfo.address] || 0) + 1;
+          }
+          
           // Store a sample of the coinbase text for unknown pools
           if (!coinbaseTextSamples[coinbaseText] && Object.keys(coinbaseTextSamples).length < 10) {
             coinbaseTextSamples[coinbaseText] = block.height;
           }
-          logger.debug(`Block ${block.height}: Unknown pool, coinbase text: ${coinbaseText.substring(0, 100)}`);
+          logger.debug(`Block ${block.height}: ${poolName}, coinbase text: ${coinbaseText.substring(0, 100)}`);
         } else {
           logger.debug(`Block ${block.height}: Identified pool ${poolName}`);
         }
@@ -306,13 +348,23 @@ const getRealPoolDistribution = async (date) => {
       for (const [text, height] of Object.entries(coinbaseTextSamples)) {
         logger.info(`Block ${height}: ${text.substring(0, 100)}`);
       }
+      
+      // Log addresses of unknown pools
+      logger.info('Addresses of unknown pools:');
+      for (const [address, count] of Object.entries(unknownPoolAddresses)) {
+        logger.info(`Address ${address}: ${count} blocks (${((count / unknownCount) * 100).toFixed(1)}% of unknown)`);
+      }
     }
     
     // Convert pool counts to distribution data
     const totalBlocks = blocks.length;
     const poolDistribution = Object.entries(poolCounts).map(([name, count]) => {
       const percentage = parseFloat(((count / totalBlocks) * 100).toFixed(1));
-      return { name, percentage, count };
+      return { 
+        name, 
+        percentage, // This represents hashrate percentage
+        count 
+      };
     });
     
     // Sort by percentage (descending)
@@ -325,6 +377,57 @@ const getRealPoolDistribution = async (date) => {
   } catch (error) {
     logger.error(`Failed to get real pool distribution for ${date}:`, error);
     return [{ name: 'Error retrieving data', percentage: 100, count: 0 }];
+  }
+};
+
+/**
+ * Get mined blocks data for a specific date
+ * @param {string} date - Date in YYYY-MM-DD format
+ * @returns {Promise<Array>} Mined blocks data
+ */
+const getMinedBlocksData = async (date) => {
+  try {
+    // Get blocks for the specified date using binary search
+    const blocks = await getBlocksForDate(date);
+    
+    if (blocks.length === 0) {
+      logger.warn(`No blocks found for date ${date}`);
+      return [];
+    }
+    
+    // Process blocks to identify mining pools
+    const minedBlocks = [];
+    
+    for (const block of blocks) {
+      try {
+        // Get the coinbase transaction (first transaction in the block)
+        const coinbaseTxid = block.tx[0];
+        const coinbaseTx = await getRawTransaction(coinbaseTxid, 1);
+        
+        // Extract text from coinbase and identify the pool
+        const coinbaseText = extractCoinbaseText(coinbaseTx);
+        const poolInfo = identifyPool(coinbaseText, coinbaseTx);
+        
+        // Add block to the list with pool information
+        minedBlocks.push({
+          blockHeight: block.height,
+          pool: poolInfo.name,
+          size: block.size,
+          timestamp: new Date(block.time * 1000).toISOString(),
+          address: poolInfo.address || null
+        });
+      } catch (error) {
+        logger.error(`Error processing block ${block.hash}:`, error);
+      }
+    }
+    
+    // Sort by block height (descending)
+    minedBlocks.sort((a, b) => b.blockHeight - a.blockHeight);
+    
+    return minedBlocks;
+  } catch (error) {
+    logger.error(`Failed to get mined blocks data for ${date}:`, error);
+    return [];
   }
 };
 
@@ -348,6 +451,63 @@ router.get('/real-pool-stat', async (req, res) => {
     return res.json(data);
   } catch (error) {
     logger.error('Error in real-pool-stat endpoint:', error);
+    return res.status(500).json({
+      error: 'An unexpected error occurred',
+      message: error.message
+    });
+  }
+});
+
+// Endpoint for mined blocks data
+router.get('/mined-blocks', async (req, res) => {
+  try {
+    const date = req.query.date || new Date().toISOString().split('T')[0];
+    const days = parseInt(req.query.days || '1', 10);
+    
+    logger.info(`MINED-BLOCKS endpoint hit for date: ${date}, days: ${days}`);
+    
+    // For multi-day requests, we need to get data for each day
+    if (days > 1) {
+      const allMinedBlocks = [];
+      
+      // Get data for each day, starting from the specified date and going back
+      for (let i = 0; i < days; i++) {
+        const currentDate = new Date(date);
+        currentDate.setDate(currentDate.getDate() - i);
+        const currentDateStr = currentDate.toISOString().split('T')[0];
+        
+        const dayBlocks = await getMinedBlocksData(currentDateStr);
+        allMinedBlocks.push(...dayBlocks);
+      }
+      
+      // Sort all blocks by height (descending)
+      allMinedBlocks.sort((a, b) => b.blockHeight - a.blockHeight);
+      
+      // Format response
+      const data = {
+        date,
+        days,
+        chartType: 'mined-block',
+        data: allMinedBlocks
+      };
+      
+      return res.json(data);
+    } else {
+      // Single day request
+      const minedBlocks = await getMinedBlocksData(date);
+      
+      // Format response
+      const data = {
+        date,
+        days: 1,
+        chartType: 'mined-block',
+        data: minedBlocks
+      };
+      
+      return res.json(data);
+    }
+  } catch (error) {
+    logger.error('Error in mined-blocks endpoint:', error);
     return res.status(500).json({
       error: 'An unexpected error occurred',
       message: error.message

@@ -3,18 +3,33 @@ import PropTypes from 'prop-types';
 import { formatDate } from './chartUtils';
 
 /**
- * Calendar component for date selection
+ * Calendar component for date range selection
  */
 const Calendar = ({ selectedDate, onDateChange, onApply, minDate, maxDate }) => {
   // Parse the selected date
   const dateObj = new Date(selectedDate);
   const [month, setMonth] = useState(dateObj.getMonth());
   const [year, setYear] = useState(dateObj.getFullYear());
-  const [tempDate, setTempDate] = useState(selectedDate);
+  
+  // Date range selection states
+  const [startDate, setStartDate] = useState(selectedDate);
+  const [endDate, setEndDate] = useState(null);
+  const [selectingStart, setSelectingStart] = useState(true); // true = selecting start date, false = selecting end date
   
   // Convert min/max dates to Date objects
   const minDateObj = minDate ? new Date(minDate) : new Date('2017-09-09');
   const maxDateObj = maxDate ? new Date(maxDate) : new Date();
+  
+  // Format date for display
+  const formatDisplayDate = (dateStr) => {
+    if (!dateStr) return '';
+    const date = new Date(dateStr);
+    return date.toLocaleDateString('en-US', {
+      year: 'numeric',
+      month: 'short',
+      day: 'numeric'
+    });
+  };
   
   // Get days in month
   const getDaysInMonth = (year, month) => {
@@ -40,14 +55,24 @@ const Calendar = ({ selectedDate, onDateChange, onApply, minDate, maxDate }) => 
     // Add days of current month
     for (let i = 1; i <= daysInMonth; i++) {
       const date = new Date(year, month, i);
+      const dateStr = formatDate(date);
       const isDisabled = date < minDateObj || date > maxDateObj;
+      
+      // Check if this day is in the selected range
+      const isStartDate = dateStr === startDate;
+      const isEndDate = dateStr === endDate;
+      const isInRange = startDate && endDate && 
+                        date >= new Date(startDate) && 
+                        date <= new Date(endDate);
       
       days.push({ 
         day: i, 
         isCurrentMonth: true,
-        isSelected: date.toDateString() === new Date(tempDate).toDateString(),
-        isDisabled: isDisabled,
-        date: formatDate(date)
+        isStartDate,
+        isEndDate,
+        isInRange,
+        isDisabled,
+        date: dateStr
       });
     }
     
@@ -71,13 +96,50 @@ const Calendar = ({ selectedDate, onDateChange, onApply, minDate, maxDate }) => 
     setYear(newYear);
   };
   
-  // Handle day click
+  // Selection mode instructions
+  const getSelectionInstructions = () => {
+    if (selectingStart) {
+      return "Select start date";
+    } else {
+      return "Select end date";
+    }
+  };
+
+  // Handle day click for range selection
   const handleDayClick = (day) => {
     if (day.isCurrentMonth && !day.isDisabled) {
-      setTempDate(day.date);
-      // Also update the parent component
-      onDateChange(day.date);
+      if (selectingStart) {
+        // Start new range selection
+        setStartDate(day.date);
+        setEndDate(null);
+        setSelectingStart(false);
+        onDateChange({ startDate: day.date, endDate: null });
+      } else {
+        // Complete range selection
+        const newStartDate = new Date(startDate);
+        const clickedDate = new Date(day.date);
+        
+        // Ensure end date is after start date
+        if (clickedDate < newStartDate) {
+          setEndDate(startDate);
+          setStartDate(day.date);
+          onDateChange({ startDate: day.date, endDate: startDate });
+        } else {
+          setEndDate(day.date);
+          onDateChange({ startDate, endDate: day.date });
+        }
+        
+        setSelectingStart(true);
+      }
     }
+  };
+  
+  // Reset selection
+  const resetSelection = () => {
+    setStartDate(null);
+    setEndDate(null);
+    setSelectingStart(true);
+    onDateChange({ startDate: null, endDate: null });
   };
   
   // Get month name
@@ -161,7 +223,13 @@ const Calendar = ({ selectedDate, onDateChange, onApply, minDate, maxDate }) => 
           {days.map((day, index) => (
             <div 
               key={index} 
-              className={`calendar-day ${day.isCurrentMonth ? 'current-month' : 'other-month'} ${day.isSelected ? 'selected' : ''} ${day.isDisabled ? 'disabled' : ''}`}
+              className={`calendar-day 
+                ${day.isCurrentMonth ? 'current-month' : 'other-month'} 
+                ${day.isStartDate ? 'start-date' : ''} 
+                ${day.isEndDate ? 'end-date' : ''} 
+                ${day.isInRange ? 'in-range' : ''} 
+                ${day.isDisabled ? 'disabled' : ''}`
+              }
               onClick={() => handleDayClick(day)}
             >
               {day.day}
@@ -172,45 +240,91 @@ const Calendar = ({ selectedDate, onDateChange, onApply, minDate, maxDate }) => 
     );
   };
   
-  // Quick date buttons (Today, Yesterday, This Week, etc.)
+  // Quick date range buttons
   const renderQuickDateButtons = () => {
     const today = new Date();
-    const yesterday = new Date();
-    yesterday.setDate(yesterday.getDate() - 1);
     
-    const lastWeek = new Date();
-    lastWeek.setDate(lastWeek.getDate() - 7);
-    
-    const lastMonth = new Date();
-    lastMonth.setMonth(lastMonth.getMonth() - 1);
-    
-    const quickDates = [
-      { label: 'Today', date: formatDate(today) },
-      { label: 'Yesterday', date: formatDate(yesterday) },
-      { label: 'Last Week', date: formatDate(lastWeek) },
-      { label: 'Last Month', date: formatDate(lastMonth) }
+    const quickRanges = [
+      { label: 'Today', startDate: formatDate(today), endDate: formatDate(today) },
+      { 
+        label: 'Yesterday', 
+        startDate: formatDate(new Date(today.setDate(today.getDate() - 1))), 
+        endDate: formatDate(new Date(today))
+      },
+      { 
+        label: 'Last Week', 
+        startDate: formatDate(new Date(new Date().setDate(new Date().getDate() - 7))), 
+        endDate: formatDate(new Date())
+      },
+      { 
+        label: 'Last Month', 
+        startDate: formatDate(new Date(new Date().setMonth(new Date().getMonth() - 1))), 
+        endDate: formatDate(new Date())
+      }
     ];
     
     return (
       <div className="quick-dates">
-        {quickDates.map(quick => (
+        {quickRanges.map(range => (
           <button 
-            key={quick.label} 
+            key={range.label} 
             className="quick-date-button"
             onClick={() => {
-              setTempDate(quick.date);
-              onDateChange(quick.date);
+              setStartDate(range.startDate);
+              setEndDate(range.endDate);
+              setSelectingStart(true);
+              onDateChange({ startDate: range.startDate, endDate: range.endDate });
             }}
           >
-            {quick.label}
+            {range.label}
           </button>
         ))}
       </div>
     );
   };
   
+  // Show selected range with more explicit guidance
+  const renderSelectedRange = () => {
+    return (
+      <div className="selected-range">
+        <div className="range-display-row">
+          <div className="range-display">
+            <div className="range-label">From:</div>
+            <div className="range-value">{startDate ? formatDisplayDate(startDate) : "Select start date"}</div>
+          </div>
+          
+          <div className="range-display">
+            <div className="range-label">To:</div>
+            <div className="range-value">
+              {endDate ? formatDisplayDate(endDate) : (startDate ? "Now select end date" : "Select dates")}
+            </div>
+          </div>
+        </div>
+        
+        <div className="range-instruction">
+          {!startDate && !endDate && (
+            <span>Click on a date to start selection</span>
+          )}
+          {startDate && !endDate && (
+            <span>Now click another date to complete the range</span>
+          )}
+          {(startDate || endDate) && (
+            <button className="reset-button" onClick={resetSelection}>
+              Clear
+            </button>
+          )}
+        </div>
+      </div>
+    );
+  };
+  
   return (
     <div className="calendar-container">
+      <div className="calendar-header">
+        <span>Select Date Range</span>
+      </div>
+      
+      {renderSelectedRange()}
       {renderMonthNavigation()}
       {renderCalendarDays()}
       {renderQuickDateButtons()}
@@ -218,7 +332,8 @@ const Calendar = ({ selectedDate, onDateChange, onApply, minDate, maxDate }) => 
       <div className="calendar-footer">
         <button 
           className="apply-button"
-          onClick={() => onApply(tempDate)}
+          onClick={() => onApply({ startDate, endDate })}
+          disabled={!startDate}
         >
           Apply
         </button>

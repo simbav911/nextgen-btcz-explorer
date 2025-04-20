@@ -62,26 +62,28 @@ const TimeFilter = ({ date, setDate, applyFilter }) => {
     
     // Calculate the date based on the range
     let newDate = new Date();
+    let endDate = new Date();
+    let startDate = new Date();
     
     switch (range) {
       case '1d':
-        newDate.setDate(newDate.getDate() - 1);
+        startDate.setDate(endDate.getDate() - 1);
         break;
       case '7d':
-        newDate.setDate(newDate.getDate() - 7);
+        startDate.setDate(endDate.getDate() - 7);
         break;
       case '30d':
-        newDate.setDate(newDate.getDate() - 30);
+        startDate.setDate(endDate.getDate() - 30);
         break;
       case '90d':
-        newDate.setDate(newDate.getDate() - 90);
+        startDate.setDate(endDate.getDate() - 90);
         break;
       case '1y':
-        newDate.setFullYear(newDate.getFullYear() - 1);
+        startDate.setFullYear(endDate.getFullYear() - 1);
         break;
       case 'all':
         // Set to earliest BitcoinZ data (approx. 2017-09-09)
-        newDate = new Date('2017-09-09');
+        startDate = new Date('2017-09-09');
         break;
       case 'custom':
         // For custom, just show the date picker without changing the date
@@ -91,9 +93,20 @@ const TimeFilter = ({ date, setDate, applyFilter }) => {
         break;
     }
     
-    const formattedDate = formatDate(newDate);
+    const formattedDate = formatDate(startDate);
     setDate(formattedDate);
-    applyFilter(formattedDate, range);
+    
+    // Store the date range
+    setDateRange({
+      startDate: formatDate(startDate),
+      endDate: formatDate(endDate)
+    });
+    
+    applyFilter(formattedDate, range, {
+      startDate: formatDate(startDate),
+      endDate: formatDate(endDate)
+    });
+    
     setShowDatePicker(false);
   };
 
@@ -111,44 +124,76 @@ const TimeFilter = ({ date, setDate, applyFilter }) => {
   
   // Calculate position for date picker
   const getDatePickerPosition = () => {
-    if (!dateButtonRef.current) return {};
+    // Since we removed the button, we'll position relative to the time filter container
+    const filterEl = document.querySelector('.chart-time-filter');
+    if (!filterEl) return { top: '100px', right: '20px' };
     
-    const buttonRect = dateButtonRef.current.getBoundingClientRect();
+    const filterRect = filterEl.getBoundingClientRect();
     
     // Calculate position to ensure it's visible
     return {
       position: 'fixed',
-      top: `${buttonRect.bottom + 10}px`,
-      right: `${window.innerWidth - buttonRect.right + 10}px`,
+      top: `${filterRect.bottom + 10}px`,
+      right: '20px',
     };
   };
 
-  // Get a human-readable date range description
+  // Store the selected date range
+  const [dateRange, setDateRange] = useState({ startDate: null, endDate: null });
+
+  // Get a human-readable date range description with specific from/to dates
   const getDateRangeDescription = () => {
+    // Format date in a human-readable way
+    const formatDisplayDate = (date) => {
+      return new Date(date).toLocaleDateString('en-US', {
+        year: 'numeric',
+        month: 'short',
+        day: 'numeric'
+      });
+    };
+    
+    // If we're in custom mode and have a date range, show that
+    if (timeRange === 'custom' && dateRange.startDate && dateRange.endDate) {
+      const start = formatDisplayDate(dateRange.startDate);
+      const end = formatDisplayDate(dateRange.endDate);
+      
+      if (start === end) {
+        return `Custom: ${start}`;
+      }
+      
+      return `From ${start} to ${end}`;
+    }
+    
+    // Calculate the start date based on the time range
+    const endDate = new Date();
+    let startDate = new Date();
+    
     switch(timeRange) {
       case '1d':
-        return 'Last 24 hours';
+        startDate.setDate(endDate.getDate() - 1);
+        break;
       case '7d':
-        return 'Last 7 days';
+        startDate.setDate(endDate.getDate() - 7);
+        break;
       case '30d':
-        return 'Last 30 days';
+        startDate.setDate(endDate.getDate() - 30);
+        break;
       case '90d':
-        return 'Last 90 days';
+        startDate.setDate(endDate.getDate() - 90);
+        break;
       case '1y':
-        return 'Last year';
+        startDate.setFullYear(endDate.getFullYear() - 1);
+        break;
       case 'all':
-        return 'All time';
+        startDate = new Date('2017-09-09'); // BitcoinZ inception date
+        break;
       case 'custom':
-        // Format the custom date to a readable format
-        const customDate = new Date(date);
-        return `Custom: ${customDate.toLocaleDateString('en-US', {
-          year: 'numeric',
-          month: 'short',
-          day: 'numeric'
-        })}`;
+        return `Custom: ${formatDisplayDate(date)}`;
       default:
-        return 'Selected period';
+        startDate.setDate(endDate.getDate() - 30); // Default to 30 days
     }
+    
+    return `From ${formatDisplayDate(startDate)} to ${formatDisplayDate(endDate)}`;
   };
 
   return (
@@ -169,25 +214,7 @@ const TimeFilter = ({ date, setDate, applyFilter }) => {
         ))}
       </div>
       
-      {/* Only show the date selector button when not in Custom mode or when in the top filter bar */}
-      {(timeRange !== 'custom' || !showDatePicker) && (
-        <div className="chart-date-selector">
-          <span>{getCurrentRangeLabel()}</span>
-          <button 
-            className="date-button"
-            onClick={() => setShowDatePicker(!showDatePicker)}
-            aria-label="Open date picker"
-            ref={dateButtonRef}
-          >
-            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-              <rect x="3" y="4" width="18" height="18" rx="2" ry="2"></rect>
-              <line x1="16" y1="2" x2="16" y2="6"></line>
-              <line x1="8" y1="2" x2="8" y2="6"></line>
-              <line x1="3" y1="10" x2="21" y2="10"></line>
-            </svg>
-          </button>
-        </div>
-      )}
+      {/* Date selector button has been removed as requested */}
       
       {showDatePicker && (
         <DatePickerPortal>
@@ -196,33 +223,46 @@ const TimeFilter = ({ date, setDate, applyFilter }) => {
             ref={datePickerRef}
             style={getDatePickerPosition()}
           >
-            <div className="date-picker-header">
-              <span>Select Date Range</span>
-              <button 
-                className="close-button"
-                onClick={() => setShowDatePicker(false)}
-                aria-label="Close date picker"
-              >
-                <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                  <line x1="18" y1="6" x2="6" y2="18"></line>
-                  <line x1="6" y1="6" x2="18" y2="18"></line>
-                </svg>
-              </button>
-            </div>
-            
-            <div className="active-range-display">
-              <div className="range-label">Selected range:</div>
-              <div className="range-value">{timeRange === 'custom' ? 'Custom' : timeRanges.find(r => r.value === timeRange)?.label}</div>
-            </div>
+            <button 
+              className="date-picker-close"
+              onClick={() => setShowDatePicker(false)}
+              aria-label="Close date picker"
+            >
+              <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <line x1="18" y1="6" x2="6" y2="18"></line>
+                <line x1="6" y1="6" x2="18" y2="18"></line>
+              </svg>
+            </button>
             
             <Calendar
               selectedDate={date}
-              onDateChange={newDate => setDate(newDate)}
-              onApply={(newDate) => {
-                setDate(newDate);
-                applyFilter(newDate, 'custom');
-                setTimeRange('custom');
-                setShowDatePicker(false);
+              onDateChange={(dateRange) => {
+                if (dateRange.startDate && dateRange.endDate) {
+                  // Format the date range for display
+                  const startDate = new Date(dateRange.startDate);
+                  const endDate = new Date(dateRange.endDate);
+                  
+                  // Use the start date for filtering
+                  setDate(dateRange.startDate);
+                }
+              }}
+              onApply={(dateRange) => {
+                if (dateRange.startDate) {
+                  setDate(dateRange.startDate);
+                  
+                  // Create a custom description for the date range
+                  const startDate = new Date(dateRange.startDate);
+                  const endDate = dateRange.endDate ? new Date(dateRange.endDate) : startDate;
+                  
+                  // Set the custom date range
+                  applyFilter(dateRange.startDate, 'custom', {
+                    startDate: dateRange.startDate,
+                    endDate: dateRange.endDate || dateRange.startDate
+                  });
+                  
+                  setTimeRange('custom');
+                  setShowDatePicker(false);
+                }
               }}
               minDate="2017-09-09"
               maxDate={formatDate(new Date())}

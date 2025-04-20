@@ -5,7 +5,7 @@ import { formatDate } from './chartUtils';
 /**
  * Calendar component for date range selection
  */
-const Calendar = ({ selectedDate, onDateChange, onApply, minDate, maxDate }) => {
+const Calendar = ({ selectedDate, onDateChange, onApply, minDate, maxDate, singleDateMode = false }) => {
   // Parse the selected date
   const dateObj = new Date(selectedDate);
   const [month, setMonth] = useState(dateObj.getMonth());
@@ -106,7 +106,9 @@ const Calendar = ({ selectedDate, onDateChange, onApply, minDate, maxDate }) => 
   
   // Selection mode instructions
   const getSelectionInstructions = () => {
-    if (selectingStart) {
+    if (singleDateMode) {
+      return "Select date";
+    } else if (selectingStart) {
       return "Select start date";
     } else {
       return "Select end date";
@@ -116,30 +118,37 @@ const Calendar = ({ selectedDate, onDateChange, onApply, minDate, maxDate }) => 
   // Handle day click for range selection
   const handleDayClick = (day) => {
     if (day.isCurrentMonth && !day.isDisabled) {
-      // Fixed logic: Always select start date first, then end date
-      if (selectingStart || (!startDate && !endDate)) {
-        // Start new range selection
+      if (singleDateMode) {
+        // In single date mode, just set the start date and use it as both start and end
         setStartDate(day.date);
-        setEndDate(null);
-        setSelectingStart(false);
-        onDateChange({ startDate: day.date, endDate: null });
+        setEndDate(day.date); // Same as start date for single date mode
+        onDateChange({ startDate: day.date, endDate: day.date });
       } else {
-        // Complete range selection
-        const newStartDate = new Date(startDate);
-        const clickedDate = new Date(day.date);
-        
-        // Ensure end date is after start date
-        if (clickedDate < newStartDate) {
-          // If user clicked a date before the start date, swap them
-          setEndDate(startDate);
+        // Fixed logic: Always select start date first, then end date
+        if (selectingStart || (!startDate && !endDate)) {
+          // Start new range selection
           setStartDate(day.date);
-          onDateChange({ startDate: day.date, endDate: startDate });
+          setEndDate(null);
+          setSelectingStart(false);
+          onDateChange({ startDate: day.date, endDate: null });
         } else {
-          setEndDate(day.date);
-          onDateChange({ startDate, endDate: day.date });
+          // Complete range selection
+          const newStartDate = new Date(startDate);
+          const clickedDate = new Date(day.date);
+          
+          // Ensure end date is after start date
+          if (clickedDate < newStartDate) {
+            // If user clicked a date before the start date, swap them
+            setEndDate(startDate);
+            setStartDate(day.date);
+            onDateChange({ startDate: day.date, endDate: startDate });
+          } else {
+            setEndDate(day.date);
+            onDateChange({ startDate, endDate: day.date });
+          }
+          
+          setSelectingStart(true);
         }
-        
-        setSelectingStart(true);
       }
     }
   };
@@ -149,9 +158,12 @@ const Calendar = ({ selectedDate, onDateChange, onApply, minDate, maxDate }) => 
     // Reset to default date (today) instead of null to avoid undefined states
     const today = formatDate(new Date());
     setStartDate(today);
-    setEndDate(null);
+    setEndDate(singleDateMode ? today : null);
     setSelectingStart(true);
-    onDateChange({ startDate: today, endDate: null });
+    onDateChange({ 
+      startDate: today, 
+      endDate: singleDateMode ? today : null 
+    });
   };
   
   // Get month name
@@ -217,146 +229,93 @@ const Calendar = ({ selectedDate, onDateChange, onApply, minDate, maxDate }) => 
       </div>
     );
   };
-  
-  // Render calendar days
-  const renderCalendarDays = () => {
-    const days = generateCalendarDays();
-    const dayLabels = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
-    
-    return (
-      <div className="calendar-body">
-        <div className="weekday-header">
-          {dayLabels.map(day => (
-            <div key={day} className="weekday">{day}</div>
-          ))}
-        </div>
-        
-        <div className="calendar-days">
-          {days.map((day, index) => (
-            <div 
-              key={index} 
-              className={`calendar-day 
-                ${day.isCurrentMonth ? 'current-month' : 'other-month'} 
-                ${day.isStartDate ? 'start-date' : ''} 
-                ${day.isEndDate ? 'end-date' : ''} 
-                ${day.isInRange ? 'in-range' : ''} 
-                ${day.isDisabled ? 'disabled' : ''}
-                ${selectingStart && day.isCurrentMonth && !day.isDisabled ? 'selecting-start' : ''}
-                ${!selectingStart && day.isCurrentMonth && !day.isDisabled ? 'selecting-end' : ''}`
-              }
-              onClick={() => handleDayClick(day)}
-              title={day.isCurrentMonth ? `${year}-${month+1}-${day.day}` : ''}
-            >
-              {day.day}
-            </div>
-          ))}
-        </div>
-      </div>
-    );
-  };
-  
-  // Quick date range buttons
-  const renderQuickDateButtons = () => {
-    const today = new Date();
-    
-    const quickRanges = [
-      { label: 'Today', startDate: formatDate(today), endDate: formatDate(today) },
-      { 
-        label: 'Yesterday', 
-        startDate: formatDate(new Date(today.setDate(today.getDate() - 1))), 
-        endDate: formatDate(new Date(today))
-      },
-      { 
-        label: 'Last Week', 
-        startDate: formatDate(new Date(new Date().setDate(new Date().getDate() - 7))), 
-        endDate: formatDate(new Date())
-      },
-      { 
-        label: 'Last Month', 
-        startDate: formatDate(new Date(new Date().setMonth(new Date().getMonth() - 1))), 
-        endDate: formatDate(new Date())
-      }
-    ];
-    
-    return (
-      <div className="quick-dates">
-        {quickRanges.map(range => (
-          <button 
-            key={range.label} 
-            className="quick-date-button"
-            onClick={() => {
-              setStartDate(range.startDate);
-              setEndDate(range.endDate);
-              setSelectingStart(true);
-              onDateChange({ startDate: range.startDate, endDate: range.endDate });
-            }}
-          >
-            {range.label}
-          </button>
-        ))}
-      </div>
-    );
-  };
-  
-  // Show selected range with more explicit guidance
-  const renderSelectedRange = () => {
-    return (
-      <div className="selected-range">
-        <div className="range-display-row">
-          <div className="range-display">
-            <div className="range-label">From:</div>
-            <div className={`range-value ${selectingStart ? 'selecting' : ''}`}>
-              {startDate ? formatDisplayDate(startDate) : "Select start date"}
-            </div>
-          </div>
-          
-          <div className="range-display">
-            <div className="range-label">To:</div>
-            <div className={`range-value ${!selectingStart ? 'selecting' : ''}`}>
-              {endDate ? formatDisplayDate(endDate) : (startDate ? "Now select end date" : "Select dates")}
-            </div>
-          </div>
-        </div>
-        
-        <div className="range-instruction">
-          {!startDate && !endDate && (
-            <span className="instruction-highlight">Click on a date to start selection</span>
-          )}
-          {startDate && !endDate && (
-            <span className="instruction-highlight">Now click another date to complete the range</span>
-          )}
-          {startDate && (
-            <button className="reset-button" onClick={resetSelection}>
-              Clear
-            </button>
-          )}
-        </div>
-      </div>
-    );
-  };
-  
+
   return (
     <div className="calendar-container">
       <div className="calendar-header">
         <span>Select Date Range</span>
       </div>
       
-      {renderSelectedRange()}
+      {singleDateMode ? (
+        <div className="selected-date">
+          <span>Selected Date:</span>
+          <span className="date-value">{formatDisplayDate(startDate)}</span>
+        </div>
+      ) : (
+        <div className="selected-range">
+          <div className="range-display-row">
+            <div className="range-display">
+              <div className="range-label">From:</div>
+              <div className={`range-value ${selectingStart ? 'selecting' : ''}`}>
+                {startDate ? formatDisplayDate(startDate) : "Select start date"}
+              </div>
+            </div>
+            
+            <div className="range-display">
+              <div className="range-label">To:</div>
+              <div className={`range-value ${!selectingStart ? 'selecting' : ''}`}>
+                {endDate ? formatDisplayDate(endDate) : (startDate ? "Now select end date" : "Select dates")}
+              </div>
+            </div>
+          </div>
+          
+          <div className="range-instruction">
+            {!startDate && !endDate && (
+              <span className="instruction-highlight">Click on a date to start selection</span>
+            )}
+            {startDate && !endDate && (
+              <span className="instruction-highlight">Now click another date to complete the range</span>
+            )}
+            {startDate && (
+              <button className="reset-button" onClick={resetSelection}>
+                Clear
+              </button>
+            )}
+          </div>
+        </div>
+      )}
       {renderMonthNavigation()}
-      {renderCalendarDays()}
-      {renderQuickDateButtons()}
+      <div className="weekday-header">
+        <div>Sun</div>
+        <div>Mon</div>
+        <div>Tue</div>
+        <div>Wed</div>
+        <div>Thu</div>
+        <div>Fri</div>
+        <div>Sat</div>
+      </div>
+      <div className="calendar-grid">
+        {generateCalendarDays().map((day, index) => (
+          <div 
+            key={index} 
+            className={`calendar-day ${!day.isCurrentMonth ? 'empty' : ''} ${
+              day.isStartDate ? 'start-date' : ''
+            } ${day.isEndDate ? 'end-date' : ''} ${
+              day.isInRange ? 'in-range' : ''
+            } ${day.isDisabled ? 'disabled' : ''}`}
+            onClick={() => !day.isDisabled && handleDayClick(day)}
+          >
+            {day.day}
+          </div>
+        ))}
+      </div>
       
-      <div className="calendar-footer">
+      <div className="calendar-actions">
         <button 
-          className="apply-button"
-          onClick={() => onApply({ startDate, endDate })}
-          disabled={!startDate}
+          className="calendar-button clear" 
+          onClick={resetSelection}
         >
-          {startDate && endDate ? 
-            `Apply range: ${formatDisplayDate(startDate)} to ${formatDisplayDate(endDate)}` : 
-            startDate ? 
-              `Apply date: ${formatDisplayDate(startDate)}` : 
-              'Select a date to apply'}
+          Clear
+        </button>
+        <button 
+          className="calendar-button apply" 
+          onClick={() => onApply({ 
+            startDate, 
+            endDate: singleDateMode ? startDate : endDate 
+          })}
+          disabled={!singleDateMode && !endDate}
+        >
+          Apply
         </button>
       </div>
     </div>
@@ -368,7 +327,8 @@ Calendar.propTypes = {
   onDateChange: PropTypes.func.isRequired,
   onApply: PropTypes.func.isRequired,
   minDate: PropTypes.string,
-  maxDate: PropTypes.string
+  maxDate: PropTypes.string,
+  singleDateMode: PropTypes.bool
 };
 
 export default Calendar;

@@ -2,7 +2,7 @@ import React, { useState, useRef, useEffect } from 'react';
 import PropTypes from 'prop-types';
 import ReactDOM from 'react-dom';
 import Calendar from './Calendar';
-import { formatDate } from './chartUtils';
+import { formatDate, chartTypes } from './chartUtils';
 
 // Portal component for rendering date picker outside the DOM hierarchy
 const DatePickerPortal = ({ children }) => {
@@ -37,11 +37,14 @@ const DatePickerPortal = ({ children }) => {
 /**
  * Time filter component for chart data
  */
-const TimeFilter = ({ date, setDate, applyFilter, showTodayDefault = false }) => {
+const TimeFilter = ({ date, setDate, applyFilter, showTodayDefault = false, activeChart }) => {
   const [showDatePicker, setShowDatePicker] = useState(false);
   const [timeRange, setTimeRange] = useState(showTodayDefault ? '1d' : '30d'); // Default to 1 day if showTodayDefault is true
   const datePickerRef = useRef(null);
   const dateButtonRef = useRef(null);
+  
+  // Check if this is a single-day chart (Pool Distribution or Mined Block)
+  const isSingleDayChart = activeChart === chartTypes.POOL_STAT || activeChart === chartTypes.MINED_BLOCK;
   
   // Update timeRange when showTodayDefault changes
   useEffect(() => {
@@ -58,15 +61,20 @@ const TimeFilter = ({ date, setDate, applyFilter, showTodayDefault = false }) =>
   }, [showTodayDefault, setDate, applyFilter]);
   
   // Predefined time ranges
-  const timeRanges = [
-    { label: 'Today', value: '1d' }, // Changed from "24 Hours" to "Today" for clarity
-    { label: '7 Days', value: '7d' },
-    { label: '30 Days', value: '30d' },
-    { label: '90 Days', value: '90d' },
-    { label: '1 Year', value: '1y' },
-    { label: 'All Time', value: 'all' },
-    { label: 'Custom', value: 'custom' }
-  ];
+  const timeRanges = isSingleDayChart 
+    ? [
+        { label: 'Today', value: '1d' },
+        { label: 'Custom', value: 'custom' }
+      ]
+    : [
+        { label: 'Today', value: '1d' },
+        { label: '7 Days', value: '7d' },
+        { label: '30 Days', value: '30d' },
+        { label: '90 Days', value: '90d' },
+        { label: '1 Year', value: '1y' },
+        { label: 'All Time', value: 'all' },
+        { label: 'Custom', value: 'custom' }
+      ];
 
   // Close the date picker when clicking outside
   useEffect(() => {
@@ -149,16 +157,20 @@ const TimeFilter = ({ date, setDate, applyFilter, showTodayDefault = false }) =>
     const formattedDate = formatDate(startDate);
     setDate(formattedDate);
     
-    // Store the date range
-    setDateRange({
-      startDate: formatDate(startDate),
-      endDate: formatDate(endDate)
-    });
+    // For single-day charts, always use the same date for start and end
+    const dateRange = isSingleDayChart
+      ? {
+          startDate: formatDate(startDate),
+          endDate: formatDate(startDate)
+        }
+      : {
+          startDate: formatDate(startDate),
+          endDate: formatDate(endDate)
+        };
     
-    applyFilter(formattedDate, range, {
-      startDate: formatDate(startDate),
-      endDate: formatDate(endDate)
-    });
+    setDateRange(dateRange);
+    
+    applyFilter(formattedDate, range, dateRange);
     
     // Make sure date picker is closed for non-custom ranges
     setShowDatePicker(false);
@@ -195,27 +207,32 @@ const TimeFilter = ({ date, setDate, applyFilter, showTodayDefault = false }) =>
   // Store the selected date range
   const [dateRange, setDateRange] = useState({ startDate: null, endDate: null });
 
+  // Format date in a human-readable way
+  const formatDisplayDate = (date) => {
+    return new Date(date).toLocaleDateString('en-US', {
+      year: 'numeric',
+      month: 'short',
+      day: 'numeric'
+    });
+  };
+
   // Get a human-readable date range description with specific from/to dates
   const getDateRangeDescription = () => {
-    // Format date in a human-readable way
-    const formatDisplayDate = (date) => {
-      return new Date(date).toLocaleDateString('en-US', {
-        year: 'numeric',
-        month: 'short',
-        day: 'numeric'
-      });
-    };
-    
     // If we're in custom mode and have a date range, show that
     if (timeRange === 'custom' && dateRange.startDate && dateRange.endDate) {
       const start = formatDisplayDate(dateRange.startDate);
       const end = formatDisplayDate(dateRange.endDate);
       
-      if (start === end) {
-        return `Custom: ${start}`;
+      if (start === end || isSingleDayChart) {
+        return `${start}`;
       }
       
       return `From ${start} to ${end}`;
+    }
+    
+    // For single-day charts, just show the date
+    if (isSingleDayChart) {
+      return formatDisplayDate(date);
     }
     
     // Calculate the start date based on the time range
@@ -242,7 +259,7 @@ const TimeFilter = ({ date, setDate, applyFilter, showTodayDefault = false }) =>
         startDate = new Date('2017-09-09'); // BitcoinZ inception date
         break;
       case 'custom':
-        return `Custom: ${formatDisplayDate(date)}`;
+        return `${formatDisplayDate(date)}`;
       default:
         startDate.setDate(endDate.getDate() - 30); // Default to 30 days
     }
@@ -295,11 +312,19 @@ const TimeFilter = ({ date, setDate, applyFilter, showTodayDefault = false }) =>
                 
                 // Always update the internal state when a date is selected
                 if (dateRange.startDate) {
+                  // For single-day charts, use the same date for start and end
+                  const newDateRange = isSingleDayChart
+                    ? {
+                        startDate: dateRange.startDate,
+                        endDate: dateRange.startDate
+                      }
+                    : {
+                        startDate: dateRange.startDate,
+                        endDate: dateRange.endDate
+                      };
+                  
                   // Store the date range for display
-                  setDateRange({
-                    startDate: dateRange.startDate,
-                    endDate: dateRange.endDate
-                  });
+                  setDateRange(newDateRange);
                   
                   // Always update the date with at least the start date
                   setDate(dateRange.startDate);
@@ -312,17 +337,22 @@ const TimeFilter = ({ date, setDate, applyFilter, showTodayDefault = false }) =>
                   // Update the date
                   setDate(dateRange.startDate);
                   
+                  // For single-day charts, use the same date for start and end
+                  const newDateRange = isSingleDayChart
+                    ? {
+                        startDate: dateRange.startDate,
+                        endDate: dateRange.startDate
+                      }
+                    : {
+                        startDate: dateRange.startDate,
+                        endDate: dateRange.endDate || dateRange.startDate
+                      };
+                  
                   // Set the custom date range
-                  applyFilter(dateRange.startDate, 'custom', {
-                    startDate: dateRange.startDate,
-                    endDate: dateRange.endDate || dateRange.startDate
-                  });
+                  applyFilter(dateRange.startDate, 'custom', newDateRange);
                   
                   // Update display range
-                  setDateRange({
-                    startDate: dateRange.startDate,
-                    endDate: dateRange.endDate || dateRange.startDate
-                  });
+                  setDateRange(newDateRange);
                   
                   setTimeRange('custom');
                   setShowDatePicker(false);
@@ -330,6 +360,7 @@ const TimeFilter = ({ date, setDate, applyFilter, showTodayDefault = false }) =>
               }}
               minDate="2017-09-09"
               maxDate={formatDate(new Date())}
+              singleDateMode={isSingleDayChart} // Only allow selecting a single date for Pool Distribution and Mined Block
             />
           </div>
         </DatePickerPortal>
@@ -342,7 +373,8 @@ TimeFilter.propTypes = {
   date: PropTypes.string.isRequired,
   setDate: PropTypes.func.isRequired,
   applyFilter: PropTypes.func.isRequired,
-  showTodayDefault: PropTypes.bool
+  showTodayDefault: PropTypes.bool,
+  activeChart: PropTypes.string
 };
 
 export default TimeFilter;

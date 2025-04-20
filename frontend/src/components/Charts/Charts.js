@@ -182,6 +182,7 @@ const Charts = () => {
             setDate={setDate} 
             applyFilter={handleTimeFilterChange} 
             showTodayDefault={activeChart === chartTypes.POOL_STAT || activeChart === chartTypes.MINED_BLOCK}
+            activeChart={activeChart}
           />
         </div>
         

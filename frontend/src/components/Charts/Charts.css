@@ -479,7 +479,7 @@
   border-radius: 16px;
   box-shadow: 0 15px 35px rgba(0, 0, 0, 0.3),
               0 0 0 1px rgba(0, 0, 0, 0.1);
-  padding: 0;
+  padding: 12px;
   width: 320px;
   overflow: hidden;
   z-index: 9999; /* Extremely high z-index to ensure it's always on top */
@@ -521,7 +521,7 @@
 }
 
 .calendar-container {
-  padding: 0;
+  padding: 12px;
   box-shadow: 0 10px 25px rgba(0, 0, 0, 0.15);
   border-radius: 0;
   overflow: hidden;
@@ -532,17 +532,19 @@
   background: linear-gradient(to right, #3b82f6, #2563eb);
   color: white;
   font-weight: 600;
-  padding: 16px 20px;
+  padding: 12px;
   font-size: 16px;
   letter-spacing: 0.3px;
   position: relative;
   text-align: center;
+  border-bottom: 1px solid #e5e7eb;
+  margin-bottom: 8px;
 }
 
 .date-picker-close {
   position: absolute;
-  top: 10px;
-  right: 10px;
+  top: 8px;
+  right: 8px;
   background: rgba(255, 255, 255, 0.2);
   border: none;
   width: 30px;
@@ -1559,7 +1561,7 @@ canvas + .chartjs-legend {
 .calendar-grid {
   display: grid;
   grid-template-columns: repeat(7, 1fr);
-  gap: 2px;
+  gap: 4px;
 }
 
 .calendar-day {

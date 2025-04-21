@@ -99,13 +99,17 @@ const getAddressTransactions = async (address, limit = 10, offset = 0) => {
     
     // First get all transaction IDs for this address
     try {
-      const txids = await executeRpcCommand('getaddresstxids', [{"addresses": [address]}], 60000);
+      let txids = await executeRpcCommand('getaddresstxids', [{"addresses": [address]}], 60000);
       txCount = txids ? txids.length : 0;
       
       if (txids && txids.length > 0) {
         logger.info(`Found ${txids.length} transaction IDs for ${address}`);
         
-        // Get the right slice of txids for the requested page
+        // IMPORTANT: Reverse the txids array to get newest transactions first
+        // The array from getaddresstxids is typically in ascending order (oldest first)
+        txids = txids.reverse();
+        
+        // Now get the right slice of txids for the requested page
         const start = Math.min(offset, txids.length);
         const end = Math.min(offset + limit, txids.length);
         const pageTxids = txids.slice(start, end);
@@ -196,11 +200,14 @@ const getAddressTransactions = async (address, limit = 10, offset = 0) => {
         logger.debug(`Successfully imported address ${address}`);
         
         // Try getting txids again
-        const txids = await executeRpcCommand('getaddresstxids', [{"addresses": [address]}], 60000);
+        let txids = await executeRpcCommand('getaddresstxids', [{"addresses": [address]}], 60000);
         txCount = txids ? txids.length : 0;
         
         if (txids && txids.length > 0) {
           logger.info(`After import: Found ${txids.length} transaction IDs for ${address}`);
+          
+          // IMPORTANT: Reverse txids to get newest transactions first
+          txids = txids.reverse();
           
           // Just get a sample of transactions to avoid overloading
           const start = Math.min(offset, txids.length);

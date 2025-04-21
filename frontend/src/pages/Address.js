@@ -249,80 +249,176 @@ const Address = () => {
     return timelineData;
   };
   
-  // Function to filter history data based on selected time range
+  // Function to create time-range data points with proper balance progression
+  const getTimeRangePoints = () => {
+    // Get current wallet balance
+    const currentBalance = addressInfo?.balance || 0;
+    
+    // First sort transactions by time (oldest first)
+    const sortedTxs = [...allTransactions].sort((a, b) => a.time - b.time);
+    
+    // Calculate the balance at each point in time
+    const balanceTimeline = [];
+    let runningBalance = 0;
+    
+    // Build full timeline from transactions
+    sortedTxs.forEach(tx => {
+      runningBalance += Number(tx.value || 0);
+      balanceTimeline.push({
+        timestamp: tx.time,
+        balance: Math.max(0, runningBalance),
+        txid: tx.txid
+      });
+    });
+    
+    // Now create time points based on the selected range
+    if (timeRange === TIME_RANGES.DAY) {
+      const points = [];
+      const now = moment();
+      const dayStart = moment().subtract(24, 'hours');
+      
+      // Create points for each 2 hours in the last 24 hours
+      for (let i = 12; i >= 0; i--) {
+        const pointTime = moment().subtract(i * 2, 'hours');
+        const pointTimestamp = pointTime.unix();
+        
+        // Find the last balance before this point
+        let balanceAtPoint = 0;
+        for (let j = balanceTimeline.length - 1; j >= 0; j--) {
+          if (balanceTimeline[j].timestamp <= pointTimestamp) {
+            balanceAtPoint = balanceTimeline[j].balance;
+            break;
+          }
+        }
+        
+        // If no transactions happened yet, the balance is 0
+        // If this is the last point, use the current balance
+        if (i === 0) {
+          balanceAtPoint = currentBalance;
+        }
+        
+        points.push({
+          date: pointTime.format('YYYY-MM-DD HH:00:00'),
+          dateKey: pointTime.format('YYYY-MM-DD HH:00:00'),
+          label: pointTime.format('ha'), // e.g. 2pm
+          balance: balanceAtPoint,
+          timestamp: pointTimestamp,
+          isGeneratedPoint: true
+        });
+      }
+      
+      return points;
+    } 
+    else if (timeRange === TIME_RANGES.WEEK) {
+      const points = [];
+      
+      // Create a point for each day in the last week
+      for (let i = 6; i >= 0; i--) {
+        const pointTime = moment().subtract(i, 'days');
+        const pointTimestamp = pointTime.unix();
+        
+        // Find the last balance before this point
+        let balanceAtPoint = 0;
+        for (let j = balanceTimeline.length - 1; j >= 0; j--) {
+          if (balanceTimeline[j].timestamp <= pointTimestamp) {
+            balanceAtPoint = balanceTimeline[j].balance;
+            break;
+          }
+        }
+        
+        // If no transactions happened yet, the balance is 0
+        // If this is the last point, use the current balance
+        if (i === 0) {
+          balanceAtPoint = currentBalance;
+        }
+        
+        points.push({
+          date: pointTime.format('YYYY-MM-DD'),
+          dateKey: pointTime.format('YYYY-MM-DD'),
+          label: pointTime.format('ddd'), // e.g. Mon
+          balance: balanceAtPoint,
+          timestamp: pointTimestamp,
+          isGeneratedPoint: true
+        });
+      }
+      
+      return points;
+    }
+    else if (timeRange === TIME_RANGES.MONTH) {
+      const points = [];
+      
+      // Create points at 6-day intervals for the month
+      for (let i = 5; i >= 0; i--) {
+        const pointTime = moment().subtract(i * 6, 'days');
+        const pointTimestamp = pointTime.unix();
+        
+        // Find the last balance before this point
+        let balanceAtPoint = 0;
+        for (let j = balanceTimeline.length - 1; j >= 0; j--) {
+          if (balanceTimeline[j].timestamp <= pointTimestamp) {
+            balanceAtPoint = balanceTimeline[j].balance;
+            break;
+          }
+        }
+        
+        // If no transactions happened yet, the balance is 0
+        // If this is the last point, use the current balance
+        if (i === 0) {
+          balanceAtPoint = currentBalance;
+        }
+        
+        points.push({
+          date: pointTime.format('YYYY-MM-DD'),
+          dateKey: pointTime.format('YYYY-MM-DD'),
+          label: pointTime.format('MMM D'), // e.g. Jan 15
+          balance: balanceAtPoint,
+          timestamp: pointTimestamp,
+          isGeneratedPoint: true
+        });
+      }
+      
+      return points;
+    }
+    
+    // For ALL time range, return an empty array since we'll handle it differently
+    return [];
+  };
+
+  // Function to get balance history based on selected time range
   const getFilteredBalanceHistory = () => {
-    // If we don't have all transactions data, rebuild from current transactions
+    // If we have no transactions at all, return a simple point with current balance
+    if (allTransactions.length === 0 && transactions.length === 0) {
+      return [{
+        date: moment().format('YYYY-MM-DD'),
+        dateKey: moment().format('YYYY-MM-DD'),
+        balance: addressInfo?.balance || 0,
+        timestamp: moment().unix(),
+        isCurrent: true
+      }];
+    }
+    
+    // If we're looking at 24h, week, or month range, use our time range points
+    if (timeRange === TIME_RANGES.DAY || 
+        timeRange === TIME_RANGES.WEEK || 
+        timeRange === TIME_RANGES.MONTH) {
+      return getTimeRangePoints();
+    }
+    
+    // For ALL time range, use complete transaction history
     const historyData = buildBalanceHistory(allTransactions.length > 0 ? allTransactions : transactions);
     
     if (historyData.length === 0) {
-      return [];
+      // If building history failed, return current balance as single point
+      return [{
+        date: moment().format('YYYY-MM-DD'),
+        dateKey: moment().format('YYYY-MM-DD'),
+        balance: addressInfo?.balance || 0,
+        timestamp: moment().unix(),
+        isCurrent: true
+      }];
     }
     
-    // Filter based on selected time range
-    let filtered = [];
-    const now = moment();
-    
-    switch (timeRange) {
-      case TIME_RANGES.MONTH:
-        // Last 30 days
-        filtered = historyData.filter(item => {
-          return moment(item.date).isAfter(moment().subtract(30, 'days').startOf('day'));
-        });
-        break;
-      
-      case TIME_RANGES.WEEK:
-        // Last 7 days
-        filtered = historyData.filter(item => {
-          return moment(item.date).isAfter(moment().subtract(7, 'days').startOf('day'));
-        });
-        break;
-      
-      case TIME_RANGES.DAY:
-        // Last 24 hours
-        filtered = historyData.filter(item => {
-          return moment(item.date).isAfter(moment().subtract(24, 'hours'));
-        });
-        break;
-      
-      case TIME_RANGES.ALL:
-      default:
-        filtered = [...historyData];
-        break;
-    }
-    
-    // If we have no data in the selected range but we have overall history,
-    // return the current balance as a single point
-    if (filtered.length === 0 && historyData.length > 0) {
-      if (addressInfo && addressInfo.balance !== undefined) {
-        return [{
-          date: moment().format('YYYY-MM-DD'),
-          dateKey: moment().format('YYYY-MM-DD'),
-          balance: addressInfo.balance,
-          timestamp: moment().unix(),
-          isCurrent: true
-        }];
-      }
-    }
-    
-    // For better visualization, ensure we have at least two points:
-    // - For empty or small filters, add the starting point
-    if (filtered.length === 1) {
-      const startDate = timeRange === TIME_RANGES.DAY ? 
-        moment().subtract(24, 'hours') : 
-        (timeRange === TIME_RANGES.WEEK ? 
-          moment().subtract(7, 'days') : 
-          moment().subtract(30, 'days'));
-          
-      filtered.unshift({
-        date: startDate.format('YYYY-MM-DD'),
-        dateKey: startDate.format('YYYY-MM-DD'),
-        balance: 0,
-        timestamp: startDate.unix(),
-        isStartPoint: true
-      });
-    }
-    
-    return filtered;
+    return historyData;
   };
   
   // Fetch transactions for the current page
@@ -433,17 +529,28 @@ const Address = () => {
   
   // Format labels based on time range
   const formatLabel = (item) => {
+    // If the item has a pre-formatted label, use it
+    if (item.label) {
+      return item.label;
+    }
+    
     // Use timestamp if available, otherwise parse date string
     const date = item.timestamp ? moment.unix(item.timestamp) : moment(item.date);
     
     switch (timeRange) {
-      case '24h':
+      case TIME_RANGES.DAY:
+        // For 24h view, show hour with am/pm
         return date.format('ha'); // 1am, 2pm etc.
-      case 'week':
+      
+      case TIME_RANGES.WEEK:
+        // For week view, show day of week
         return date.format('ddd'); // Mon, Tue etc.
-      case 'month':
+      
+      case TIME_RANGES.MONTH:
+        // For month view, show month and day
         return date.format('MMM D'); // Jan 1, Feb 2 etc.
-      case 'all':
+      
+      case TIME_RANGES.ALL:
       default:
         // For all time, use month/year or just month depending on range
         const firstDate = filteredHistory.length > 0 ? 
@@ -477,11 +584,13 @@ const Address = () => {
         data: filteredHistory.map(item => item.balance),
         borderColor: 'rgba(59, 130, 246, 1)',
         backgroundColor: 'rgba(59, 130, 246, 0.2)',
-        tension: 0.2, // Lower tension for more accurate representation
+        tension: timeRange === TIME_RANGES.DAY ? 0 : 0.2, // Straight lines for 24h
         fill: true,
-        pointRadius: timeRange === '24h' ? 1 : (timeRange === 'week' ? 1.5 : 2),
+        pointRadius: (timeRange === TIME_RANGES.DAY) ? 3 : 
+                     (timeRange === TIME_RANGES.WEEK) ? 3 : 
+                     (timeRange === TIME_RANGES.ALL && filteredHistory.length > 30) ? 0 : 2,
         pointHoverRadius: 5,
-        stepped: 'after' // Use stepped line for more accurate balance representation
+        stepped: timeRange === TIME_RANGES.DAY || timeRange === TIME_RANGES.WEEK ? 'after' : false // Stepped line for shorter time frames
       }
     ]
   };
@@ -489,22 +598,22 @@ const Address = () => {
   // Determine appropriate tick settings based on time range
   const getTickSettings = () => {
     switch (timeRange) {
-      case 'month':
+      case TIME_RANGES.MONTH:
         return {
           maxTicksLimit: 10,
           format: 'MMM D'
         };
-      case 'week':
+      case TIME_RANGES.WEEK:
         return {
           maxTicksLimit: 7,
           format: 'ddd'
         };
-      case '24h':
+      case TIME_RANGES.DAY:
         return {
-          maxTicksLimit: 6,
+          maxTicksLimit: 12,
           format: 'ha'
         };
-      case 'all':
+      case TIME_RANGES.ALL:
       default:
         // For all-time view, adjust tick count based on data span
         const firstDate = filteredHistory.length > 0 ? 
@@ -565,9 +674,17 @@ const Address = () => {
               moment.unix(dataPoint.timestamp) : 
               moment(dataPoint.date);
             
-            return timeRange === '24h'
-              ? date.format('MMM D, h:mm a')
-              : date.format('MMM D, YYYY');
+            switch (timeRange) {
+              case TIME_RANGES.DAY:
+                return date.format('MMM D, h:mm a');
+              case TIME_RANGES.WEEK:
+                return date.format('ddd, MMM D');
+              case TIME_RANGES.MONTH:
+                return date.format('MMM D, YYYY');
+              case TIME_RANGES.ALL:
+              default:
+                return date.format('MMM D, YYYY');
+            }
           }
         }
       }
@@ -592,7 +709,11 @@ const Address = () => {
           callback: function(value) {
             return formatBTCZ(value, true);
           }
-        }
+        },
+        // For 24h and week views with no balance, adjust max so we don't show a completely flat line at 0
+        suggestedMax: timeRange === TIME_RANGES.DAY || timeRange === TIME_RANGES.WEEK ? 
+                      (filteredHistory.every(item => item.balance === 0) ? 1 : undefined) : 
+                      undefined
       }
     },
     animation: {
@@ -601,12 +722,16 @@ const Address = () => {
     // Improves rendering of balance history with steps
     elements: {
       line: {
-        tension: 0.1 // Lower tension for more accurate lines
+        tension: timeRange === TIME_RANGES.DAY ? 0 : 0.1 // Straight lines for 24h, slight curve for others
       },
       point: {
-        radius: timeRange === 'all' && filteredHistory.length > 30 ? 0 : undefined // Hide points in all-time view if many data points
+        radius: (timeRange === TIME_RANGES.ALL && filteredHistory.length > 30) ? 0 : 
+                (timeRange === TIME_RANGES.DAY) ? 3 :
+                (timeRange === TIME_RANGES.WEEK) ? 3 : undefined
       }
-    }
+    },
+    // Only use stepped charts for All view
+    stepped: timeRange === TIME_RANGES.ALL ? 'after' : false
   };
   
   return (
@@ -684,9 +809,9 @@ const Address = () => {
           <div className="flex items-center space-x-2 mt-2 md:mt-0">
             <div className="inline-flex items-center bg-gray-100 rounded-lg p-1">
               <button 
-                onClick={() => setTimeRange('all')}
+                onClick={() => setTimeRange(TIME_RANGES.ALL)}
                 className={`px-3 py-1.5 text-sm rounded-md transition-colors ${
-                  timeRange === 'all' 
+                  timeRange === TIME_RANGES.ALL 
                     ? 'bg-blue-500 text-white shadow-sm' 
                     : 'text-gray-700 hover:bg-gray-200'
                 }`}
@@ -694,9 +819,9 @@ const Address = () => {
                 All
               </button>
               <button 
-                onClick={() => setTimeRange('month')}
+                onClick={() => setTimeRange(TIME_RANGES.MONTH)}
                 className={`px-3 py-1.5 text-sm rounded-md transition-colors ${
-                  timeRange === 'month' 
+                  timeRange === TIME_RANGES.MONTH 
                     ? 'bg-blue-500 text-white shadow-sm' 
                     : 'text-gray-700 hover:bg-gray-200'
                 }`}
@@ -704,9 +829,9 @@ const Address = () => {
                 Month
               </button>
               <button 
-                onClick={() => setTimeRange('week')}
+                onClick={() => setTimeRange(TIME_RANGES.WEEK)}
                 className={`px-3 py-1.5 text-sm rounded-md transition-colors ${
-                  timeRange === 'week' 
+                  timeRange === TIME_RANGES.WEEK 
                     ? 'bg-blue-500 text-white shadow-sm' 
                     : 'text-gray-700 hover:bg-gray-200'
                 }`}
@@ -714,9 +839,9 @@ const Address = () => {
                 Week
               </button>
               <button 
-                onClick={() => setTimeRange('24h')}
+                onClick={() => setTimeRange(TIME_RANGES.DAY)}
                 className={`px-3 py-1.5 text-sm rounded-md transition-colors ${
-                  timeRange === '24h' 
+                  timeRange === TIME_RANGES.DAY 
                     ? 'bg-blue-500 text-white shadow-sm' 
                     : 'text-gray-700 hover:bg-gray-200'
                 }`}
@@ -734,7 +859,24 @@ const Address = () => {
             <div className="flex items-center justify-center h-full bg-gray-50 rounded-lg">
               <div className="text-center">
                 <FaHistory className="mx-auto text-gray-300 mb-3" size={30} />
-                <p className="text-gray-500">No transaction history available for this time range</p>
+                <p className="text-gray-500">
+                  {timeRange === TIME_RANGES.DAY ? 
+                    'No transactions in the last 24 hours' : 
+                    timeRange === TIME_RANGES.WEEK ? 
+                      'No transactions in the last 7 days' : 
+                      timeRange === TIME_RANGES.MONTH ? 
+                        'No transactions in the last 30 days' : 
+                        'No transaction history available'
+                  }
+                </p>
+                {timeRange !== TIME_RANGES.ALL && (
+                  <button 
+                    onClick={() => setTimeRange(TIME_RANGES.ALL)}
+                    className="mt-3 px-4 py-2 bg-blue-500 text-white rounded-md text-sm hover:bg-blue-600 transition-colors"
+                  >
+                    View All History
+                  </button>
+                )}
               </div>
             </div>
           )}

@@ -96,13 +96,15 @@ startReindexProgressMonitor();
  */
 const initializeNodeConnection = async () => {
   const rpcOptions = {
-    host: process.env.BITCOINZ_RPC_HOST,
-    port: process.env.BITCOINZ_RPC_PORT,
-    user: process.env.BITCOINZ_RPC_USER,
-    pass: process.env.BITCOINZ_RPC_PASS,
+    host: process.env.BITCOINZ_RPC_HOST || '127.0.0.1',
+    port: process.env.BITCOINZ_RPC_PORT || 1978,
+    user: process.env.BITCOINZ_RPC_USER || '2a629aa93a1847',  // Use the values from .env as fallback
+    pass: process.env.BITCOINZ_RPC_PASS || 'ca3bd775e7722cf2a9babab65d4ad',
     protocol: 'http'
   };
 
+  logger.info(`Initializing RPC connection to ${rpcOptions.protocol}://${rpcOptions.host}:${rpcOptions.port}`);
+  
   rpcClient = {
     url: `${rpcOptions.protocol}://${rpcOptions.host}:${rpcOptions.port}`,
     auth: {
@@ -430,24 +432,47 @@ const getAddressInfo = async (address) => {
       logger.warn(`Could not get wallet transactions for ${address}: ${walletError.message}`);
     }
     
-    if (txIds.size === 0) {
-      try {
-        logger.debug(`No transactions found for ${address}, trying importaddress`);
-        await executeRpcCommand('importaddress', [address, '', false]);
-        logger.debug(`Successfully imported address ${address}`);
+    // Always try to get address txids directly from the blockchain
+    // This ensures we get all transactions even if the address isn't in the wallet
+    try {
+      logger.debug(`Getting all txids for address ${address} using getaddresstxids RPC call`);
+      const result = await executeRpcCommand('getaddresstxids', [{"addresses": [address]}]);
+      
+      if (result && Array.isArray(result) && result.length > 0) {
+        logger.debug(`Found ${result.length} txids for address ${address} from getaddresstxids`);
         
-        const utxos = await executeRpcCommand('listunspent', [0, 9999999, [address]]);
-        logger.debug(`After import: Found ${utxos.length} UTXOs for address ${address}`);
-        
-        for (const utxo of utxos) {
-          balance += utxo.amount;
-          
-          if (!txIds.has(utxo.txid)) {
-            txIds.add(utxo.txid);
+        // Clear existing txids if we found transactions via getaddresstxids
+        // This ensures we use the blockchain data as the source of truth
+        if (txIds.size === 0 || result.length > txIds.size) {
+          txIds = new Set();
+          for (const txid of result) {
+            txIds.add(txid);
           }
         }
-      } catch (importError) {
-        logger.error(`Error importing address ${address}: ${importError.message}`);
+      }
+    } catch (txidsError) {
+      logger.error(`Failed to get txids for address ${address}: ${txidsError.message}`);
+      
+      // If getaddresstxids fails, try importing the address first
+      if (txIds.size === 0) {
+        try {
+          logger.debug(`No transactions found for ${address}, trying importaddress`);
+          await executeRpcCommand('importaddress', [address, '', false]);
+          logger.debug(`Successfully imported address ${address}`);
+          
+          const utxos = await executeRpcCommand('listunspent', [0, 9999999, [address]]);
+          logger.debug(`After import: Found ${utxos.length} UTXOs for address ${address}`);
+          
+          for (const utxo of utxos) {
+            balance += utxo.amount;
+            
+            if (!txIds.has(utxo.txid)) {
+              txIds.add(utxo.txid);
+            }
+          }
+        } catch (importError) {
+          logger.error(`Error importing address ${address}: ${importError.message}`);
+        }
       }
     }
     
@@ -625,7 +650,7 @@ const getAddressInfo = async (address) => {
       totalSent,
       unconfirmedBalance,
       txCount: txIds.size,
-      transactions: transactions.slice(0, 10) 
+      transactions // Return all transactions without slicing them
     };
   } catch (error) {
     logger.error(`Failed to get address info for ${address}:`, error.message);

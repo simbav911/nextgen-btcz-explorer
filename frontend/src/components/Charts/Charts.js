@@ -18,7 +18,7 @@ const Charts = () => {
   const [timeRange, setTimeRange] = useState('1d'); // Default to 1 day (today) instead of 30d
   const [error, setError] = useState(null);
 
-  // Generate mock data for when API fails (keeping this from original)
+  // Generate mock data for when API fails (keeping this for non-pool charts only)
   const generateMockData = (chartType) => {
     const days = getDaysFromRange(timeRange);
     
@@ -71,32 +71,10 @@ const Charts = () => {
           })).reverse()
         };
         
+      // Remove mock data for pool stats - must come from backend only
       case chartTypes.POOL_STAT:
-        return {
-          date: date,
-          chartType: 'pool-stat',
-          data: [
-            { name: 'Zpool', percentage: 32.5, count: Math.floor(Math.random() * 100) + 900 },
-            { name: 'Zergpool', percentage: 48.2, count: Math.floor(Math.random() * 150) + 1300 },
-            { name: 'DarkFiberMines', percentage: 8.7, count: Math.floor(Math.random() * 50) + 200 },
-            { name: '2Mars', percentage: 5.3, count: Math.floor(Math.random() * 30) + 120 },
-            { name: 'Z-NOMP', percentage: 3.1, count: Math.floor(Math.random() * 20) + 80 },
-            { name: 'Others', percentage: 2.2, count: Math.floor(Math.random() * 20) + 50 }
-          ]
-        };
-        
       case chartTypes.MINED_BLOCK:
-        return {
-          date: date,
-          days: days,
-          chartType: 'mined-block',
-          data: Array(days * 10).fill(0).map((_, i) => ({
-            blockHeight: 1545720 - i,
-            pool: ['Zpool', 'Zergpool', 'Others', 'DarkFiberMines', '2Mars'][Math.floor(Math.random() * 5)],
-            size: Math.floor(Math.random() * 3000) + 500,
-            timestamp: new Date(Date.now() - (i * 8640000)).toISOString()
-          })).reverse()
-        };
+        return null;
         
       default:
         return null;
@@ -106,7 +84,7 @@ const Charts = () => {
   // Fetch chart data based on active chart type and date
   const fetchChartData = useCallback(async () => {
     setLoading(true);
-    setError(null);
+    setError(null);``
     
     try {
       // Use the chart service with the correct chart type and parameters
@@ -135,12 +113,18 @@ const Charts = () => {
         console.log('Detailed error info for mined-block:', err.response?.status, err.response?.data);
       }
       
-      // Generate mock data when API fails
-      const mockData = generateMockData(activeChart);
-      setChartData(mockData);
-      
-      // Show error message but with fallback notice
-      setError(`Failed to load chart data from server (${err.message}). Showing sample data for demonstration purposes.`);
+      // Generate mock data when API fails, but not for pool stats
+      if (activeChart !== chartTypes.POOL_STAT && activeChart !== chartTypes.MINED_BLOCK) {
+        const mockData = generateMockData(activeChart);
+        setChartData(mockData);
+        
+        // Show error message with fallback notice for non-pool charts
+        setError(`Failed to load chart data from server (${err.message}). Showing sample data for demonstration purposes.`);
+      } else {
+        // For pool stats, don't use mock data and show a different error message
+        setChartData(null);
+        setError(`Failed to load mining pool data from the blockchain (${err.message}). Please try again later.`);
+      }
     } finally {
       setLoading(false);
     }

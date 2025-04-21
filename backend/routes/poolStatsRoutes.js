@@ -77,19 +77,20 @@ const extractPoolFromText = (coinbaseText) => {
   // Common patterns to extract pool information - these are just pattern recognition
   // techniques, not hard-coded pool names
   const patterns = [
-    // URL patterns
+    // URL patterns - these are more reliable for pool identification
     { regex: /https?:\/\/([a-zA-Z0-9.-]+\.[a-zA-Z]{2,})/i, group: 1 },
+    
+    // Domain patterns
     { regex: /([a-zA-Z0-9.-]+\.[a-zA-Z]{2,})\/?/i, group: 1 },
     
     // Common pool naming patterns
     { regex: /([a-zA-Z0-9.-]+)[- ]pool/i, group: 1 },
     { regex: /pool[.:]([a-zA-Z0-9.-]+)/i, group: 1 },
     { regex: /pool[- ]?([a-zA-Z0-9.-]+)/i, group: 1 },
-    { regex: /([a-zA-Z0-9.-]+)[- ]?miner/i, group: 1 },
-    { regex: /mined[- ]by[- ]([a-zA-Z0-9.-]+)/i, group: 1 },
     
-    // Extract anything that looks like a service name
-    { regex: /^([a-zA-Z0-9][a-zA-Z0-9.-]{2,})$/i, group: 1 },
+    // Extract anything that looks like a service name with at least 3 characters
+    // This is a last resort and should be less prioritized
+    { regex: /^([a-zA-Z][a-zA-Z0-9.-]{3,})$/i, group: 1 },
   ];
   
   // Try to extract pool name using patterns
@@ -101,6 +102,12 @@ const extractPoolFromText = (coinbaseText) => {
       
       // Remove common TLDs
       poolName = poolName.replace(/\.(com|org|net|io|app|us|ca)$/, '');
+      
+      // Filter out known non-pool services that might appear in coinbase text
+      const nonPoolServices = ['github', 'gitlab', 'bitbucket', 'sourceforge', 'npm', 'docker'];
+      if (nonPoolServices.includes(poolName.toLowerCase())) {
+        continue; // Skip this match and try the next pattern
+      }
       
       return poolName;
     }
@@ -307,6 +314,10 @@ const getRealPoolDistribution = async (date) => {
     // Store coinbase texts for each pool to analyze patterns
     const poolCoinbaseTexts = {};
     
+    // Track addresses by pool for consistency
+    const poolAddresses = {};
+    const addressPools = {};
+    
     for (const block of blocks) {
       try {
         // Get the coinbase transaction (first transaction in the block)
@@ -315,8 +326,22 @@ const getRealPoolDistribution = async (date) => {
         
         // Extract text from coinbase and identify the pool
         const coinbaseText = extractCoinbaseText(coinbaseTx);
-        const poolInfo = identifyPool(coinbaseText, coinbaseTx);
-        const poolName = poolInfo.name;
+        const address = extractBitcoinZAddress(coinbaseTx);
+        
+        // First, check if we've seen this address before and it was associated with a known pool
+        let poolName = 'Unknown';
+        if (address && addressPools[address]) {
+          poolName = addressPools[address];
+        } else {
+          // Try to identify the pool from coinbase text
+          const poolInfo = identifyPool(coinbaseText, coinbaseTx);
+          poolName = poolInfo.name;
+          
+          // If we have an address, associate it with this pool for future blocks
+          if (address && !poolName.startsWith('Unknown')) {
+            addressPools[address] = poolName;
+          }
+        }
         
         // Store coinbase text for this pool for pattern analysis
         if (!poolCoinbaseTexts[poolName]) {
@@ -324,6 +349,14 @@ const getRealPoolDistribution = async (date) => {
         }
         if (!poolCoinbaseTexts[poolName].includes(coinbaseText)) {
           poolCoinbaseTexts[poolName].push(coinbaseText);
+        }
+        
+        // Store address for this pool
+        if (address) {
+          if (!poolAddresses[poolName]) {
+            poolAddresses[poolName] = {};
+          }
+          poolAddresses[poolName][address] = (poolAddresses[poolName][address] || 0) + 1;
         }
         
         // Store coinbase signature for this pool for future analysis
@@ -338,8 +371,8 @@ const getRealPoolDistribution = async (date) => {
           unknownCount++;
           
           // Store the address for unknown pools
-          if (poolInfo.address) {
-            unknownPoolAddresses[poolInfo.address] = (unknownPoolAddresses[poolInfo.address] || 0) + 1;
+          if (address) {
+            unknownPoolAddresses[address] = (unknownPoolAddresses[address] || 0) + 1;
           }
           
           // Store a sample of the coinbase text for unknown pools
@@ -359,7 +392,6 @@ const getRealPoolDistribution = async (date) => {
     }
     
     // Analyze pool coinbase texts to find patterns and potentially refine pool names
-    // This is where we could detect regional information or other patterns
     Object.entries(poolCoinbaseTexts).forEach(([poolName, texts]) => {
       if (poolName.toLowerCase().includes('equipool') && texts.length > 0) {
         // Look for regional patterns in the coinbase texts
@@ -403,33 +435,6 @@ const getRealPoolDistribution = async (date) => {
         }
       }
     });
-    
-    // Log unknown percentage for debugging
-    const unknownPercentage = (unknownCount / blocks.length) * 100;
-    logger.info(`Unknown pools: ${unknownCount}/${blocks.length} (${unknownPercentage.toFixed(1)}%)`);
-    
-    // Log samples of unknown coinbase texts to help identify new pools
-    if (unknownCount > 0) {
-      logger.info('Samples of unknown coinbase texts:');
-      for (const [text, height] of Object.entries(coinbaseTextSamples)) {
-        logger.info(`Block ${height}: ${text.substring(0, 100)}`);
-      }
-      
-      // Log addresses of unknown pools
-      logger.info('Addresses of unknown pools:');
-      for (const [address, count] of Object.entries(unknownPoolAddresses)) {
-        logger.info(`Address ${address}: ${count} blocks (${((count / unknownCount) * 100).toFixed(1)}% of unknown)`);
-      }
-    }
-    
-    // Log pool signatures for future pattern recognition improvement
-    logger.info('Pool signatures:');
-    for (const [pool, signatures] of Object.entries(poolSignatures)) {
-      if (signatures.length > 0) {
-        logger.info(`${pool} signatures:`);
-        signatures.forEach(sig => logger.info(`  - ${sig.substring(0, 100)}`));
-      }
-    }
     
     // Group solo miners if they have few blocks
     const soloMinersThreshold = Math.max(1, Math.floor(blocks.length * 0.005)); // 0.5% of blocks
@@ -529,6 +534,135 @@ const getMinedBlocksData = async (date) => {
   }
 };
 
+/**
+ * Debug function to examine coinbase texts from blocks
+ * @param {string} date - Date in YYYY-MM-DD format
+ * @param {string} searchText - Text to search for in coinbase
+ * @returns {Promise<void>}
+ */
+const debugCoinbaseTexts = async (date, searchText) => {
+  try {
+    logger.info(`Debugging coinbase texts containing "${searchText}" on ${date}`);
+    
+    // Get blocks for the specified date
+    const blocks = await getBlocksForDate(date);
+    
+    if (blocks.length === 0) {
+      logger.warn(`No blocks found for date ${date}`);
+      return;
+    }
+    
+    // Process blocks to find coinbase texts
+    const matchingTexts = [];
+    
+    for (const block of blocks) {
+      try {
+        // Get the coinbase transaction (first transaction in the block)
+        const coinbaseTxid = block.tx[0];
+        const coinbaseTx = await getRawTransaction(coinbaseTxid, 1);
+        
+        // Extract text from coinbase
+        const coinbaseText = extractCoinbaseText(coinbaseTx);
+        const extractedPool = extractPoolFromText(coinbaseText);
+        
+        // Check if the coinbase text contains the search text
+        if (coinbaseText.toLowerCase().includes(searchText.toLowerCase())) {
+          matchingTexts.push({
+            height: block.height,
+            text: coinbaseText,
+            extractedPool: extractedPool,
+            address: extractBitcoinZAddress(coinbaseTx)
+          });
+        }
+      } catch (error) {
+        logger.error(`Error processing block ${block.hash}:`, error);
+      }
+    }
+    
+    // Log the results
+    logger.info(`Found ${matchingTexts.length} blocks containing "${searchText}"`);
+    matchingTexts.forEach(item => {
+      logger.info(`Block ${item.height}: "${item.text}" (Extracted Pool: ${item.extractedPool}, Address: ${item.address})`);
+    });
+    
+    return matchingTexts;
+  } catch (error) {
+    logger.error(`Failed to debug coinbase texts for "${searchText}" on ${date}:`, error);
+    return [];
+  }
+};
+
+/**
+ * Debug function to sample random blocks and examine their coinbase texts
+ * @param {string} date - Date in YYYY-MM-DD format
+ * @param {number} sampleSize - Number of blocks to sample
+ * @returns {Promise<Array>} Sample of coinbase texts
+ */
+const sampleCoinbaseTexts = async (date, sampleSize = 20) => {
+  try {
+    logger.info(`Sampling ${sampleSize} random blocks on ${date}`);
+    
+    // Get blocks for the specified date
+    const blocks = await getBlocksForDate(date);
+    
+    if (blocks.length === 0) {
+      logger.warn(`No blocks found for date ${date}`);
+      return [];
+    }
+    
+    // Randomly sample blocks
+    const sampleBlocks = [];
+    const totalBlocks = blocks.length;
+    const sampleCount = Math.min(sampleSize, totalBlocks);
+    
+    // Create a copy of the blocks array to avoid modifying the original
+    const blocksCopy = [...blocks];
+    
+    for (let i = 0; i < sampleCount; i++) {
+      const randomIndex = Math.floor(Math.random() * blocksCopy.length);
+      sampleBlocks.push(blocksCopy[randomIndex]);
+      blocksCopy.splice(randomIndex, 1); // Remove the selected block to avoid duplicates
+    }
+    
+    // Process blocks to extract coinbase texts
+    const samples = [];
+    
+    for (const block of sampleBlocks) {
+      try {
+        // Get the coinbase transaction (first transaction in the block)
+        const coinbaseTxid = block.tx[0];
+        const coinbaseTx = await getRawTransaction(coinbaseTxid, 1);
+        
+        // Extract text from coinbase
+        const coinbaseText = extractCoinbaseText(coinbaseTx);
+        const extractedPool = extractPoolFromText(coinbaseText);
+        const poolInfo = identifyPool(coinbaseText, coinbaseTx);
+        
+        samples.push({
+          height: block.height,
+          text: coinbaseText,
+          extractedPool: extractedPool,
+          identifiedPool: poolInfo.name,
+          address: poolInfo.address
+        });
+      } catch (error) {
+        logger.error(`Error processing block ${block.hash}:`, error);
+      }
+    }
+    
+    // Log the results
+    logger.info(`Sampled ${samples.length} blocks`);
+    samples.forEach(item => {
+      logger.info(`Block ${item.height}: "${item.text}" (Extracted: ${item.extractedPool}, Identified: ${item.identifiedPool}, Address: ${item.address})`);
+    });
+    
+    return samples;
+  } catch (error) {
+    logger.error(`Failed to sample coinbase texts on ${date}:`, error);
+    return [];
+  }
+};
+
 // Endpoint for real pool distribution data
 router.get('/real-pool-stat', async (req, res) => {
   try {
@@ -610,6 +744,53 @@ router.get('/mined-blocks', async (req, res) => {
       error: 'An unexpected error occurred',
       message: error.message
     });
+  }
+});
+
+// Add the debug route
+router.get('/debug-coinbase/:date/:searchText', async (req, res) => {
+  try {
+    const { date, searchText } = req.params;
+    
+    // Validate date format
+    if (!date.match(/^\d{4}-\d{2}-\d{2}$/)) {
+      return res.status(400).json({ error: 'Invalid date format. Use YYYY-MM-DD' });
+    }
+    
+    const results = await debugCoinbaseTexts(date, searchText);
+    
+    res.json({
+      date,
+      searchText,
+      results
+    });
+  } catch (error) {
+    logger.error('Error in debug-coinbase route:', error);
+    res.status(500).json({ error: 'Failed to debug coinbase texts' });
+  }
+});
+
+// Add the sample route
+router.get('/sample-coinbase/:date/:sampleSize?', async (req, res) => {
+  try {
+    const { date } = req.params;
+    const sampleSize = parseInt(req.params.sampleSize) || 20;
+    
+    // Validate date format
+    if (!date.match(/^\d{4}-\d{2}-\d{2}$/)) {
+      return res.status(400).json({ error: 'Invalid date format. Use YYYY-MM-DD' });
+    }
+    
+    const results = await sampleCoinbaseTexts(date, sampleSize);
+    
+    res.json({
+      date,
+      sampleSize,
+      results
+    });
+  } catch (error) {
+    logger.error('Error in sample-coinbase route:', error);
+    res.status(500).json({ error: 'Failed to sample coinbase texts' });
   }
 });
 

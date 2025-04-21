@@ -148,7 +148,13 @@ const executeRpcCommand = async (method, params = [], timeout = 30000) => {
     });
 
     if (response.data.error) {
-      throw new Error(`RPC Error: ${response.data.error.message}`);
+      logger.error(`RPC Error from ${method}: ${JSON.stringify(response.data.error)}`);
+      throw new Error(`RPC Error: ${response.data.error.message || JSON.stringify(response.data.error)}`);
+    }
+
+    // Debug log the response for certain commands to help with troubleshooting
+    if (['getaddressbalance', 'getaddresstxids', 'getaddressutxos'].includes(method)) {
+      logger.debug(`RPC ${method} response: ${JSON.stringify(response.data.result)}`);
     }
 
     return response.data.result;
@@ -159,6 +165,9 @@ const executeRpcCommand = async (method, params = [], timeout = 30000) => {
     }
     
     logger.error(`RPC command '${method}' failed:`, error.message);
+    if (error.response) {
+      logger.error(`Response status: ${error.response.status}, data: ${JSON.stringify(error.response.data || {})}`);
+    }
     throw error;
   }
 };
@@ -539,38 +548,101 @@ const getAddressInfo = async (address) => {
       logger.warn(`No transactions found for address ${address} after all attempts`);
     }
     
-    if (balance === 0 && transactions.length > 0) {
-      logger.debug(`Calculating balance from transactions for ${address}`);
-      
-      transactions.sort((a, b) => a.time - b.time);
-      
-      let runningBalance = 0;
-      
-      for (const tx of transactions) {
-        for (const output of tx.vout) {
-          if (output.scriptPubKey && 
-              output.scriptPubKey.addresses && 
-              output.scriptPubKey.addresses.includes(address)) {
-            runningBalance += output.value;
-          }
-        }
+    // Try to get the real balance from getaddressbalance RPC
+    let addressBalanceResult;
+    try {
+      addressBalanceResult = await executeRpcCommand('getaddressbalance', [{"addresses": [address]}]);
+      if (addressBalanceResult && 'balance' in addressBalanceResult && 'received' in addressBalanceResult) {
+        // Convert satoshis to BTCZ (divide by 10^8)
+        balance = parseFloat(addressBalanceResult.balance) / 100000000;
+        totalReceived = parseFloat(addressBalanceResult.received) / 100000000;
+        totalSent = totalReceived - balance;
         
-        for (const input of tx.vin) {
-          if (input.coinbase) continue;
+        logger.info(`Got balance from getaddressbalance for ${address}: ${balance} BTCZ, received: ${totalReceived} BTCZ, sent: ${totalSent} BTCZ`);
+      } else {
+        logger.warn(`Invalid getaddressbalance response for ${address}: ${JSON.stringify(addressBalanceResult)}`);
+        // If RPC returned invalid data, calculate from transactions
+        transactions.sort((a, b) => a.time - b.time);
+        balance = 0;
+        totalReceived = 0;
+        totalSent = 0;
+      }
+    } catch (balanceError) {
+      logger.error(`Error getting address balance via RPC for ${address}: ${balanceError.message}`);
+      // If RPC failed, calculate from transactions
+      transactions.sort((a, b) => a.time - b.time);
+      balance = 0;
+      totalReceived = 0;
+      totalSent = 0;
+    }
+    
+    // Calculate accurate value for each transaction (for display purposes)
+    for (const tx of transactions) {
+      // Initialize the value for this transaction
+      tx.value = 0;
+      
+      // Add all outputs sent to this address
+      for (const output of tx.vout) {
+        if (output.scriptPubKey && 
+            output.scriptPubKey.addresses && 
+            output.scriptPubKey.addresses.includes(address)) {
+          const outputValue = parseFloat(output.value || 0);
+          tx.value += outputValue;
           
-          if (input.prevout && 
-              input.prevout.scriptPubKey && 
-              input.prevout.scriptPubKey.addresses && 
-              input.prevout.scriptPubKey.addresses.includes(address)) {
-            runningBalance -= input.prevout.value;
+          // If we're calculating balances from transactions, add to totals
+          if (addressBalanceResult === undefined) {
+            totalReceived += outputValue;
           }
         }
       }
       
-      if (runningBalance > 0) {
-        balance = runningBalance;
+      // Subtract all inputs spent from this address
+      let isSpending = false;
+      for (const input of tx.vin) {
+        if (input.coinbase) continue;
+        
+        // Try multiple ways to check if input is from this address
+        if (input.address === address) {
+          isSpending = true;
+          const inputValue = parseFloat(input.value || 0);
+          tx.value -= inputValue;
+          
+          // If we're calculating balances from transactions, add to totals
+          if (addressBalanceResult === undefined) {
+            totalSent += inputValue;
+          }
+        }
+        // Also check prevout for address match
+        else if (input.prevout && 
+                 input.prevout.scriptPubKey && 
+                 input.prevout.scriptPubKey.addresses && 
+                 input.prevout.scriptPubKey.addresses.includes(address)) {
+          isSpending = true;
+          const inputValue = parseFloat(input.prevout.value || 0);
+          tx.value -= inputValue;
+          
+          // If we're calculating balances from transactions, add to totals
+          if (addressBalanceResult === undefined) {
+            totalSent += inputValue;
+          }
+        }
       }
+      
+      // Set transaction direction flag to help frontend display
+      tx.isReceived = tx.value >= 0 && !isSpending;
+      
+      logger.debug(`Transaction ${tx.txid} value for ${address}: ${tx.value} BTCZ (${tx.isReceived ? 'received' : 'sent'})`);
     }
+    
+    // If we're calculating balances from transactions, set the final balance
+    if (addressBalanceResult === undefined) {
+      balance = totalReceived - totalSent;
+      balance = Math.max(0, balance); // Ensure balance is not negative
+      logger.info(`Calculated balance from transactions for ${address}: ${balance} BTCZ, received: ${totalReceived} BTCZ, sent: ${totalSent} BTCZ`);
+    }
+    
+    // Make sure balance is never negative
+    balance = Math.max(0, balance);
     
     transactions.sort((a, b) => b.time - a.time);
     
@@ -684,64 +756,105 @@ const getAddressBalanceHistory = async (address, days = 30) => {
   try {
     logger.info(`Fetching balance history for ${address}`);
     
-    const addressInfo = await getAddressInfo(address);
+    // Get all transactions for this address (not just the first page)
+    const txids = await executeRpcCommand('getaddresstxids', [{"addresses": [address]}]);
+    let allTransactions = [];
     
-    const history = [];
-    const now = Math.floor(Date.now() / 1000);
-    const daySeconds = 86400;
-    
-    let currentBalance = addressInfo.balance;
-    
-    history.push({
-      date: new Date(now * 1000).toISOString().split('T')[0],
-      balance: currentBalance
-    });
-    
-    const sortedTxs = [...addressInfo.transactions].sort((a, b) => a.time - b.time);
-    
-    const dateBalanceMap = new Map();
-    
-    for (const tx of sortedTxs) {
-      const txDate = new Date(tx.time * 1000).toISOString().split('T')[0];
+    if (txids && Array.isArray(txids) && txids.length > 0) {
+      logger.info(`Found ${txids.length} transactions for address ${address}`);
       
-      let balanceChange = 0;
+      // Get details for each transaction
+      const txPromises = txids.map(txid => 
+        getRawTransaction(txid, 1).catch(err => {
+          logger.error(`Failed to fetch transaction ${txid}: ${err.message}`);
+          return null;
+        })
+      );
       
+      const txResults = await Promise.all(txPromises);
+      allTransactions = txResults.filter(tx => tx !== null);
+      
+      // Sort by time (oldest first)
+      allTransactions.sort((a, b) => a.time - b.time);
+    } else {
+      logger.warn(`No transactions found for address ${address}`);
+      return {
+        address,
+        history: [{
+          date: new Date().toISOString().split('T')[0],
+          balance: 0
+        }]
+      };
+    }
+    
+    // Process all transactions to build daily balance history
+    const dailyBalances = new Map();
+    let runningBalance = 0;
+    
+    for (const tx of allTransactions) {
+      // Calculate the effect of this transaction on the address's balance
+      let txEffect = 0;
+      
+      // Add outputs sent to this address
       for (const output of tx.vout) {
         if (output.scriptPubKey && 
             output.scriptPubKey.addresses && 
             output.scriptPubKey.addresses.includes(address)) {
-          balanceChange += output.value;
+          txEffect += parseFloat(output.value) || 0;
         }
       }
       
+      // Subtract inputs from this address
       for (const input of tx.vin) {
         if (input.coinbase) continue;
         
-        if (input.prevout && 
-            input.prevout.scriptPubKey && 
-            input.prevout.scriptPubKey.addresses && 
-            input.prevout.scriptPubKey.addresses.includes(address)) {
-          balanceChange -= input.prevout.value;
+        // Check if the input is from this address
+        if (input.address === address) {
+          txEffect -= parseFloat(input.value) || 0;
+        }
+        // Also check prevout for address match
+        else if (input.prevout && 
+                input.prevout.scriptPubKey && 
+                input.prevout.scriptPubKey.addresses && 
+                input.prevout.scriptPubKey.addresses.includes(address)) {
+          txEffect -= parseFloat(input.prevout.value) || 0;
         }
       }
       
-      if (dateBalanceMap.has(txDate)) {
-        dateBalanceMap.set(txDate, dateBalanceMap.get(txDate) + balanceChange);
-      } else {
-        dateBalanceMap.set(txDate, balanceChange);
-      }
+      // Update running balance
+      runningBalance += txEffect;
+      
+      // Store the balance for this day
+      const txDate = new Date(tx.time * 1000).toISOString().split('T')[0];
+      dailyBalances.set(txDate, runningBalance);
     }
     
-    for (let i = 1; i <= days; i++) {
-      const date = new Date((now - (i * daySeconds)) * 1000).toISOString().split('T')[0];
+    // Create a history array for the requested number of days
+    const now = new Date();
+    const history = [];
+    
+    // Fill in the history with known balances or the last known balance
+    for (let i = days - 1; i >= 0; i--) {
+      const date = new Date(now);
+      date.setDate(date.getDate() - i);
+      const dateStr = date.toISOString().split('T')[0];
       
-      if (dateBalanceMap.has(date)) {
-        currentBalance -= dateBalanceMap.get(date);
+      let balance = 0;
+      // Find the last known balance on or before this date
+      const relevantDates = Array.from(dailyBalances.keys())
+        .filter(d => d <= dateStr)
+        .sort((a, b) => b.localeCompare(a)); // Latest date first
+      
+      if (relevantDates.length > 0) {
+        balance = dailyBalances.get(relevantDates[0]);
+      } else {
+        // If no transaction before this date, balance is 0
+        balance = 0;
       }
       
-      history.unshift({
-        date,
-        balance: Math.max(0, currentBalance) 
+      history.push({
+        date: dateStr,
+        balance: Math.max(0, balance)
       });
     }
     

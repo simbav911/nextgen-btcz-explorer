@@ -14,11 +14,20 @@ export const formatRelativeTime = (timestamp) => {
 export const formatBTCZ = (value) => {
   if (value === undefined || value === null) return '0 BTCZ';
   
+  // Parse the value as a number
+  let numValue = 0;
+  try {
+    numValue = parseFloat(value);
+    if (isNaN(numValue)) numValue = 0;
+  } catch (e) {
+    numValue = 0;
+  }
+  
   // Format with thousands separator and 8 decimal places
   const formatted = new Intl.NumberFormat('en-US', {
     minimumFractionDigits: 2,
     maximumFractionDigits: 8
-  }).format(value);
+  }).format(numValue);
   
   return `${formatted} BTCZ`;
 };

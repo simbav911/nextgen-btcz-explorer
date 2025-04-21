@@ -70,13 +70,13 @@ const Address = () => {
                 setBalanceHistory(historyResponse.data.history);
               } else {
                 console.log('No balance history data available from API');
-                // Only generate mock balance history if no real data is available
-                generateConsistentBalanceHistory(response.data.balance, address);
+                // Use fallback balance history
+                setBalanceHistory(createFallbackBalanceHistory(response.data.balance));
               }
             } catch (historyError) {
               console.error('Error fetching balance history:', historyError);
-              // Only generate mock balance history if API fails
-              generateConsistentBalanceHistory(response.data.balance, address);
+              // Use fallback balance history
+              setBalanceHistory(createFallbackBalanceHistory(response.data.balance));
             }
           } else {
             throw new Error('API returned empty data');
@@ -96,27 +96,16 @@ const Address = () => {
     fetchAddressInfo();
   }, [address]);
   
-  // Generate consistent balance history based on address hash
-  // This ensures the same address always gets the same mock data when real data isn't available
-  const generateConsistentBalanceHistory = (currentBalance, addressHash) => {
+  // Function to create a fallback balance history with just the current balance
+  const createFallbackBalanceHistory = (currentBalance) => {
     const history = [];
     const days = 30;
     
-    // Use address hash to generate a consistent seed
-    const seed = addressHash.split('').reduce((acc, char) => acc + char.charCodeAt(0), 0);
-    
-    // Simple deterministic random number generator
-    const pseudoRandom = (index) => {
-      const x = Math.sin(seed + index) * 10000;
-      return x - Math.floor(x);
-    };
-    
-    // Generate data points with consistent randomness but trending toward current balance
     for (let i = 0; i < days; i++) {
       const date = moment().subtract(days - i - 1, 'days').format('YYYY-MM-DD');
-      const factor = 0.5 + ((i + 1) / days) * 0.5; // Factor increases from 0.5 to 1.0
-      const randomVariation = 1 + (pseudoRandom(i) * 0.2 - 0.1); // Consistent random variation between 0.9 and 1.1
-      const balance = currentBalance * factor * randomVariation;
+      // Use actual balance only for the last day, zero for historical days
+      // This creates a simple chart showing when balance was received
+      const balance = i === days - 1 ? currentBalance : 0;
       
       history.push({
         date,
@@ -124,13 +113,7 @@ const Address = () => {
       });
     }
     
-    // Add current balance as the final point
-    history.push({
-      date: moment().format('YYYY-MM-DD'),
-      balance: currentBalance
-    });
-    
-    setBalanceHistory(history);
+    return history;
   };
   
   // Fetch transactions for the current page
@@ -244,6 +227,7 @@ const Address = () => {
         }
       },
       y: {
+        beginAtZero: true,
         grid: {
           color: 'rgba(226, 232, 240, 0.5)'
         },
@@ -253,6 +237,9 @@ const Address = () => {
           }
         }
       }
+    },
+    animation: {
+      duration: 1000
     }
   };
   
@@ -350,11 +337,11 @@ const Address = () => {
                       <div className="flex items-center mb-3 md:mb-0">
                         {/* Transaction type icon */}
                         <div className={`p-3 rounded-full mr-4 ${
-                          tx.isReceived || (tx.vout && tx.vout.some(out => out.scriptPubKey?.addresses?.includes(address)))
+                          tx.value >= 0
                             ? 'bg-green-100 text-green-600'
                             : 'bg-red-100 text-red-600'
                         }`}>
-                          {tx.isReceived || (tx.vout && tx.vout.some(out => out.scriptPubKey?.addresses?.includes(address)))
+                          {tx.value >= 0
                             ? <FaArrowDown size={18} />
                             : <FaArrowUp size={18} />
                           }
@@ -373,21 +360,11 @@ const Address = () => {
                       
                       {/* Transaction amount */}
                       <div className={`text-right ${
-                        tx.isReceived || (tx.vout && tx.vout.some(out => out.scriptPubKey?.addresses?.includes(address)))
-                          ? 'text-green-600'
-                          : 'text-red-600'
+                        tx.value > 0 ? 'text-green-600' : 'text-red-600'
                       }`}>
                         <div className="text-lg font-bold">
-                          {tx.isReceived || (tx.vout && tx.vout.some(out => out.scriptPubKey?.addresses?.includes(address)))
-                            ? '+'
-                            : '-'
-                          }
-                          {formatBTCZ(tx.value || (tx.vout ? tx.vout.reduce((sum, out) => {
-                            if (out.scriptPubKey?.addresses?.includes(address)) {
-                              return sum + (out.value || 0);
-                            }
-                            return sum;
-                          }, 0) : 0))}
+                          {tx.value > 0 ? '+' : ''}
+                          {formatBTCZ(Math.abs(tx.value || 0))}
                         </div>
                         <div className="text-xs text-gray-500">
                           {tx.confirmations > 0 

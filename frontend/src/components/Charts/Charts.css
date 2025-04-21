@@ -520,11 +520,10 @@
   color: #3b82f6;
 }
 
-/* Calendar Component Styles */
 .calendar-container {
   padding: 0;
   box-shadow: 0 10px 25px rgba(0, 0, 0, 0.15);
-  border-radius: 16px;
+  border-radius: 0;
   overflow: hidden;
   background: white;
 }
@@ -706,7 +705,7 @@
   justify-content: center;
   height: 36px;
   font-size: 14px;
-  border-radius: 8px;
+  border-radius: 0;
   cursor: pointer;
   transition: all 0.2s;
   position: relative;
@@ -1569,7 +1568,7 @@ canvas + .chartjs-legend {
   align-items: center;
   justify-content: center;
   font-size: 14px;
-  border-radius: 50%;
+  border-radius: 0;
   cursor: pointer;
   color: #1f2937;
   position: relative;

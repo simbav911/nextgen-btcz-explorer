@@ -192,17 +192,20 @@ const TimeFilter = ({ date, setDate, applyFilter, showTodayDefault = false, acti
   
   // Calculate position for date picker
   const getDatePickerPosition = () => {
-    // Since we removed the button, we'll position relative to the time filter container
-    const filterEl = document.querySelector('.chart-time-filter');
-    if (!filterEl) return { top: '100px', right: '20px' };
-    
-    const filterRect = filterEl.getBoundingClientRect();
-    
-    // Calculate position to ensure it's visible
+    // Position calendar container relative to Custom button
+    const buttonEl = dateButtonRef.current;
+    if (!buttonEl) {
+      return {
+        position: 'fixed',
+        top: '100px',
+        left: '20px',
+      };
+    }
+    const rect = buttonEl.getBoundingClientRect();
     return {
       position: 'fixed',
-      top: `${filterRect.bottom + 10}px`,
-      right: '20px',
+      top: `${rect.bottom + 5}px`,
+      left: `${rect.left}px`,
     };
   };
 
@@ -281,6 +284,7 @@ const TimeFilter = ({ date, setDate, applyFilter, showTodayDefault = false, acti
       <div className="time-filter-buttons">
         {timeRanges.map(range => (
           <button 
+            ref={range.value === 'custom' ? dateButtonRef : null}
             key={range.value}
             className={timeRange === range.value ? 'active' : ''}
             onClick={() => handleTimeRangeChange(range.value)}

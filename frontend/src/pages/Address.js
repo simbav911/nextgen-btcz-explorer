@@ -204,16 +204,37 @@ const Address = () => {
     let timelineData = [];
     let seenDates = new Set(); // To track dates we've already processed
     
-    // Create a data point for each unique date
+    // For very long histories (5+ years), we need to reduce data points to avoid performance issues
+    const oldestTx = sortedTxs[0];
+    const newestTx = sortedTxs[sortedTxs.length - 1];
+    const daysDiff = moment.unix(newestTx.time).diff(moment.unix(oldestTx.time), 'days');
+    
+    // If we have more than 2 years of data, we'll group by weeks or months
+    const groupByMonth = daysDiff > 730; // 2 years
+    const groupByWeek = daysDiff > 180 && daysDiff <= 730; // 6 months to 2 years
+    
+    // Create a data point for each unique date, with smart grouping for long histories
     sortedTxs.forEach(tx => {
       // Add transaction value to running balance
       runningBalance += Number(tx.value || 0);
       
-      // Create a date key for this transaction
+      // Create an appropriate date key based on the history length
       const txMoment = moment.unix(tx.time);
-      const dateKey = txMoment.format('YYYY-MM-DD');
+      let dateKey;
       
-      // If we have multiple transactions on the same day, update the balance
+      if (groupByMonth) {
+        // For very long histories, group by month
+        dateKey = txMoment.format('YYYY-MM');
+      } else if (groupByWeek) {
+        // For medium histories, group by week
+        // Use the year and week number as key
+        dateKey = `${txMoment.format('YYYY')}-W${txMoment.week()}`;
+      } else {
+        // For shorter histories, use daily points
+        dateKey = txMoment.format('YYYY-MM-DD');
+      }
+      
+      // If we have multiple transactions in the same period, update the balance
       if (seenDates.has(dateKey)) {
         // Find and update the existing entry
         const existingIndex = timelineData.findIndex(item => item.dateKey === dateKey);
@@ -223,26 +244,40 @@ const Address = () => {
       } else {
         // Add a new data point
         timelineData.push({
-          date: dateKey,
+          date: groupByMonth ? txMoment.format('YYYY-MM-01') : 
+                (groupByWeek ? txMoment.startOf('week').format('YYYY-MM-DD') : 
+                 txMoment.format('YYYY-MM-DD')),
           dateKey: dateKey,
           balance: Math.max(0, runningBalance),
           timestamp: tx.time,
           blockHeight: tx.blockHeight || 0,
-          txid: tx.txid
+          txid: tx.txid,
+          label: groupByMonth ? txMoment.format('MMM YY') : 
+                 (groupByWeek ? txMoment.format('MMM D') : 
+                  txMoment.format('MMM D'))
         });
         seenDates.add(dateKey);
       }
     });
     
     // Add today's point if not already there
-    const todayKey = moment().format('YYYY-MM-DD');
+    const todayMoment = moment();
+    const todayKey = groupByMonth ? todayMoment.format('YYYY-MM') : 
+                    (groupByWeek ? `${todayMoment.format('YYYY')}-W${todayMoment.week()}` : 
+                     todayMoment.format('YYYY-MM-DD'));
+                     
     if (!seenDates.has(todayKey) && addressInfo && addressInfo.balance !== undefined) {
       timelineData.push({
-        date: todayKey,
+        date: groupByMonth ? todayMoment.format('YYYY-MM-01') : 
+              (groupByWeek ? todayMoment.startOf('week').format('YYYY-MM-DD') : 
+               todayMoment.format('YYYY-MM-DD')),
         dateKey: todayKey,
         balance: addressInfo.balance,
-        timestamp: moment().unix(),
-        isCurrent: true
+        timestamp: todayMoment.unix(),
+        isCurrent: true,
+        label: groupByMonth ? todayMoment.format('MMM YY') : 
+               (groupByWeek ? todayMoment.format('MMM D') : 
+                todayMoment.format('MMM D'))
       });
     }
     
@@ -588,7 +623,7 @@ const Address = () => {
         fill: true,
         pointRadius: (timeRange === TIME_RANGES.DAY) ? 3 : 
                      (timeRange === TIME_RANGES.WEEK) ? 3 : 
-                     (timeRange === TIME_RANGES.ALL && filteredHistory.length > 30) ? 0 : 2,
+                     (timeRange === TIME_RANGES.MONTH) ? 3 : 2,
         pointHoverRadius: 5,
         stepped: timeRange === TIME_RANGES.DAY || timeRange === TIME_RANGES.WEEK ? 'after' : false // Stepped line for shorter time frames
       }
@@ -725,9 +760,8 @@ const Address = () => {
         tension: timeRange === TIME_RANGES.DAY ? 0 : 0.1 // Straight lines for 24h, slight curve for others
       },
       point: {
-        radius: (timeRange === TIME_RANGES.ALL && filteredHistory.length > 30) ? 0 : 
-                (timeRange === TIME_RANGES.DAY) ? 3 :
-                (timeRange === TIME_RANGES.WEEK) ? 3 : undefined
+        radius: 3, // Show points for all views
+        hoverRadius: 6
       }
     },
     // Only use stepped charts for All view

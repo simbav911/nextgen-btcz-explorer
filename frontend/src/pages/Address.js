@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useParams, Link } from 'react-router-dom';
-import { FaWallet, FaArrowUp, FaArrowDown, FaCopy, FaExchangeAlt, FaHistory } from 'react-icons/fa';
+import { FaWallet, FaArrowUp, FaArrowDown, FaCopy, FaExchangeAlt, FaHistory, FaCalendarAlt } from 'react-icons/fa';
 import { Line } from 'react-chartjs-2';
 import { Chart, CategoryScale, LinearScale, PointElement, LineElement, Title, Tooltip, Legend, Filler } from 'chart.js';
 import moment from 'moment';
@@ -12,6 +12,14 @@ Chart.register(CategoryScale, LinearScale, PointElement, LineElement, Title, Too
 import Spinner from '../components/Spinner';
 import TransactionCard from '../components/TransactionCard';
 import Pagination from '../components/Pagination';
+
+// Constants for time ranges
+const TIME_RANGES = {
+  ALL: 'all',
+  MONTH: 'month',
+  WEEK: 'week',
+  DAY: '24h'
+};
 
 // Services
 import { addressService } from '../services/api';
@@ -31,7 +39,9 @@ const Address = () => {
   const [totalPages, setTotalPages] = useState(1);
   const [error, setError] = useState(null);
   const [copied, setCopied] = useState(false);
-  const [balanceHistory, setBalanceHistory] = useState([]);
+  const [balanceHistory, setBalanceHistory] = useState([]); 
+  const [timeRange, setTimeRange] = useState(TIME_RANGES.ALL);
+  const [allTransactions, setAllTransactions] = useState([]);
   
   const txsPerPage = 10;
   
@@ -54,29 +64,91 @@ const Address = () => {
               setTotalPages(Math.ceil(response.data.txCount / txsPerPage));
             }
             
-            // If transactions are included in the response, use them
+            // Process transactions and set full transaction list
             if (response.data.transactions && response.data.transactions.length > 0) {
-              setTransactions(response.data.transactions);
+              // Process transactions to ensure they all have proper timestamps and values
+              const processedTxs = response.data.transactions.map(tx => {
+                // Ensure each transaction has a time and convert from unix timestamp
+                if (!tx.time && tx.timestamp) {
+                  tx.time = tx.timestamp;
+                }
+                
+                // If transaction is missing a proper value, calculate it
+                if (tx.value === undefined || tx.value === null) {
+                  let txValue = 0;
+                  
+                  // Calculate transaction value by examining inputs and outputs
+                  if (tx.vout) {
+                    for (const output of tx.vout) {
+                      if (output.scriptPubKey && 
+                          output.scriptPubKey.addresses && 
+                          output.scriptPubKey.addresses.includes(address)) {
+                        txValue += parseFloat(output.value || 0);
+                      }
+                    }
+                  }
+                  
+                  // Subtract inputs from this address
+                  if (tx.vin) {
+                    for (const input of tx.vin) {
+                      if (input.address === address || 
+                          (input.prevout && 
+                           input.prevout.scriptPubKey && 
+                           input.prevout.scriptPubKey.addresses && 
+                           input.prevout.scriptPubKey.addresses.includes(address))) {
+                        txValue -= parseFloat(input.value || input.prevout?.value || 0);
+                      }
+                    }
+                  }
+                  
+                  tx.value = txValue;
+                }
+                
+                return tx;
+              });
+              
+              // Store all transactions for balance history
+              setAllTransactions(processedTxs);
+              
+              // Sort transactions by time (newest first for display)
+              const sortedTxs = [...processedTxs].sort((a, b) => b.time - a.time);
+              
+              // Only show first page of transactions
+              const firstPageTxs = sortedTxs.slice(0, txsPerPage);
+              setTransactions(firstPageTxs);
               setTxsLoading(false);
+              
+              console.log(`Using ${processedTxs.length} transactions to build balance history chart`);
             } else {
-              // Otherwise fetch transactions separately
+              // If no transactions in response, try to fetch them separately
               await fetchAddressTransactions(1);
-            }
-            
-            // Fetch balance history
-            try {
-              const historyResponse = await apiInstance.get(`/addresses/${address}/history`);
-              if (historyResponse.data && historyResponse.data.history && historyResponse.data.history.length > 0) {
-                setBalanceHistory(historyResponse.data.history);
-              } else {
-                console.log('No balance history data available from API');
-                // Use fallback balance history
-                setBalanceHistory(createFallbackBalanceHistory(response.data.balance));
+              
+              // Try to get all transactions for chart (more than just first page)
+              if (response.data.txCount > txsPerPage) {
+                try {
+                  console.log(`Fetching all ${response.data.txCount} transactions for chart data...`);
+                  const allTxResponse = await addressService.getAddressTransactions(
+                    address, 
+                    response.data.txCount,
+                    0
+                  );
+                  
+                  if (allTxResponse.data && allTxResponse.data.transactions) {
+                    // Process all transactions
+                    const allProcessedTxs = allTxResponse.data.transactions.map(tx => {
+                      if (!tx.time && tx.timestamp) {
+                        tx.time = tx.timestamp;
+                      }
+                      return tx;
+                    });
+                    
+                    setAllTransactions(allProcessedTxs);
+                    console.log(`Successfully loaded ${allProcessedTxs.length} transactions for chart data`);
+                  }
+                } catch (allTxError) {
+                  console.error('Error fetching all transactions:', allTxError);
+                }
               }
-            } catch (historyError) {
-              console.error('Error fetching balance history:', historyError);
-              // Use fallback balance history
-              setBalanceHistory(createFallbackBalanceHistory(response.data.balance));
             }
           } else {
             throw new Error('API returned empty data');
@@ -94,12 +166,15 @@ const Address = () => {
     };
     
     fetchAddressInfo();
+    
+    // Reset timeRange when address changes
+    setTimeRange(TIME_RANGES.ALL);
   }, [address]);
   
   // Function to create a fallback balance history with just the current balance
   const createFallbackBalanceHistory = (currentBalance) => {
     const history = [];
-    const days = 30;
+    const days = 90; // Create 90 days of history to support all time ranges
     
     for (let i = 0; i < days; i++) {
       const date = moment().subtract(days - i - 1, 'days').format('YYYY-MM-DD');
@@ -116,6 +191,140 @@ const Address = () => {
     return history;
   };
   
+  // Function to build balance history from transactions
+  const buildBalanceHistory = (txs) => {
+    if (!txs || txs.length === 0) {
+      return [];
+    }
+    
+    // Create a copy and sort by time (oldest first)
+    const sortedTxs = [...txs].sort((a, b) => a.time - b.time);
+    
+    let runningBalance = 0;
+    let timelineData = [];
+    let seenDates = new Set(); // To track dates we've already processed
+    
+    // Create a data point for each unique date
+    sortedTxs.forEach(tx => {
+      // Add transaction value to running balance
+      runningBalance += Number(tx.value || 0);
+      
+      // Create a date key for this transaction
+      const txMoment = moment.unix(tx.time);
+      const dateKey = txMoment.format('YYYY-MM-DD');
+      
+      // If we have multiple transactions on the same day, update the balance
+      if (seenDates.has(dateKey)) {
+        // Find and update the existing entry
+        const existingIndex = timelineData.findIndex(item => item.dateKey === dateKey);
+        if (existingIndex !== -1) {
+          timelineData[existingIndex].balance = Math.max(0, runningBalance);
+        }
+      } else {
+        // Add a new data point
+        timelineData.push({
+          date: dateKey,
+          dateKey: dateKey,
+          balance: Math.max(0, runningBalance),
+          timestamp: tx.time,
+          blockHeight: tx.blockHeight || 0,
+          txid: tx.txid
+        });
+        seenDates.add(dateKey);
+      }
+    });
+    
+    // Add today's point if not already there
+    const todayKey = moment().format('YYYY-MM-DD');
+    if (!seenDates.has(todayKey) && addressInfo && addressInfo.balance !== undefined) {
+      timelineData.push({
+        date: todayKey,
+        dateKey: todayKey,
+        balance: addressInfo.balance,
+        timestamp: moment().unix(),
+        isCurrent: true
+      });
+    }
+    
+    return timelineData;
+  };
+  
+  // Function to filter history data based on selected time range
+  const getFilteredBalanceHistory = () => {
+    // If we don't have all transactions data, rebuild from current transactions
+    const historyData = buildBalanceHistory(allTransactions.length > 0 ? allTransactions : transactions);
+    
+    if (historyData.length === 0) {
+      return [];
+    }
+    
+    // Filter based on selected time range
+    let filtered = [];
+    const now = moment();
+    
+    switch (timeRange) {
+      case TIME_RANGES.MONTH:
+        // Last 30 days
+        filtered = historyData.filter(item => {
+          return moment(item.date).isAfter(moment().subtract(30, 'days').startOf('day'));
+        });
+        break;
+      
+      case TIME_RANGES.WEEK:
+        // Last 7 days
+        filtered = historyData.filter(item => {
+          return moment(item.date).isAfter(moment().subtract(7, 'days').startOf('day'));
+        });
+        break;
+      
+      case TIME_RANGES.DAY:
+        // Last 24 hours
+        filtered = historyData.filter(item => {
+          return moment(item.date).isAfter(moment().subtract(24, 'hours'));
+        });
+        break;
+      
+      case TIME_RANGES.ALL:
+      default:
+        filtered = [...historyData];
+        break;
+    }
+    
+    // If we have no data in the selected range but we have overall history,
+    // return the current balance as a single point
+    if (filtered.length === 0 && historyData.length > 0) {
+      if (addressInfo && addressInfo.balance !== undefined) {
+        return [{
+          date: moment().format('YYYY-MM-DD'),
+          dateKey: moment().format('YYYY-MM-DD'),
+          balance: addressInfo.balance,
+          timestamp: moment().unix(),
+          isCurrent: true
+        }];
+      }
+    }
+    
+    // For better visualization, ensure we have at least two points:
+    // - For empty or small filters, add the starting point
+    if (filtered.length === 1) {
+      const startDate = timeRange === TIME_RANGES.DAY ? 
+        moment().subtract(24, 'hours') : 
+        (timeRange === TIME_RANGES.WEEK ? 
+          moment().subtract(7, 'days') : 
+          moment().subtract(30, 'days'));
+          
+      filtered.unshift({
+        date: startDate.format('YYYY-MM-DD'),
+        dateKey: startDate.format('YYYY-MM-DD'),
+        balance: 0,
+        timestamp: startDate.unix(),
+        isStartPoint: true
+      });
+    }
+    
+    return filtered;
+  };
+  
   // Fetch transactions for the current page
   const fetchAddressTransactions = async (page) => {
     try {
@@ -128,7 +337,48 @@ const Address = () => {
       );
       
       if (response.data && response.data.transactions && response.data.transactions.length > 0) {
-        setTransactions(response.data.transactions);
+        // Process transactions to ensure they all have proper values
+        const processedTxs = response.data.transactions.map(tx => {
+          // Ensure each transaction has a time
+          if (!tx.time && tx.timestamp) {
+            tx.time = tx.timestamp;
+          }
+          
+          // If transaction is missing a proper value, calculate it
+          if (tx.value === undefined || tx.value === null) {
+            let txValue = 0;
+            
+            // Calculate transaction value by examining inputs and outputs
+            if (tx.vout) {
+              for (const output of tx.vout) {
+                if (output.scriptPubKey && 
+                    output.scriptPubKey.addresses && 
+                    output.scriptPubKey.addresses.includes(address)) {
+                  txValue += parseFloat(output.value || 0);
+                }
+              }
+            }
+            
+            // Subtract inputs from this address
+            if (tx.vin) {
+              for (const input of tx.vin) {
+                if (input.address === address || 
+                    (input.prevout && 
+                     input.prevout.scriptPubKey && 
+                     input.prevout.scriptPubKey.addresses && 
+                     input.prevout.scriptPubKey.addresses.includes(address))) {
+                  txValue -= parseFloat(input.value || input.prevout?.value || 0);
+                }
+              }
+            }
+            
+            tx.value = txValue;
+          }
+          
+          return tx;
+        });
+        
+        setTransactions(processedTxs);
       } else {
         console.error('No transaction data available from API');
         setTransactions([]);
@@ -147,7 +397,7 @@ const Address = () => {
   const handlePageChange = (page) => {
     fetchAddressTransactions(page);
     // Scroll to transaction list
-    document.getElementById('transactions-list').scrollIntoView({
+    document.getElementById('transactions-list')?.scrollIntoView({
       behavior: 'smooth'
     });
   };
@@ -178,22 +428,114 @@ const Address = () => {
     );
   }
   
-  // Prepare chart data
+  // Get filtered balance history based on transactions
+  const filteredHistory = getFilteredBalanceHistory();
+  
+  // Format labels based on time range
+  const formatLabel = (item) => {
+    // Use timestamp if available, otherwise parse date string
+    const date = item.timestamp ? moment.unix(item.timestamp) : moment(item.date);
+    
+    switch (timeRange) {
+      case '24h':
+        return date.format('ha'); // 1am, 2pm etc.
+      case 'week':
+        return date.format('ddd'); // Mon, Tue etc.
+      case 'month':
+        return date.format('MMM D'); // Jan 1, Feb 2 etc.
+      case 'all':
+      default:
+        // For all time, use month/year or just month depending on range
+        const firstDate = filteredHistory.length > 0 ? 
+          (filteredHistory[0].timestamp ? moment.unix(filteredHistory[0].timestamp) : moment(filteredHistory[0].date)) : 
+          moment();
+        const lastDate = filteredHistory.length > 0 ? 
+          (filteredHistory[filteredHistory.length-1].timestamp ? moment.unix(filteredHistory[filteredHistory.length-1].timestamp) : moment(filteredHistory[filteredHistory.length-1].date)) : 
+          moment();
+        
+        // If the range spans more than a year, show month/year
+        if (lastDate.diff(firstDate, 'months') > 12) {
+          return date.format('MMM YY');
+        }
+        // If the range spans a few months, show just month name
+        else if (lastDate.diff(firstDate, 'days') > 60) {
+          return date.format('MMM');
+        }
+        // Otherwise show month day
+        else {
+          return date.format('MMM D');
+        }
+    }
+  };
+  
+  // Create chart data with enhanced visualization based on transactions
   const chartData = {
-    labels: balanceHistory.map(item => moment(item.date).format('MMM D')),
+    labels: filteredHistory.map(item => formatLabel(item)),
     datasets: [
       {
         label: 'Balance',
-        data: balanceHistory.map(item => item.balance),
+        data: filteredHistory.map(item => item.balance),
         borderColor: 'rgba(59, 130, 246, 1)',
         backgroundColor: 'rgba(59, 130, 246, 0.2)',
-        tension: 0.4,
+        tension: 0.2, // Lower tension for more accurate representation
         fill: true,
-        pointRadius: 2,
-        pointHoverRadius: 5
+        pointRadius: timeRange === '24h' ? 1 : (timeRange === 'week' ? 1.5 : 2),
+        pointHoverRadius: 5,
+        stepped: 'after' // Use stepped line for more accurate balance representation
       }
     ]
   };
+  
+  // Determine appropriate tick settings based on time range
+  const getTickSettings = () => {
+    switch (timeRange) {
+      case 'month':
+        return {
+          maxTicksLimit: 10,
+          format: 'MMM D'
+        };
+      case 'week':
+        return {
+          maxTicksLimit: 7,
+          format: 'ddd'
+        };
+      case '24h':
+        return {
+          maxTicksLimit: 6,
+          format: 'ha'
+        };
+      case 'all':
+      default:
+        // For all-time view, adjust tick count based on data span
+        const firstDate = filteredHistory.length > 0 ? 
+          (filteredHistory[0].timestamp ? moment.unix(filteredHistory[0].timestamp) : moment(filteredHistory[0].date)) : 
+          moment();
+        const lastDate = filteredHistory.length > 0 ? 
+          (filteredHistory[filteredHistory.length-1].timestamp ? moment.unix(filteredHistory[filteredHistory.length-1].timestamp) : moment(filteredHistory[filteredHistory.length-1].date)) : 
+          moment();
+        
+        // Adjust tick count based on date range
+        const monthsDiff = lastDate.diff(firstDate, 'months');
+        if (monthsDiff > 24) {
+          return {
+            maxTicksLimit: 12,
+            format: 'MMM YY'
+          };
+        } else if (monthsDiff > 6) {
+          return {
+            maxTicksLimit: 10,
+            format: 'MMM'
+          };
+        } else {
+          return {
+            maxTicksLimit: 8,
+            format: 'MMM D'
+          };
+        }
+    }
+  };
+  
+  const tickSettings = getTickSettings();
   
   const chartOptions = {
     responsive: true,
@@ -211,6 +553,21 @@ const Address = () => {
         callbacks: {
           label: function(context) {
             return `Balance: ${formatBTCZ(context.raw)}`;
+          },
+          title: function(tooltipItems) {
+            // Format the date in tooltip based on time range
+            const item = tooltipItems[0];
+            const dataPoint = filteredHistory[item.dataIndex];
+            if (!dataPoint) return '';
+            
+            // Use timestamp if available, otherwise parse date string
+            const date = dataPoint.timestamp ? 
+              moment.unix(dataPoint.timestamp) : 
+              moment(dataPoint.date);
+            
+            return timeRange === '24h'
+              ? date.format('MMM D, h:mm a')
+              : date.format('MMM D, YYYY');
           }
         }
       }
@@ -223,7 +580,7 @@ const Address = () => {
         ticks: {
           maxRotation: 0,
           autoSkip: true,
-          maxTicksLimit: 8
+          maxTicksLimit: tickSettings.maxTicksLimit
         }
       },
       y: {
@@ -240,6 +597,15 @@ const Address = () => {
     },
     animation: {
       duration: 1000
+    },
+    // Improves rendering of balance history with steps
+    elements: {
+      line: {
+        tension: 0.1 // Lower tension for more accurate lines
+      },
+      point: {
+        radius: timeRange === 'all' && filteredHistory.length > 30 ? 0 : undefined // Hide points in all-time view if many data points
+      }
     }
   };
   
@@ -309,12 +675,69 @@ const Address = () => {
       
       {/* Balance History Chart */}
       <div className="bg-white rounded-xl shadow-lg p-6 mb-8">
-        <h2 className="text-xl font-bold text-gray-800 mb-4 flex items-center">
-          <FaHistory className="text-blue-500 mr-2" />
-          Balance History
-        </h2>
+        <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-4">
+          <h2 className="text-xl font-bold text-gray-800 flex items-center">
+            <FaHistory className="text-blue-500 mr-2" />
+            Balance History
+          </h2>
+          
+          <div className="flex items-center space-x-2 mt-2 md:mt-0">
+            <div className="inline-flex items-center bg-gray-100 rounded-lg p-1">
+              <button 
+                onClick={() => setTimeRange('all')}
+                className={`px-3 py-1.5 text-sm rounded-md transition-colors ${
+                  timeRange === 'all' 
+                    ? 'bg-blue-500 text-white shadow-sm' 
+                    : 'text-gray-700 hover:bg-gray-200'
+                }`}
+              >
+                All
+              </button>
+              <button 
+                onClick={() => setTimeRange('month')}
+                className={`px-3 py-1.5 text-sm rounded-md transition-colors ${
+                  timeRange === 'month' 
+                    ? 'bg-blue-500 text-white shadow-sm' 
+                    : 'text-gray-700 hover:bg-gray-200'
+                }`}
+              >
+                Month
+              </button>
+              <button 
+                onClick={() => setTimeRange('week')}
+                className={`px-3 py-1.5 text-sm rounded-md transition-colors ${
+                  timeRange === 'week' 
+                    ? 'bg-blue-500 text-white shadow-sm' 
+                    : 'text-gray-700 hover:bg-gray-200'
+                }`}
+              >
+                Week
+              </button>
+              <button 
+                onClick={() => setTimeRange('24h')}
+                className={`px-3 py-1.5 text-sm rounded-md transition-colors ${
+                  timeRange === '24h' 
+                    ? 'bg-blue-500 text-white shadow-sm' 
+                    : 'text-gray-700 hover:bg-gray-200'
+                }`}
+              >
+                24h
+              </button>
+            </div>
+          </div>
+        </div>
+        
         <div className="h-72">
-          <Line data={chartData} options={chartOptions} />
+          {filteredHistory.length > 0 ? (
+            <Line data={chartData} options={chartOptions} />
+          ) : (
+            <div className="flex items-center justify-center h-full bg-gray-50 rounded-lg">
+              <div className="text-center">
+                <FaHistory className="mx-auto text-gray-300 mb-3" size={30} />
+                <p className="text-gray-500">No transaction history available for this time range</p>
+              </div>
+            </div>
+          )}
         </div>
       </div>
       

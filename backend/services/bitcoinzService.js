@@ -735,6 +735,99 @@ const getAddressInfo = async (address) => {
  */
 const getAddressTransactions = async (address, limit = 10, offset = 0) => {
   try {
+    logger.info(`Fetching transactions for address ${address} (limit: ${limit}, offset: ${offset})`);
+    
+    // For addresses with many transactions, we need a more efficient approach
+    // First, get just the txids instead of full transaction info
+    let txids = [];
+    
+    try {
+      txids = await executeRpcCommand('getaddresstxids', [{"addresses": [address]}]);
+      logger.info(`Found ${txids.length} transaction IDs for address ${address}`);
+      
+      // Sort txids by time (if possible) - we'll need to get timestamp data
+      if (txids.length > 0) {
+        // For very large sets, sorting all txids can be slow
+        // Instead, we'll just get the specific page of transactions needed
+        const pageStart = offset;
+        const pageEnd = Math.min(offset + limit, txids.length);
+        const pageTxids = txids.slice(pageStart, pageEnd);
+        
+        // Get full information for this page of transactions
+        const pageTxs = await Promise.all(
+          pageTxids.map(async (txid) => {
+            try {
+              const tx = await getRawTransaction(txid, 1);
+              
+              // Calculate transaction value for this address
+              let value = 0;
+              
+              // Check outputs for money received
+              if (tx.vout) {
+                for (const output of tx.vout) {
+                  if (output.scriptPubKey && 
+                      output.scriptPubKey.addresses && 
+                      output.scriptPubKey.addresses.includes(address)) {
+                    value += parseFloat(output.value || 0);
+                  }
+                }
+              }
+              
+              // Check inputs for money spent
+              if (tx.vin) {
+                for (const input of tx.vin) {
+                  if (input.coinbase) continue;
+                  
+                  try {
+                    const prevTx = await getRawTransaction(input.txid, 1);
+                    if (prevTx && prevTx.vout && prevTx.vout[input.vout]) {
+                      const prevOut = prevTx.vout[input.vout];
+                      if (prevOut.scriptPubKey && 
+                          prevOut.scriptPubKey.addresses && 
+                          prevOut.scriptPubKey.addresses.includes(address)) {
+                        value -= parseFloat(prevOut.value || 0);
+                      }
+                    }
+                  } catch (prevTxError) {
+                    logger.error(`Error fetching previous tx ${input.txid}: ${prevTxError.message}`);
+                  }
+                }
+              }
+              
+              // Add the calculated value and other transaction details
+              return {
+                ...tx,
+                value: value,
+                isReceived: value >= 0
+              };
+            } catch (txError) {
+              logger.error(`Error fetching transaction ${txid}: ${txError.message}`);
+              return {
+                txid,
+                error: true,
+                value: 0,
+                time: 0,
+                confirmations: 0
+              };
+            }
+          })
+        );
+        
+        // Sort transactions by time (newest first)
+        pageTxs.sort((a, b) => (b.time || 0) - (a.time || 0));
+        
+        return {
+          address,
+          transactions: pageTxs,
+          count: txids.length,
+          offset
+        };
+      }
+    } catch (txidsError) {
+      logger.error(`Error getting txids for address ${address}: ${txidsError.message}`);
+    }
+    
+    // If we couldn't get transactions directly, fall back to address info
     const addressInfo = await getAddressInfo(address);
     
     return {

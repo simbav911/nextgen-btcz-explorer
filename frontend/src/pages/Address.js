@@ -456,10 +456,15 @@ const Address = () => {
     return historyData;
   };
   
-  // Fetch transactions for the current page
-  const fetchAddressTransactions = async (page) => {
+  // Fetch transactions for the current page with retry logic
+  const fetchAddressTransactions = async (page, retryCount = 0) => {
     try {
       setTxsLoading(true);
+      
+      // Show a special message for addresses with large transaction counts
+      if (addressInfo && addressInfo.txCount > 1000) {
+        console.log(`Fetching page ${page} of transactions for large address (${addressInfo.txCount} transactions total)`);
+      }
       
       const response = await addressService.getAddressTransactions(
         address, 
@@ -467,57 +472,56 @@ const Address = () => {
         (page - 1) * txsPerPage
       );
       
-      if (response.data && response.data.transactions && response.data.transactions.length > 0) {
-        // Process transactions to ensure they all have proper values
+      if (response.data && response.data.transactions) {
+        // Process transactions
         const processedTxs = response.data.transactions.map(tx => {
           // Ensure each transaction has a time
           if (!tx.time && tx.timestamp) {
             tx.time = tx.timestamp;
+          } else if (!tx.time) {
+            // If still no time, use a reasonable default
+            tx.time = Math.floor(Date.now() / 1000) - (tx.confirmations || 0) * 600; // ~10 min per block
           }
           
-          // If transaction is missing a proper value, calculate it
+          // Ensure transaction has a value
           if (tx.value === undefined || tx.value === null) {
-            let txValue = 0;
-            
-            // Calculate transaction value by examining inputs and outputs
-            if (tx.vout) {
-              for (const output of tx.vout) {
-                if (output.scriptPubKey && 
-                    output.scriptPubKey.addresses && 
-                    output.scriptPubKey.addresses.includes(address)) {
-                  txValue += parseFloat(output.value || 0);
-                }
-              }
-            }
-            
-            // Subtract inputs from this address
-            if (tx.vin) {
-              for (const input of tx.vin) {
-                if (input.address === address || 
-                    (input.prevout && 
-                     input.prevout.scriptPubKey && 
-                     input.prevout.scriptPubKey.addresses && 
-                     input.prevout.scriptPubKey.addresses.includes(address))) {
-                  txValue -= parseFloat(input.value || input.prevout?.value || 0);
-                }
-              }
-            }
-            
-            tx.value = txValue;
+            tx.value = 0;
           }
           
           return tx;
         });
         
-        setTransactions(processedTxs);
+        // Sort transactions by time (newest first)
+        const sortedTxs = processedTxs.sort((a, b) => b.time - a.time);
+        
+        setTransactions(sortedTxs);
+        
+        // Update total pages if count is provided
+        if (response.data.count) {
+          const newTotalPages = Math.ceil(response.data.count / txsPerPage);
+          if (newTotalPages !== totalPages) {
+            setTotalPages(newTotalPages);
+          }
+        }
       } else {
-        console.error('No transaction data available from API');
+        console.warn('No transaction data available from API');
+        
+        // If we got a response but no transactions, use empty array
         setTransactions([]);
       }
       
       setCurrentPage(page);
     } catch (error) {
       console.error('Error fetching address transactions:', error);
+      
+      // Retry logic for transient errors
+      if (retryCount < 2) {
+        console.log(`Retrying transaction fetch (attempt ${retryCount + 1})...`);
+        setTimeout(() => fetchAddressTransactions(page, retryCount + 1), 2000);
+        return;
+      }
+      
+      // If all retries failed, show error
       setTransactions([]);
     } finally {
       setTxsLoading(false);
@@ -526,11 +530,19 @@ const Address = () => {
   
   // Handle page change
   const handlePageChange = (page) => {
+    // Show loading indicator for transactions
+    setTxsLoading(true);
+    
+    // Fetch the new page of transactions
     fetchAddressTransactions(page);
+    
     // Scroll to transaction list
     document.getElementById('transactions-list')?.scrollIntoView({
       behavior: 'smooth'
     });
+    
+    // For large transaction counts, we want to avoid re-fetching balance history
+    // when changing transaction pages
   };
   
   // Copy address to clipboard
@@ -545,6 +557,10 @@ const Address = () => {
     return <Spinner message="Loading address data..." />;
   }
   
+  if (loading) {
+    return <Spinner message="Loading address data..." />;
+  }
+  
   if (error || !addressInfo) {
     return (
       <div className="max-w-7xl mx-auto px-4 sm:px-6 py-8">
@@ -553,7 +569,17 @@ const Address = () => {
           <p className="text-gray-500 mb-6">
             {error || 'The address you are looking for does not exist or has not been indexed yet.'}
           </p>
-          <Link to="/" className="btn btn-primary">Back to Home</Link>
+          <div className="flex justify-center space-x-4">
+            <Link to="/" className="px-4 py-2 bg-blue-500 text-white rounded hover:bg-blue-600">
+              Back to Home
+            </Link>
+            <button 
+              onClick={() => window.location.reload()}
+              className="px-4 py-2 bg-gray-200 text-gray-800 rounded hover:bg-gray-300"
+            >
+              Try Again
+            </button>
+          </div>
         </div>
       </div>
     );

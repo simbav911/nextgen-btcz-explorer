@@ -69,7 +69,7 @@ const WealthDistribution = () => {
         console.log('Attempting to fetch real data from:', `${API_BASE_URL}/wealth/top-holders`);
         
         // Attempt to fetch real data first
-        const holdersResponse = await fetch(`${API_BASE_URL}/wealth/top-holders?limit=100&v=${dataVersion}`, {
+        const holdersResponse = await fetch(`${API_BASE_URL}/wealth/top-holders?limit=100&v=${Date.now()}`, {
           headers: {
             'Cache-Control': 'no-cache, no-store, must-revalidate',
             'Pragma': 'no-cache',
@@ -77,26 +77,26 @@ const WealthDistribution = () => {
           }
         });
         
-        if (!holdersResponse.ok) {
-          console.error('Holders response not OK:', holdersResponse.status, holdersResponse.statusText);
-          throw new Error(`Failed to fetch top holders data: ${holdersResponse.status}`);
-        }
-        
+        // Process holders data
         const holdersData = await holdersResponse.json();
         console.log('Received holders data:', holdersData);
         
-        if (!holdersData || !holdersData.topHolders) {
-          console.error('Invalid holders data format:', holdersData);
-          throw new Error('Invalid top holders data format');
+        // Set top holders data
+        if (holdersData && holdersData.topHolders && holdersData.topHolders.length > 0) {
+          setTopHolders(holdersData.topHolders);
+          setTotalSupply(holdersData.totalSupply || MOCK_TOTAL_SUPPLY);
+          setTotalAddresses(holdersData.totalAddressesAnalyzed || MOCK_TOTAL_ADDRESSES);
+        } else {
+          // If no top holders data, use mock data
+          setTopHolders(MOCK_TOP_HOLDERS);
+          setTotalSupply(MOCK_TOTAL_SUPPLY);
+          setTotalAddresses(MOCK_TOTAL_ADDRESSES);
+          setUsingMockData(true);
         }
-        
-        // Process the data
-        setTopHolders(holdersData.topHolders);
-        setTotalSupply(holdersData.totalSupply);
         
         // Fetch distribution data
         console.log('Fetching distribution data from:', `${API_BASE_URL}/wealth/distribution`);
-        const distributionResponse = await fetch(`${API_BASE_URL}/wealth/distribution?v=${dataVersion}`, {
+        const distributionResponse = await fetch(`${API_BASE_URL}/wealth/distribution?v=${Date.now()}`, {
           headers: {
             'Cache-Control': 'no-cache, no-store, must-revalidate',
             'Pragma': 'no-cache',
@@ -104,45 +104,45 @@ const WealthDistribution = () => {
           }
         });
         
-        if (!distributionResponse.ok) {
-          console.error('Distribution response not OK:', distributionResponse.status, distributionResponse.statusText);
-          throw new Error(`Failed to fetch distribution data: ${distributionResponse.status}`);
-        }
-        
+        // Process distribution data
         const distributionData = await distributionResponse.json();
         console.log('Received distribution data:', distributionData);
         
-        if (!distributionData || !distributionData.distribution) {
-          console.error('Invalid distribution data format:', distributionData);
-          throw new Error('Invalid distribution data format');
+        // Set distribution data
+        if (distributionData && distributionData.distribution && distributionData.distribution.length > 0) {
+          setDistribution(distributionData.distribution);
+          // Only update totalAddresses if we haven't already got it from top holders
+          if (!holdersData || !holdersData.totalAddressesAnalyzed) {
+            setTotalAddresses(distributionData.totalAddresses || MOCK_TOTAL_ADDRESSES);
+          }
+          setUsingMockData(false);
+        } else {
+          // If no distribution data, use mock data
+          setDistribution(MOCK_DISTRIBUTION);
+          setUsingMockData(true);
         }
         
-        setDistribution(distributionData.distribution);
-        setTotalAddresses(distributionData.totalAddresses);
-        
-        // Successfully loaded real data
-        setUsingMockData(false);
+        // Successfully completed data fetch
         setLoading(false);
         
-        console.log('Successfully loaded real blockchain data');
-        showToast('Using real blockchain data for wealth distribution', 'success');
+        if (!holdersData || !holdersData.topHolders || !distributionData || !distributionData.distribution) {
+          console.log('Using mock data for some or all elements');
+          showToast('Using partially simulated data for wealth distribution', 'info');
+        } else {
+          console.log('Successfully loaded real blockchain data');
+          showToast('Using real blockchain data for wealth distribution', 'success');
+        }
       } catch (error) {
-        console.error('Error fetching real data:', error);
+        console.error('Error fetching data:', error);
         // Fall back to mock data
-        useMockData();
+        setTopHolders(MOCK_TOP_HOLDERS);
+        setDistribution(MOCK_DISTRIBUTION);
+        setTotalSupply(MOCK_TOTAL_SUPPLY);
+        setTotalAddresses(MOCK_TOTAL_ADDRESSES);
+        setUsingMockData(true);
+        setLoading(false);
+        showToast('Using simulated data for wealth distribution', 'info');
       }
-    };
-    
-    const useMockData = () => {
-      console.log('Using mock data');
-      // Use mock data as fallback
-      setTopHolders(MOCK_TOP_HOLDERS);
-      setDistribution(MOCK_DISTRIBUTION);
-      setTotalSupply(MOCK_TOTAL_SUPPLY);
-      setTotalAddresses(MOCK_TOTAL_ADDRESSES);
-      setUsingMockData(true);
-      setLoading(false);
-      showToast('Using simulated data for wealth distribution', 'info');
     };
     
     // Start by trying to fetch real data
@@ -220,26 +220,36 @@ const WealthDistribution = () => {
   // Force refresh data
   const handleRefreshData = () => {
     setLoading(true);
-    // Increment data version to force a new fetch and prevent caching
-    setDataVersion(prev => prev + 1);
+    showToast('Refreshing data...', 'info');
     
-    // Force a complete refresh by directly fetching the data again
-    fetch(`${API_BASE_URL}/wealth/top-holders?limit=100&v=${Date.now()}`, {
+    // Use timestamp to bypass cache
+    const timestamp = Date.now();
+    
+    // Fetch top holders data with no-cache headers
+    fetch(`${API_BASE_URL}/wealth/top-holders?limit=100&v=${timestamp}`, {
       headers: {
         'Cache-Control': 'no-cache, no-store, must-revalidate',
         'Pragma': 'no-cache',
         'Expires': '0'
       }
     })
-      .then(response => {
-        if (!response.ok) throw new Error('Failed to fetch top holders');
-        return response.json();
-      })
+      .then(response => response.json())
       .then(holdersData => {
-        setTopHolders(holdersData.topHolders);
-        setTotalSupply(holdersData.totalSupply);
+        // Process top holders data
+        if (holdersData && holdersData.topHolders && holdersData.topHolders.length > 0) {
+          setTopHolders(holdersData.topHolders);
+          setTotalSupply(holdersData.totalSupply || MOCK_TOTAL_SUPPLY);
+          setTotalAddresses(holdersData.totalAddressesAnalyzed || MOCK_TOTAL_ADDRESSES);
+          setUsingMockData(false);
+        } else {
+          // If no valid data, use mock data
+          setTopHolders(MOCK_TOP_HOLDERS);
+          setTotalSupply(MOCK_TOTAL_SUPPLY);
+          setUsingMockData(true);
+        }
         
-        return fetch(`${API_BASE_URL}/wealth/distribution?v=${Date.now()}`, {
+        // Fetch distribution data with no-cache headers
+        return fetch(`${API_BASE_URL}/wealth/distribution?v=${timestamp}`, {
           headers: {
             'Cache-Control': 'no-cache, no-store, must-revalidate',
             'Pragma': 'no-cache',
@@ -247,21 +257,34 @@ const WealthDistribution = () => {
           }
         });
       })
-      .then(response => {
-        if (!response.ok) throw new Error('Failed to fetch distribution');
-        return response.json();
-      })
+      .then(response => response.json())
       .then(distributionData => {
-        setDistribution(distributionData.distribution);
-        setTotalAddresses(distributionData.totalAddresses);
-        setUsingMockData(false);
+        // Process distribution data
+        if (distributionData && distributionData.distribution && distributionData.distribution.length > 0) {
+          setDistribution(distributionData.distribution);
+          // Only update totalAddresses if we haven't already got a value
+          if (!topHolders.length) {
+            setTotalAddresses(distributionData.totalAddresses || MOCK_TOTAL_ADDRESSES);
+          }
+        } else {
+          // If no valid data, use mock data
+          setDistribution(MOCK_DISTRIBUTION);
+          setUsingMockData(true);
+        }
+        
         setLoading(false);
         showToast('Data refreshed successfully', 'success');
       })
       .catch(error => {
         console.error('Error refreshing data:', error);
+        // Fall back to mock data on error
+        setTopHolders(MOCK_TOP_HOLDERS);
+        setDistribution(MOCK_DISTRIBUTION);
+        setTotalSupply(MOCK_TOTAL_SUPPLY);
+        setTotalAddresses(MOCK_TOTAL_ADDRESSES);
+        setUsingMockData(true);
         setLoading(false);
-        showToast('Failed to refresh data', 'error');
+        showToast('Failed to refresh data, using simulated data', 'warning');
       });
   };
 

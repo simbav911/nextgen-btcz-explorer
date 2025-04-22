@@ -42,6 +42,9 @@ app.use((err, req, res, next) => {
   });
 });
 
+// Import the indexer service
+const { initializeIndexer } = require('./services/indexerService');
+
 // Connect to database and start server
 const startServer = async () => {
   try {
@@ -74,6 +77,11 @@ const startServer = async () => {
     if (dbType === 'postgres') {
       try {
         initializeModels();
+        
+        // Start the blockchain indexer service
+        logger.info('Starting blockchain indexer service...');
+        await initializeIndexer();
+        logger.info('Blockchain indexer service started');
       } catch (modelError) {
         logger.warn('Model initialization failed:', modelError.message);
       }

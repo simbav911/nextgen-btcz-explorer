@@ -47,12 +47,61 @@ const initializeModels = () => {
   }
 };
 
+// Async accessors to ensure models are loaded with sequelize instance
+const getBlock = async (sequelizeInstance = null) => {
+  if (Block) return Block;
+  
+  const sequelize = sequelizeInstance || getSequelize();
+  if (!sequelize) {
+    logger.warn('No database connection available for Block model');
+    return null;
+  }
+  
+  return require('./postgres/Block')(sequelize);
+};
+
+const getTransaction = async (sequelizeInstance = null) => {
+  if (Transaction) return Transaction;
+  
+  const sequelize = sequelizeInstance || getSequelize();
+  if (!sequelize) {
+    logger.warn('No database connection available for Transaction model');
+    return null;
+  }
+  
+  return require('./postgres/Transaction')(sequelize);
+};
+
+const getAddress = async (sequelizeInstance = null) => {
+  if (Address) return Address;
+  
+  const sequelize = sequelizeInstance || getSequelize();
+  if (!sequelize) {
+    logger.warn('No database connection available for Address model');
+    return null;
+  }
+  
+  return require('./postgres/Address')(sequelize);
+};
+
+const getStatistics = async (sequelizeInstance = null) => {
+  if (Statistics) return Statistics;
+  
+  const sequelize = sequelizeInstance || getSequelize();
+  if (!sequelize) {
+    logger.warn('No database connection available for Statistics model');
+    return null;
+  }
+  
+  return require('./postgres/Statistics')(sequelize);
+};
+
 // Export models accessor functions
 module.exports = {
   initializeModels,
-  getBlock: () => Block,
-  getTransaction: () => Transaction,
-  getAddress: () => Address,
-  getStatistics: () => Statistics,
+  getBlock,
+  getTransaction,
+  getAddress,
+  getStatistics,
   isInitialized: () => initialized
 };

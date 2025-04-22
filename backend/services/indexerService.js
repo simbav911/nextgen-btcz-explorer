@@ -72,10 +72,9 @@ const runIndexingJob = async () => {
         lastIndexedBlock = lastBlock.height;
         logger.info(`Resuming indexing from block ${lastIndexedBlock}`);
       } else {
-        // Start from a reasonable point in the past if no blocks are indexed
-        // For a new explorer, you might want to start much earlier
-        lastIndexedBlock = Math.max(0, currentHeight - 1000);
-        logger.info(`No indexed blocks found. Starting from block ${lastIndexedBlock}`);
+        // If no blocks found, start from block 0 (so the loop starts with block 1)
+        lastIndexedBlock = 0;
+        logger.info(`No indexed blocks found. Starting initial sync from block 1.`);
       }
     }
     
@@ -113,21 +112,27 @@ const runIndexingJob = async () => {
  */
 const indexBlock = async (height) => {
   try {
+    logger.info(`[IndexBlock ${height}] Starting...`);
     // Get block hash
+    logger.debug(`[IndexBlock ${height}] Getting block hash...`);
     const blockHash = await executeRpcCommand('getblockhash', [height], 20000);
     if (!blockHash) {
-      logger.warn(`Failed to get hash for block ${height}`);
+      logger.warn(`[IndexBlock ${height}] Failed to get block hash.`);
       return false;
     }
-    
+    logger.debug(`[IndexBlock ${height}] Got block hash: ${blockHash}`);
+
     // Get block details
+    logger.debug(`[IndexBlock ${height}] Getting block details...`);
     const blockDetails = await executeRpcCommand('getblock', [blockHash, 2], 30000);
     if (!blockDetails) {
-      logger.warn(`Failed to get details for block ${height} (${blockHash})`);
+      logger.warn(`[IndexBlock ${height}] Failed to get details for block hash ${blockHash}`);
       return false;
     }
-    
+    logger.debug(`[IndexBlock ${height}] Got block details.`);
+
     // Save block to database
+    logger.debug(`[IndexBlock ${height}] Saving block to DB...`);
     const db = getSequelize();
     const BlockModel = await getBlock(db);
     
@@ -151,8 +156,10 @@ const indexBlock = async (height) => {
       previousblockhash: blockDetails.previousblockhash,
       nextblockhash: blockDetails.nextblockhash
     });
-    
+    logger.debug(`[IndexBlock ${height}] Block saved.`);
+
     // Index transactions
+    logger.debug(`[IndexBlock ${height}] Processing ${blockDetails.tx?.length || 0} transactions...`);
     const TransactionModel = await getTransaction(db);
     const AddressModel = await getAddress(db);
     
@@ -182,11 +189,14 @@ const indexBlock = async (height) => {
         vout: tx.vout,
         is_coinbase: tx.vin && tx.vin.length > 0 && tx.vin[0].coinbase ? true : false
       };
-      
+
       // Save transaction
+      // logger.debug(`[IndexBlock ${height}] Saving tx ${tx.txid}...`); // Can be too verbose
       await TransactionModel.upsert(txData);
-      
+      // logger.debug(`[IndexBlock ${height}] Tx ${tx.txid} saved.`);
+
       // Extract addresses from outputs
+      // logger.debug(`[IndexBlock ${height}] Processing outputs for tx ${tx.txid}...`);
       if (tx.vout) {
         for (const vout of tx.vout) {
           if (vout.scriptPubKey && vout.scriptPubKey.addresses) {
@@ -209,8 +219,10 @@ const indexBlock = async (height) => {
           }
         }
       }
-      
+      // logger.debug(`[IndexBlock ${height}] Finished outputs for tx ${tx.txid}.`);
+
       // Extract addresses from inputs
+      // logger.debug(`[IndexBlock ${height}] Processing inputs for tx ${tx.txid}...`);
       if (tx.vin) {
         for (const vin of tx.vin) {
           // Skip coinbase transactions
@@ -277,10 +289,15 @@ const indexBlock = async (height) => {
           }
         }
       }
-    }
-    
+      // logger.debug(`[IndexBlock ${height}] Finished inputs for tx ${tx.txid}.`);
+    } // End transaction loop
+    logger.debug(`[IndexBlock ${height}] Finished processing transactions. Updating ${addressesMap.size} addresses...`);
+
     // Update address records
+    let addrUpdateCounter = 0;
     for (const [addr, data] of addressesMap.entries()) {
+      addrUpdateCounter++;
+      // logger.debug(`[IndexBlock ${height}] Updating address ${addr} (${addrUpdateCounter}/${addressesMap.size})...`);
       try {
         // Get existing address record
         let addressRecord = await AddressModel.findOne({
@@ -324,11 +341,13 @@ const indexBlock = async (height) => {
       } catch (addrError) {
         logger.error(`Error updating address ${addr}: ${addrError.message}`);
       }
-    }
-    
+      // logger.debug(`[IndexBlock ${height}] Address ${addr} updated.`);
+    } // End address update loop
+    logger.info(`[IndexBlock ${height}] Finished updating addresses.`);
+
     return true;
   } catch (error) {
-    logger.error(`Error indexing block ${height}: ${error.message}`);
+    logger.error(`[IndexBlock ${height}] Error during indexing: ${error.message}`, error); // Log full error
     return false;
   }
 };

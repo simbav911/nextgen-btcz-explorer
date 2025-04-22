@@ -631,6 +631,29 @@ const calculateAddressSent = async (address) => {
   }
 };
 
+/**
+ * Get the current synchronization status
+ */
+const getSyncStatus = async () => {
+  let currentHeight = 0;
+  try {
+    // Ensure bitcoinzService is available before calling
+    if (bitcoinzService && typeof bitcoinzService.getBlockchainInfo === 'function') {
+      const info = await bitcoinzService.getBlockchainInfo();
+      currentHeight = info?.blocks || 0;
+    } else {
+       logger.warn('bitcoinzService not available for getSyncStatus');
+    }
+  } catch (error) {
+    logger.warn('Could not fetch current blockchain height for sync status:', error.message);
+  }
+  return {
+    lastSyncedBlock,
+    currentHeight,
+    isSyncing,
+  };
+};
+
 module.exports = {
   initialize,
   startSync,
@@ -641,5 +664,6 @@ module.exports = {
   updateNetworkStats,
   updateAddressBalances,
   getLastSyncedBlock: () => lastSyncedBlock,
-  isSyncing: () => isSyncing
+  isSyncing: () => isSyncing,
+  getSyncStatus // Add the new function here
 };

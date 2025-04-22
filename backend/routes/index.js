@@ -10,6 +10,7 @@ const searchRoutes = require('./searchRoutes');
 const chartsRoutes = require('./chartsRoutes');
 const wealthRoutes = require('./wealthRoutes');
 const poolStatsRoutes = require('./poolStatsRoutes');
+const syncRoutes = require('./syncRoutes'); // Import sync routes
 
 // Use route modules
 router.use('/blocks', blockRoutes);
@@ -20,6 +21,7 @@ router.use('/search', searchRoutes);
 router.use('/charts', chartsRoutes);
 router.use('/wealth', wealthRoutes);
 router.use('/pool-stats', poolStatsRoutes);
+router.use('/sync', syncRoutes); // Register sync routes
 
 // Root endpoint - API info
 router.get('/', (req, res) => {
@@ -34,7 +36,8 @@ router.get('/', (req, res) => {
       search: '/api/search',
       charts: '/api/charts',
       wealth: '/api/wealth',
-      poolStats: '/api/pool-stats'
+      poolStats: '/api/pool-stats',
+      sync: '/api/sync' // Add sync endpoint info
     }
   });
 });

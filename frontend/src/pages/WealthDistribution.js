@@ -52,6 +52,7 @@ const WealthDistribution = () => {
   const [totalAddresses, setTotalAddresses] = useState(0);
   const [usingMockData, setUsingMockData] = useState(false);
   const [dataVersion, setDataVersion] = useState(0); // Add a version to prevent data changing on refresh
+  const [syncStatus, setSyncStatus] = useState(null); // State for sync status
   const { showToast } = useContext(ToastContext);
 
   // Enhanced colors with better contrast
@@ -147,7 +148,28 @@ const WealthDistribution = () => {
     
     // Start by trying to fetch real data
     fetchRealData();
+
+    // Fetch sync status
+    const fetchSyncStatus = async () => {
+      try {
+        const response = await fetch(`${API_BASE_URL}/sync/status`);
+        if (response.ok) {
+          const status = await response.json();
+          setSyncStatus(status);
+        } else {
+          console.error('Failed to fetch sync status');
+        }
+      } catch (error) {
+        console.error('Error fetching sync status:', error);
+      }
+    };
+    fetchSyncStatus();
+
   }, [showToast, dataVersion]);
+
+  // Determine if initial sync is likely ongoing
+  const isInitialSync = syncStatus && syncStatus.currentHeight > 0 &&
+    (syncStatus.lastSyncedBlock < 1000 || (syncStatus.currentHeight - syncStatus.lastSyncedBlock > 1000));
 
   // Format number with commas
   const formatNumber = (num) => {
@@ -333,7 +355,27 @@ const WealthDistribution = () => {
             </div>
           </div>
         )}
-        
+
+        {/* Sync Status Message */}
+        {isInitialSync && syncStatus && (
+          <div className="bg-yellow-50 border-l-4 border-yellow-500 p-4 mb-6">
+            <div className="flex">
+              <div className="flex-shrink-0">
+                <FaInfoCircle className="h-5 w-5 text-yellow-500" />
+              </div>
+              <div className="ml-3">
+                <p className="text-sm text-yellow-700 font-semibold">
+                  Database Sync in Progress
+                </p>
+                <p className="text-sm text-yellow-600 mt-1">
+                  The explorer is currently indexing the blockchain (Synced block {formatNumber(syncStatus.lastSyncedBlock)} of {formatNumber(syncStatus.currentHeight)}).
+                  This process takes time during the initial setup. Data accuracy will improve as the sync progresses.
+                </p>
+              </div>
+            </div>
+          </div>
+        )}
+
         {/* Tabs */}
         <div className="flex border-b mb-6">
           <button

@@ -73,16 +73,23 @@ const Calendar = ({ selectedDate, onDateChange, onApply, minDate, maxDate, singl
     
     // Add days of current month
     for (let i = 1; i <= daysInMonth; i++) {
-      const date = new Date(year, month, i);
-      const dateStr = formatDate(date);
-      const isDisabled = date < minDateObj || date > maxDateObj;
+      // Create a date at noon to avoid timezone issues
+      const dateObj = new Date(year, month, i, 12, 0, 0, 0);
+      const dateStr = formatDate(dateObj);
+      
+      const isDisabled = dateObj < minDateObj || dateObj > maxDateObj;
       
       // Check if this day is in the selected range
       const isStartDate = dateStr === startDate;
       const isEndDate = dateStr === endDate;
+      
+      // Use noon-based dates for comparison to avoid timezone issues
+      const startDateObj = startDate ? new Date(new Date(startDate).setHours(12, 0, 0, 0)) : null;
+      const endDateObj = endDate ? new Date(new Date(endDate).setHours(12, 0, 0, 0)) : null;
+      
       const isInRange = startDate && endDate && 
-                        date >= new Date(startDate) && 
-                        date <= new Date(endDate);
+                        dateObj >= startDateObj && 
+                        dateObj <= endDateObj;
       
       days.push({ 
         day: i, 
@@ -126,14 +133,37 @@ const Calendar = ({ selectedDate, onDateChange, onApply, minDate, maxDate, singl
     }
   };
 
-  // Handle day click for range selection
+  // Handle day click for range selection - FIXED to eliminate date lag
   const handleDayClick = (day) => {
     if (day.isCurrentMonth && !day.isDisabled) {
       if (singleDateMode) {
-        // In single date mode, just set the start date and use it as both start and end
-        setStartDate(day.date);
-        setEndDate(day.date); // Same as start date for single date mode
-        onDateChange({ startDate: day.date, endDate: day.date });
+        // CRITICAL FIX: Preserve the exact string date without creating new Date objects
+        // that could shift the date due to timezone issues
+        const exactSelectedDate = day.date; // This is already in YYYY-MM-DD format
+        console.log("🔴 Calendar - EXACT selected date:", exactSelectedDate);
+        
+        // Set both start and end to the exact same date
+        setStartDate(exactSelectedDate);
+        setEndDate(exactSelectedDate);
+        
+        // Create the date selection object with the exact date
+        const exactDateSelection = { 
+          startDate: exactSelectedDate, 
+          endDate: exactSelectedDate,
+          isCustom: true,
+          forcePersist: true,
+          exactDate: true // Flag to indicate this is an exact date selection
+        };
+        
+        // IMMEDIATE notification - no delay to prevent race conditions
+        // Notify parent component immediately to synchronize UI
+        onDateChange(exactDateSelection);
+        
+        // IMMEDIATELY apply the selection
+        onApply(exactDateSelection);
+        
+        // For debugging
+        console.log("🔴 Calendar - Date selection applied:", exactSelectedDate);
       } else {
         // Fixed logic: Always select start date first, then end date
         if (selectingStart || (!startDate && !endDate)) {
@@ -320,10 +350,40 @@ const Calendar = ({ selectedDate, onDateChange, onApply, minDate, maxDate, singl
         </button>
         <button 
           className="calendar-button apply" 
-          onClick={() => onApply({ 
-            startDate, 
-            endDate: singleDateMode ? startDate : endDate 
-          })}
+          onClick={() => {
+            // Log the exact date we're applying to help with debugging
+            console.log("Applying date selection:", {
+              startDate: startDate,
+              endDate: singleDateMode ? startDate : endDate
+            });
+            
+            // Make sure we have a startDate
+            if (!startDate) {
+              // If no date is selected, use today's date at noon to avoid timezone issues
+              const today = formatDate(new Date(new Date().setHours(12, 0, 0, 0)));
+              setStartDate(today);
+              setEndDate(singleDateMode ? today : endDate);
+              onApply({ 
+                startDate: today, 
+                endDate: singleDateMode ? today : endDate 
+              });
+            } else {
+              // Apply the currently selected date(s)
+              // For single-day mode, explicitly use the same date for start and end
+              // to ensure consistency
+              if (singleDateMode) {
+                onApply({ 
+                  startDate: startDate, 
+                  endDate: startDate  // Always use startDate for both in single mode
+                });
+              } else {
+                onApply({ 
+                  startDate, 
+                  endDate: endDate || startDate 
+                });
+              }
+            }
+          }}
           disabled={!singleDateMode && !endDate}
         >
           Apply

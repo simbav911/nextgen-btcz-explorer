@@ -46,17 +46,40 @@ const TimeFilter = ({ date, setDate, applyFilter, showTodayDefault = false, acti
   // Check if this is a single-day chart (Pool Distribution or Mined Block)
   const isSingleDayChart = activeChart === chartTypes.POOL_STAT || activeChart === chartTypes.MINED_BLOCK;
   
-  // Update internal timeRange state when props change
+  // For mined blocks, we need to ensure date consistency
+  useEffect(() => {
+    if (activeChart === chartTypes.MINED_BLOCK) {
+      console.log(`TimeFilter for Mined Blocks - current date: ${date}`);
+      
+      // Only log, don't auto-reset to today unless specifically requested
+      if (timeRange === 'custom') {
+        console.log(`Using custom date for Mined Blocks: ${date}`);
+      }
+    }
+  }, [activeChart, date, timeRange]);
+  
+  // Update internal timeRange state when props change - but with safeguards
+  // to prevent unwanted resets to Today's data
   useEffect(() => {
     // Get the effective time range from URL parameters or parent component state
     const urlParams = new URLSearchParams(window.location.search);
     const urlTimeRange = urlParams.get('timeRange');
     
+    // Maintain a local reference to detect if we're in custom mode
+    const isCustomTimeRange = timeRange === 'custom';
+    
     // Determine what time range to use
     let effectiveTimeRange;
     
+    // IMPORTANT: Don't change date if we're in custom mode and have a custom date selected
+    if (isCustomTimeRange && dateRange.startDate) {
+      // Keep the current custom selection - don't reset to Today
+      return;
+    }
+    
     // Special case: If showing today's data by default (Pool stats or Mined blocks)
-    if (showTodayDefault) {
+    // but ONLY on first load or explicit component mount, not during rerenders
+    if (showTodayDefault && !isCustomTimeRange) {
       effectiveTimeRange = '1d';
     } 
     // If URL specifies a time range, use that
@@ -69,7 +92,7 @@ const TimeFilter = ({ date, setDate, applyFilter, showTodayDefault = false, acti
     }
     
     // Only update if the time range has changed
-    if (timeRange !== effectiveTimeRange) {
+    if (timeRange !== effectiveTimeRange && !isCustomTimeRange) {
       setTimeRange(effectiveTimeRange);
       
       // For single-day charts or 1d view, use today's date
@@ -115,7 +138,7 @@ const TimeFilter = ({ date, setDate, applyFilter, showTodayDefault = false, acti
         });
       }
     }
-  }, [showTodayDefault, activeChart, applyFilter, isSingleDayChart, setDate]); // Run when relevant props change
+  }, [showTodayDefault, activeChart]); // Only run when chart type changes, removed setDate and applyFilter
   
   // Predefined time ranges
   const timeRanges = isSingleDayChart 
@@ -166,11 +189,20 @@ const TimeFilter = ({ date, setDate, applyFilter, showTodayDefault = false, acti
   }, [showDatePicker]); // Re-add the listener whenever showDatePicker changes
 
   const handleTimeRangeChange = (range) => {
+    // If selecting custom and previously had a custom date, preserve it
+    const wasCustom = timeRange === 'custom';
+    const previousCustomDate = wasCustom ? date : null;
+    
     setTimeRange(range);
     
     // Special handling for custom date range
     if (range === 'custom') {
       console.log("Custom date range selected"); // Debug log
+      
+      // If we already had a custom date selected, preserve it
+      if (previousCustomDate) {
+        console.log("Preserving previous custom date:", previousCustomDate);
+      }
       
       // Force showing the date picker with a slight delay 
       // to ensure any click events are processed first
@@ -218,11 +250,13 @@ const TimeFilter = ({ date, setDate, applyFilter, showTodayDefault = false, acti
     const dateRange = isSingleDayChart
       ? {
           startDate: formatDate(startDate),
-          endDate: formatDate(startDate)
+          endDate: formatDate(startDate),
+          isStandardRange: true  // Flag to indicate this isn't a custom user selection
         }
       : {
           startDate: formatDate(startDate),
-          endDate: formatDate(endDate)
+          endDate: formatDate(endDate),
+          isStandardRange: true  // Flag to indicate this isn't a custom user selection
         };
     
     setDateRange(dateRange);
@@ -281,24 +315,25 @@ const TimeFilter = ({ date, setDate, applyFilter, showTodayDefault = false, acti
 
   // Get a human-readable date range description with specific from/to dates
   const getDateRangeDescription = () => {
+    // For Mined Block and Pool Stat charts, always show the exact selected date
+    if (isSingleDayChart) {
+      // Show the actual date that's being used for chart data
+      return formatDisplayDate(date);
+    }
+    
     // If we're in custom mode and have a date range, show that
     if (timeRange === 'custom' && dateRange.startDate) {
       const start = formatDisplayDate(dateRange.startDate);
       const end = dateRange.endDate ? formatDisplayDate(dateRange.endDate) : start;
       
-      if (start === end || isSingleDayChart) {
+      if (start === end) {
         return `${start}`;
       }
       
       return `From ${start} to ${end}`;
     }
     
-    // For single-day charts, just show the date
-    if (isSingleDayChart) {
-      return formatDisplayDate(date);
-    }
-    
-    // Calculate the start date based on the time range
+    // Calculate the date range based on the time range
     const endDate = new Date();
     let startDate = new Date();
     
@@ -322,6 +357,7 @@ const TimeFilter = ({ date, setDate, applyFilter, showTodayDefault = false, acti
         startDate = new Date('2017-09-09'); // BitcoinZ inception date
         break;
       case 'custom':
+        // If we somehow got here without a date range, show the selected date
         return `${formatDisplayDate(date)}`;
       default:
         startDate.setDate(endDate.getDate() - 30); // Default to 30 days
@@ -376,50 +412,95 @@ const TimeFilter = ({ date, setDate, applyFilter, showTodayDefault = false, acti
                 
                 // Always update the internal state when a date is selected
                 if (dateRange.startDate) {
-                  // For single-day charts, use the same date for start and end
-                  const newDateRange = isSingleDayChart
-                    ? {
-                        startDate: dateRange.startDate,
-                        endDate: dateRange.startDate
+                  // For both Pool Stats and Mined Blocks, handle exactly the same way
+                  if (isSingleDayChart) {
+                    // Treat Pool Stats and Mined Blocks identically
+                    // Create a consistent date range object
+                    const newDateRange = {
+                      startDate: dateRange.startDate,
+                      endDate: dateRange.startDate,
+                      isCustom: true,
+                      forcePersist: true
+                    };
+                    
+                    // Store the date range for display
+                    setDateRange(newDateRange);
+                    
+                    console.log(`Updating ${activeChart} chart date:`, dateRange.startDate);
+                    
+                    // Update the displayed date
+                    setDate(dateRange.startDate);
+                    
+                    // Force timeRange to 'custom' to ensure persistence
+                    setTimeRange('custom');
+                    
+                    // Apply immediately
+                    applyFilter(dateRange.startDate, 'custom', newDateRange);
+                    
+                    // Also store in localStorage for both chart types
+                    try {
+                      if (activeChart === chartTypes.POOL_STAT) {
+                        localStorage.setItem('poolStats_selectedDate', dateRange.startDate);
+                      } else if (activeChart === chartTypes.MINED_BLOCK) {
+                        localStorage.setItem('minedBlocks_selectedDate', dateRange.startDate);
                       }
-                    : {
-                        startDate: dateRange.startDate,
-                        endDate: dateRange.endDate
-                      };
-                  
-                  // Store the date range for display
-                  setDateRange(newDateRange);
-                  
-                  // Always update the date with at least the start date
-                  setDate(dateRange.startDate);
+                    } catch (e) {
+                      console.warn("Could not save date to localStorage", e);
+                    }
+                  } else {
+                    // For range charts, just update the displayed date for now
+                    // The actual filter will be applied when user clicks Apply
+                    setDate(dateRange.startDate);
+                    setDateRange({
+                      startDate: dateRange.startDate,
+                      endDate: dateRange.endDate
+                    });
+                  }
                 }
               }}
               onApply={(dateRange) => {
-                console.log("Applying date range:", dateRange); // Debug log
+                console.log("🔵 Applying date range:", dateRange); // Debug log
                 
                 if (dateRange.startDate) {
-                  // Update the date
-                  setDate(dateRange.startDate);
+                  // CRITICAL FIX: Preserve the exact date string without any manipulation
+                  // This prevents the date shifting problem
+                  const exactSelectedDate = dateRange.startDate;
+                  console.log("🔵 TimeFilter - EXACT date to apply:", exactSelectedDate);
                   
-                  // For single-day charts, use the same date for start and end
+                  // For single-day charts, ensure we use the same date for start and end
+                  // but preserve the exact date string
                   const newDateRange = isSingleDayChart
                     ? {
-                        startDate: dateRange.startDate,
-                        endDate: dateRange.startDate
+                        startDate: exactSelectedDate,
+                        endDate: exactSelectedDate,
+                        exactDate: true, // Flag to indicate this is an exact date string
+                        isCustom: true,
+                        forcePersist: true
                       }
                     : {
-                        startDate: dateRange.startDate,
-                        endDate: dateRange.endDate || dateRange.startDate
+                        startDate: exactSelectedDate,
+                        endDate: dateRange.endDate || exactSelectedDate
                       };
                   
-                  // Set the custom date range
-                  applyFilter(dateRange.startDate, 'custom', newDateRange);
+                  console.log("🔵 TimeFilter - Processed date range to apply:", newDateRange);
                   
-                  // Update display range
+                  // CRITICAL: Set the exact date in parent component without any transformation
+                  setDate(exactSelectedDate);
+                  
+                  // Set the time range to custom to prevent auto-resets
+                  setTimeRange('custom');
+                  
+                  // Update display range for local UI
                   setDateRange(newDateRange);
                   
-                  setTimeRange('custom');
+                  // CRITICAL: Apply the filter with the exact date
+                  applyFilter(exactSelectedDate, 'custom', newDateRange);
+                  
+                  // Close the date picker
                   setShowDatePicker(false);
+                  
+                  // For debugging
+                  console.log("🔵 TimeFilter - Final applied date:", exactSelectedDate);
                 }
               }}
               minDate="2017-09-09"

@@ -1,7 +1,7 @@
 import React, { useRef, useEffect } from 'react';
 import PropTypes from 'prop-types';
 import { Pie } from 'react-chartjs-2';
-import { getChartColors, formatNumber, formatDisplayDate, isToday } from './chartUtils';
+import { getChartColors, formatNumber, formatDisplayDate, isToday, formatDate } from './chartUtils';
 import './chartConfig'; // Import chart configuration to ensure all elements are registered
 import './pie3d.css'; // Import enhanced 3D pie chart styles
 
@@ -59,10 +59,40 @@ const PieChartDisplay = ({ chartData }) => {
     };
   };
 
-  // Check if the data is for today
-  const dataDate = chartData.date ? new Date(chartData.date) : new Date();
-  const isTodayData = isToday(dataDate);
-  const dateDisplay = formatDisplayDate(dataDate);
+  // CRITICAL FIX: Use the exact date string without date object conversion
+  // This avoids timezone issues that cause date shifting
+  const exactRequestedDate = chartData.date || formatDate(new Date());
+  console.log("🟢 PieChartDisplay - Exact requested date:", exactRequestedDate);
+  
+  // Parse the date components directly from the string to avoid timezone shifts
+  let dateDisplay;
+  try {
+    // Parse the date string directly
+    const parts = exactRequestedDate.split('-');
+    const year = parts[0];
+    const month = parseInt(parts[1]) - 1; // JS months are 0-based
+    const day = parseInt(parts[2]);
+    
+    // Get month name
+    const monthNames = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 
+                         'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+    
+    // Format as "Apr 10, 2025" without timezone conversion
+    dateDisplay = `${monthNames[month]} ${day}, ${year}`;
+    
+    console.log(`🟢 PieChartDisplay - Formatted date for chart display: ${dateDisplay}`);
+  } catch (e) {
+    console.error("Error formatting date:", e);
+    dateDisplay = exactRequestedDate; // Fallback to raw date if parsing fails
+  }
+  
+  // Is this today's data?
+  const today = new Date();
+  const isTodayData = (
+    today.getFullYear() === parseInt(exactRequestedDate.split('-')[0]) &&
+    today.getMonth() === parseInt(exactRequestedDate.split('-')[1]) - 1 &&
+    today.getDate() === parseInt(exactRequestedDate.split('-')[2])
+  );
 
   return (
     <div className="chart-3d-container pie-chart-container">

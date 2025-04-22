@@ -152,10 +152,53 @@ const HorizontalBarChart = ({ chartData }) => {
     setShowAddressList(!showAddressList);
   };
 
-  // Check if the data is for today
-  const dataDate = chartData.date ? new Date(chartData.date) : new Date();
-  const isTodayData = isToday(dataDate);
-  const dateDisplay = formatDisplayDate(dataDate);
+  // ULTRA DIRECT DATE IMPLEMENTATION - No date transformations at all
+  // Direct access to the raw date string from chart data - no formatDate call
+  const rawDateString = chartData.date; 
+  
+  // Log the raw date string directly from the props
+  console.log(`🔥 RAW DATE STRING FROM PROPS: ${rawDateString}`);
+  
+  // Check localStorage for the most accurate date
+  let storedDate;
+  try {
+    storedDate = localStorage.getItem('minedBlocks_selectedDate');
+    console.log(`🔥 STORED DATE FROM LOCALSTORAGE: ${storedDate}`);
+  } catch (e) {
+    console.error("Error accessing localStorage:", e);
+  }
+  
+  // CRITICAL: Use stored date from localStorage if available
+  // This is our source of truth for the date
+  const exactRequestedDate = storedDate || rawDateString || new Date().toISOString().split('T')[0];
+  console.log(`🔥 FINAL DATE USED FOR DISPLAY: ${exactRequestedDate}`);
+  
+  // Basic direct string formatting without any Date objects
+  let dateDisplay;
+  try {
+    // Parse the date string directly
+    const parts = exactRequestedDate.split('-');
+    const year = parts[0];
+    const month = parseInt(parts[1]) - 1; // JS months are 0-based
+    const day = parseInt(parts[2]);
+    
+    // Get month name
+    const monthNames = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 
+                        'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+    
+    // Format as "Apr 10, 2025" without timezone conversion
+    dateDisplay = `${monthNames[month]} ${day}, ${year}`;
+    
+    console.log(`🔥 FORMATTED FOR DISPLAY: ${dateDisplay}`);
+  } catch (e) {
+    console.error("Error formatting date:", e);
+    dateDisplay = exactRequestedDate; // Fallback to raw date if parsing fails
+  }
+  
+  // Simple string comparison for today check
+  const now = new Date();
+  const todayString = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
+  const isTodayData = exactRequestedDate === todayString;
 
   return (
     <div className="horizontal-bar-chart-container" ref={containerRef}>

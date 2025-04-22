@@ -87,25 +87,108 @@ const Charts = () => {
     setError(null);
     
     try {
+      // CRITICAL FIX: Override any auto-generated date with what's in localStorage
+      let displayDate = date;
+      
+      // For single-day charts, prioritize the localStorage date
+      if (activeChart === chartTypes.POOL_STAT || activeChart === chartTypes.MINED_BLOCK) {
+        const storageKey = activeChart === chartTypes.POOL_STAT ? 
+          'poolStats_selectedDate' : 'minedBlocks_selectedDate';
+        
+        const savedDate = localStorage.getItem(storageKey);
+        if (savedDate) {
+          console.log(`⚠️ OVERRIDING with saved date for ${activeChart}: ${savedDate}`);
+          displayDate = savedDate;
+          
+          // Force UI state to match
+          if (displayDate !== date) {
+            setDate(displayDate);
+          }
+        }
+      }
+      
+      console.log(`⭐ EXACT DATE USED FOR REQUEST: ${displayDate}`);
+      
       // Use the chart service with the correct chart type and parameters
       const days = getDaysFromRange(timeRange);
-      const params = { days, date };
+      const params = { days, date: displayDate };
+      
+      // Debug logging to track date values
+      console.log(`Starting fetch for ${activeChart} with date:`, displayDate);
+      console.log(`Current timeRange: ${timeRange}`);
       
       let response;
       
       // Use specialized endpoints for pool distribution and mined blocks
-      if (activeChart === chartTypes.POOL_STAT) {
-        console.log('Using real pool stat endpoint for date:', date);
-        response = await chartService.getRealPoolStat({ date });
-      } else if (activeChart === chartTypes.MINED_BLOCK) {
-        console.log('Using mined blocks endpoint for date:', date, 'days:', days);
-        response = await chartService.getMinedBlocks({ date, days });
+      if (activeChart === chartTypes.POOL_STAT || activeChart === chartTypes.MINED_BLOCK) {
+        console.log(`🔄 Using ${activeChart} endpoint for date:`, displayDate);
+        
+        // Use the appropriate service based on chart type
+        if (activeChart === chartTypes.POOL_STAT) {
+          response = await chartService.getRealPoolStat({ date: displayDate });
+        } else { // MINED_BLOCK
+          response = await chartService.getMinedBlocks({ 
+            date: displayDate, 
+            days: 1  // Always use single day
+          });
+        }
+        
+        // CRITICAL FIX: For both chart types, force the correct date in the response
+        // This ensures the chart displays exactly what was requested
+        if (response.data) {
+          // Always use the exact date from the UI for display consistency
+          console.log(`🔄 Setting ${activeChart} data date to: ${displayDate}`);
+          response.data.date = displayDate;
+          
+          // Also force chart content to match the display date
+          if (response.data.data && Array.isArray(response.data.data)) {
+            console.log(`🔄 Forcing chart data to show correct date: ${displayDate}`);
+            
+            // For each item in the data array, update any date-related fields
+            response.data.data.forEach(item => {
+              if (item.dateDisplay) {
+                item.dateDisplay = displayDate;
+              }
+              if (item.date) {
+                item.date = displayDate;
+              }
+            });
+          }
+        }
       } else {
-        console.log(`Fetching ${activeChart} data for date: ${date}, days: ${days}`);
+        console.log(`Fetching ${activeChart} data for date: ${displayDate}, days: ${days}`);
         response = await chartService.getChartData(activeChart, params);
       }
       
       console.log(`Received ${activeChart} chart data:`, response.data);
+      
+      // CRITICAL FIX: Before updating state, ensure the data has the correct date
+      if (response.data && activeChart === chartTypes.MINED_BLOCK) {
+        // For Mined Blocks, force the data to have the exact date from localStorage
+        try {
+          const savedDate = localStorage.getItem('minedBlocks_selectedDate');
+          if (savedDate) {
+            console.log(`🛠️ FORCING MINED BLOCKS DATA TO USE DATE: ${savedDate}`);
+            
+            // Override the date in the response data
+            response.data.date = savedDate;
+            
+            // Create a modified copy rather than changing the original
+            const modifiedData = {
+              ...response.data,
+              date: savedDate
+            };
+            
+            // Update chart data with the forced date
+            setChartData(modifiedData);
+            return; // Skip the normal update
+          }
+        } catch (e) {
+          console.error("Error applying forced date:", e);
+        }
+      }
+      
+      // Normal update if no special handling needed
       setChartData(response.data);
     } catch (err) {
       console.error('Error fetching chart data:', err);
@@ -134,13 +217,18 @@ const Charts = () => {
 
   // Initialize with correct time range based on chart type
   useEffect(() => {
+    // Store current custom date information
+    const currentDate = date;
+    const isCustomDate = timeRange === 'custom';
+    
     // When switching to Pool Stat or Mined Block, reset to today's data
-    if (activeChart === chartTypes.POOL_STAT || activeChart === chartTypes.MINED_BLOCK) {
+    // BUT ONLY if not coming from a custom selection
+    if ((activeChart === chartTypes.POOL_STAT || activeChart === chartTypes.MINED_BLOCK) && !isCustomDate) {
       setDate(formatDate(new Date()));
       setTimeRange('1d'); // These charts work best with 1-day data
     } else {
       // For other charts, use 30-day default
-      if (timeRange !== '30d') {
+      if (timeRange !== '30d' && !isCustomDate) {
         setTimeRange('30d');
         
         // Update the date to 30 days ago
@@ -149,39 +237,204 @@ const Charts = () => {
         setDate(formatDate(thirtyDaysAgo));
       }
     }
+    
+    // If this is a date that was explicitly selected by the user,
+    // preserve it and don't reset
+    if (isCustomDate) {
+      console.log("Preserving custom date selection:", currentDate);
+    }
   }, [activeChart]);
 
   // Fetch data when active chart, date, or timeRange changes
   useEffect(() => {
+    // Get saved date if available before fetching data
+    let dateToUse = date;
+    
+    // Before fetching, check if we have a saved date that should be used
+    try {
+      const chartStorageKey = 
+        activeChart === chartTypes.POOL_STAT ? 'poolStats_selectedDate' : 
+        activeChart === chartTypes.MINED_BLOCK ? 'minedBlocks_selectedDate' : null;
+      
+      if (chartStorageKey) {
+        const savedDate = localStorage.getItem(chartStorageKey);
+        if (savedDate) {
+          console.log(`📊 Using saved date for ${activeChart}:`, savedDate);
+          dateToUse = savedDate;
+          
+          // Only update state if it's different to prevent infinite loops
+          if (dateToUse !== date) {
+            setDate(dateToUse);
+            setTimeRange('custom');
+            
+            // Return early - the state update will trigger another call to this effect
+            return;
+          }
+        }
+      }
+    } catch (e) {
+      console.warn("Error checking for saved date:", e);
+    }
+    
+    // Now fetch chart data with the correct date
+    console.log(`📊 Fetching ${activeChart} data with date:`, dateToUse);
     fetchChartData();
     
-    // Call the cleanup function when the chart type is pool stat
-    if (activeChart === chartTypes.POOL_STAT) {
-      // removeUnwantedText(); // Commented out: Potential conflict with chart styles/rendering
+    // Save the current date selection for this chart type
+    try {
+      if (activeChart === chartTypes.POOL_STAT && timeRange === 'custom') {
+        localStorage.setItem('poolStats_selectedDate', date);
+      } 
+      else if (activeChart === chartTypes.MINED_BLOCK && timeRange === 'custom') {
+        localStorage.setItem('minedBlocks_selectedDate', date);
+      }
+    } catch (e) {
+      console.warn("Could not save date selection:", e);
     }
   }, [fetchChartData, activeChart, timeRange, date]);
+
+  // Immediate check on component mount to force correct date from localStorage
+  useEffect(() => {
+    // CRITICAL FIX: This runs once on component mount to override any system date
+    try {
+      // Check which chart we're viewing
+      const chartStorageKey = 
+        activeChart === chartTypes.POOL_STAT ? 'poolStats_selectedDate' : 
+        activeChart === chartTypes.MINED_BLOCK ? 'minedBlocks_selectedDate' : null;
+      
+      // If this is a single-day chart with stored date, restore it
+      if (chartStorageKey) {
+        const savedDate = localStorage.getItem(chartStorageKey);
+        if (savedDate) {
+          console.log(`⚠️ FORCING EXACT DATE for ${activeChart}:`, savedDate);
+          
+          // DIRECT STATE UPDATE - avoid any transformations
+          setDate(savedDate);
+          setTimeRange('custom');
+          
+          // Override any browser timezone manipulations
+          const headerDate = document.getElementById('header-date');
+          if (headerDate) {
+            headerDate.innerText = savedDate;
+          }
+        }
+      }
+      
+      // Also set event listener to save date before page unload/refresh
+      const handleBeforeUnload = () => {
+        try {
+          if (activeChart === chartTypes.POOL_STAT && timeRange === 'custom') {
+            localStorage.setItem('poolStats_selectedDate', date);
+            console.log("🔁 Saved Pool Stats date before page refresh:", date);
+          } 
+          else if (activeChart === chartTypes.MINED_BLOCK && timeRange === 'custom') {
+            localStorage.setItem('minedBlocks_selectedDate', date);
+            console.log("🔁 Saved Mined Blocks date before page refresh:", date);
+          }
+        } catch (e) {
+          console.warn("Could not save date before page unload:", e);
+        }
+      };
+      
+      // Add event listener for page refresh/navigation
+      window.addEventListener('beforeunload', handleBeforeUnload);
+      
+      // Clean up on component unmount
+      return () => {
+        window.removeEventListener('beforeunload', handleBeforeUnload);
+      };
+    } catch (e) {
+      console.warn("Error initializing date persistence:", e);
+    }
+  }, [activeChart, date, timeRange]);
 
   // Handle chart type change
   const handleChartTypeChange = (chartType) => {
     setActiveChart(chartType);
     
-    // When switching to Pool Stat or Mined Block, always reset to today's data
+    // Save current date for both chart types when switching away
+    if ((activeChart === chartTypes.POOL_STAT || activeChart === chartTypes.MINED_BLOCK) && timeRange === 'custom') {
+      try {
+        if (activeChart === chartTypes.POOL_STAT) {
+          localStorage.setItem('poolStats_selectedDate', date);
+          console.log("Saved Pool Stats date before chart change:", date);
+        } else {
+          localStorage.setItem('minedBlocks_selectedDate', date);
+          console.log("Saved Mined Blocks date before chart change:", date);
+        }
+      } catch (e) {
+        console.warn("Could not save date to localStorage", e);
+      }
+    }
+    
+    // Handle switching TO either single-day chart type - use identical logic for both
     if (chartType === chartTypes.POOL_STAT || chartType === chartTypes.MINED_BLOCK) {
+      try {
+        // Check for previously selected date
+        const storageKey = chartType === chartTypes.POOL_STAT 
+          ? 'poolStats_selectedDate' 
+          : 'minedBlocks_selectedDate';
+          
+        const savedDate = localStorage.getItem(storageKey);
+        
+        if (savedDate) {
+          console.log(`Restoring saved date for ${chartType}:`, savedDate);
+          setDate(savedDate);
+          setTimeRange('custom');
+          return; // Don't reset to today if we have a saved date
+        }
+      } catch (e) {
+        console.warn("Error reading from localStorage:", e);
+      }
+      
+      // Only reset to today if we don't have a saved date
       setDate(formatDate(new Date()));
-      setTimeRange('1d'); // Default to today for these charts
+      setTimeRange('1d');
     }
   };
 
   // Handle time filter change
   const handleTimeFilterChange = (newDate, newRange, dateRange) => {
+    console.log(`Time filter changed: date=${newDate}, range=${newRange}`, dateRange);
+    
+    // Make sure we have valid date and range values
+    if (!newDate) {
+      console.warn("handleTimeFilterChange called with empty date");
+      return;
+    }
+    
+    // Always use 'custom' range for user-selected dates from calendar
+    // This prevents the date from being reset to 'Today'
+    const effectiveRange = dateRange && dateRange.isCustom ? 'custom' : newRange;
+    
+    // Update the date in parent component state
     setDate(newDate);
-    setTimeRange(newRange);
+    
+    // Update the timeRange in parent component state - using 'custom' for calendar selections
+    setTimeRange(effectiveRange);
+    
+    // Store the custom selection info to prevent unwanted resets
+    if (dateRange && dateRange.isCustom) {
+      console.log(`Custom date explicitly selected by user: ${newDate}`);
+      // We could store this in localStorage if needed for persistence across reloads
+    }
     
     // If we have a date range, we can use it for additional filtering or display
-    if (dateRange && dateRange.startDate && dateRange.endDate) {
-      console.log(`Date range selected: ${dateRange.startDate} to ${dateRange.endDate}`);
-      // Here you could add additional logic for handling the date range
+    if (dateRange && dateRange.startDate) {
+      console.log(`Date range selected: ${dateRange.startDate} to ${dateRange.endDate || dateRange.startDate}`);
+      
+      // Special handling for single-day charts (Pool Stat, Mined Block)
+      if (activeChart === chartTypes.POOL_STAT || activeChart === chartTypes.MINED_BLOCK) {
+        // For these charts, we always use the startDate only
+        console.log(`Setting single-day chart to date: ${dateRange.startDate}`);
+      }
     }
+    
+    // Force a refresh of the chart data with a sufficient delay
+    // to ensure all state updates have completed
+    setTimeout(() => {
+      fetchChartData();
+    }, 100);
   };
 
   return (

@@ -37,9 +37,91 @@ export const getYAxisTitle = (activeChart) => {
   }
 };
 
-// Format date to YYYY-MM-DD
+// Format date to YYYY-MM-DD with timezone handling
 export const formatDate = (date) => {
-  return date.toISOString().split('T')[0];
+  // CRITICAL FIX: Ensure consistent date format without timezone issues
+  
+  try {
+    // If date is already in YYYY-MM-DD format, return it directly
+    if (typeof date === 'string' && date.match(/^\d{4}-\d{2}-\d{2}$/)) {
+      console.log("📅 Date already in correct format:", date);
+      return date;
+    }
+    
+    // Create a new date at noon to avoid timezone boundary issues
+    const localDate = new Date(date);
+    localDate.setHours(12, 0, 0, 0);
+    
+    // Get YYYY-MM-DD format in local timezone
+    const year = localDate.getFullYear();
+    const month = String(localDate.getMonth() + 1).padStart(2, '0');
+    const day = String(localDate.getDate()).padStart(2, '0');
+    
+    const formattedDate = `${year}-${month}-${day}`;
+    console.log(`📅 Formatted date: ${formattedDate} (from: ${date})`);
+    return formattedDate;
+  } catch (e) {
+    console.error("Error formatting date:", e);
+    
+    // Fallback to current date if there's an error
+    const today = new Date();
+    return `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`;
+  }
+};
+
+// Special function to get exact date format for API requests
+// without any timezone transformations
+export const getExactDateString = (dateStr) => {
+  // If already in YYYY-MM-DD format, return directly
+  if (typeof dateStr === 'string' && dateStr.match(/^\d{4}-\d{2}-\d{2}$/)) {
+    return dateStr;
+  }
+  
+  // Otherwise, format appropriately
+  return formatDate(dateStr);
+};
+
+// CRITICAL: Special function for getting the correct date for Mined Blocks
+export const getMinedBlocksDate = () => {
+  try {
+    // Try to get the date from localStorage first
+    const storedDate = localStorage.getItem('minedBlocks_selectedDate');
+    if (storedDate && storedDate.match(/^\d{4}-\d{2}-\d{2}$/)) {
+      console.log("📅 Using stored Mined Blocks date:", storedDate);
+      return storedDate;
+    }
+    
+    // If not available, return today's date in YYYY-MM-DD format
+    const today = new Date();
+    const formattedDate = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`;
+    return formattedDate;
+  } catch (e) {
+    console.error("Error getting Mined Blocks date:", e);
+    // Fallback to today's date
+    const today = new Date();
+    return `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`;
+  }
+};
+
+// Special function to set & save Mined Blocks date
+export const setMinedBlocksDate = (date) => {
+  try {
+    // Normalize date format
+    let formattedDate = date;
+    if (!(typeof date === 'string' && date.match(/^\d{4}-\d{2}-\d{2}$/))) {
+      // Convert to YYYY-MM-DD format
+      const dateObj = new Date(date);
+      formattedDate = `${dateObj.getFullYear()}-${String(dateObj.getMonth() + 1).padStart(2, '0')}-${String(dateObj.getDate()).padStart(2, '0')}`;
+    }
+    
+    // Save to localStorage
+    localStorage.setItem('minedBlocks_selectedDate', formattedDate);
+    console.log("📅 Saved Mined Blocks date:", formattedDate);
+    return formattedDate;
+  } catch (e) {
+    console.error("Error saving Mined Blocks date:", e);
+    return date;
+  }
 };
 
 // Get days from time range

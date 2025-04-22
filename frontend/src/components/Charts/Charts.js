@@ -84,7 +84,7 @@ const Charts = () => {
   // Fetch chart data based on active chart type and date
   const fetchChartData = useCallback(async () => {
     setLoading(true);
-    setError(null);``
+    setError(null);
     
     try {
       // Use the chart service with the correct chart type and parameters
@@ -101,9 +101,11 @@ const Charts = () => {
         console.log('Using mined blocks endpoint for date:', date, 'days:', days);
         response = await chartService.getMinedBlocks({ date, days });
       } else {
+        console.log(`Fetching ${activeChart} data for date: ${date}, days: ${days}`);
         response = await chartService.getChartData(activeChart, params);
       }
       
+      console.log(`Received ${activeChart} chart data:`, response.data);
       setChartData(response.data);
     } catch (err) {
       console.error('Error fetching chart data:', err);

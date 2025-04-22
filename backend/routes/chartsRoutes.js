@@ -280,16 +280,20 @@ router.get('/block-size', (req, res) => {
       data: []
     };
     
-    // Generate data points
+    // Generate data points with the correct property names expected by the frontend
     for (let i = 0; i < days; i++) {
       const date = new Date();
       date.setDate(date.getDate() - i);
       
       data.data.push({
-        date: date.toISOString().split('T')[0],
-        size: Math.floor(Math.random() * 1000) + 500
+        blockHeight: 1545720 - (i * 10), // Start from a reasonable block height
+        blockSize: Math.floor(Math.random() * 1000) + 500, // Random block size in bytes
+        timestamp: date.toISOString() // Include timestamp for tooltip display
       });
     }
+    
+    // Sort data by blockHeight (ascending)
+    data.data.sort((a, b) => a.blockHeight - b.blockHeight);
     
     return res.json(data);
   } catch (error) {

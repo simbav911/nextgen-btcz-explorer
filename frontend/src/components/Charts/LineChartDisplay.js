@@ -36,6 +36,9 @@ const LineChartDisplay = ({ chartData, activeChart }) => {
       </div>
     );
   }
+  
+  // Log the chart data to help with debugging
+  console.log(`Rendering ${activeChart} chart with ${chartData.data.length} data points:`, chartData);
 
   const prepareChartData = () => {
     const ctx = chartRef.current?.canvas?.getContext('2d');

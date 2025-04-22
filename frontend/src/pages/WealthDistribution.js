@@ -151,11 +151,19 @@ const WealthDistribution = () => {
 
   // Format number with commas
   const formatNumber = (num) => {
+    // Handle null or undefined inputs gracefully
+    if (num === null || num === undefined) {
+      return '0';
+    }
     return num.toLocaleString(undefined, { maximumFractionDigits: 8 });
   };
 
   // Format percentage
   const formatPercentage = (percent) => {
+    // Handle null or undefined inputs gracefully
+    if (percent === null || percent === undefined || typeof percent !== 'number') {
+      return '0.0000%';
+    }
     return percent.toFixed(4) + '%';
   };
 

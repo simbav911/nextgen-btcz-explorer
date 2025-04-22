@@ -15,7 +15,7 @@ const Charts = () => {
   const [chartData, setChartData] = useState(null);
   const [loading, setLoading] = useState(true);
   const [date, setDate] = useState(formatDate(new Date())); // Today's date by default
-  const [timeRange, setTimeRange] = useState('1d'); // Default to 1 day (today) instead of 30d
+  const [timeRange, setTimeRange] = useState('30d'); // Default to 30 days for regular charts
   const [error, setError] = useState(null);
 
   // Generate mock data for when API fails (keeping this for non-pool charts only)
@@ -132,7 +132,26 @@ const Charts = () => {
     }
   }, [activeChart, date, timeRange]);
 
-  // Fetch data when active chart or date changes
+  // Initialize with correct time range based on chart type
+  useEffect(() => {
+    // When switching to Pool Stat or Mined Block, reset to today's data
+    if (activeChart === chartTypes.POOL_STAT || activeChart === chartTypes.MINED_BLOCK) {
+      setDate(formatDate(new Date()));
+      setTimeRange('1d'); // These charts work best with 1-day data
+    } else {
+      // For other charts, use 30-day default
+      if (timeRange !== '30d') {
+        setTimeRange('30d');
+        
+        // Update the date to 30 days ago
+        const thirtyDaysAgo = new Date();
+        thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
+        setDate(formatDate(thirtyDaysAgo));
+      }
+    }
+  }, [activeChart]);
+
+  // Fetch data when active chart, date, or timeRange changes
   useEffect(() => {
     fetchChartData();
     
@@ -140,7 +159,7 @@ const Charts = () => {
     if (activeChart === chartTypes.POOL_STAT) {
       // removeUnwantedText(); // Commented out: Potential conflict with chart styles/rendering
     }
-  }, [fetchChartData, activeChart]);
+  }, [fetchChartData, activeChart, timeRange, date]);
 
   // Handle chart type change
   const handleChartTypeChange = (chartType) => {

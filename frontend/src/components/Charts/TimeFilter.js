@@ -46,21 +46,76 @@ const TimeFilter = ({ date, setDate, applyFilter, showTodayDefault = false, acti
   // Check if this is a single-day chart (Pool Distribution or Mined Block)
   const isSingleDayChart = activeChart === chartTypes.POOL_STAT || activeChart === chartTypes.MINED_BLOCK;
   
-  // Update timeRange when showTodayDefault changes, but only on initial mount or when activeChart changes
+  // Update internal timeRange state when props change
   useEffect(() => {
-    if (showTodayDefault && timeRange !== 'custom') {
-      setTimeRange('1d');
-      // Only set today's date if we're not in custom mode
-      if (timeRange !== 'custom') {
+    // Get the effective time range from URL parameters or parent component state
+    const urlParams = new URLSearchParams(window.location.search);
+    const urlTimeRange = urlParams.get('timeRange');
+    
+    // Determine what time range to use
+    let effectiveTimeRange;
+    
+    // Special case: If showing today's data by default (Pool stats or Mined blocks)
+    if (showTodayDefault) {
+      effectiveTimeRange = '1d';
+    } 
+    // If URL specifies a time range, use that
+    else if (urlTimeRange && ['1d', '7d', '30d', '90d', '1y', 'all', 'custom'].includes(urlTimeRange)) {
+      effectiveTimeRange = urlTimeRange;
+    } 
+    // Default to 30d for regular charts
+    else {
+      effectiveTimeRange = '30d';
+    }
+    
+    // Only update if the time range has changed
+    if (timeRange !== effectiveTimeRange) {
+      setTimeRange(effectiveTimeRange);
+      
+      // For single-day charts or 1d view, use today's date
+      if (effectiveTimeRange === '1d' || isSingleDayChart) {
         const today = formatDate(new Date());
         setDate(today);
-        applyFilter(today, '1d', {
+        applyFilter(today, effectiveTimeRange, {
           startDate: today,
           endDate: today
         });
+      } 
+      // For other time ranges, calculate appropriate start date
+      else {
+        const endDate = new Date();
+        let startDate = new Date();
+        
+        switch(effectiveTimeRange) {
+          case '7d':
+            startDate.setDate(endDate.getDate() - 7);
+            break;
+          case '30d':
+            startDate.setDate(endDate.getDate() - 30);
+            break;
+          case '90d':
+            startDate.setDate(endDate.getDate() - 90);
+            break;
+          case '1y':
+            startDate.setFullYear(endDate.getFullYear() - 1);
+            break;
+          case 'all':
+            startDate = new Date('2017-09-09'); // BitcoinZ inception date
+            break;
+          default:
+            startDate.setDate(endDate.getDate() - 30);
+        }
+        
+        const formattedStartDate = formatDate(startDate);
+        setDate(formattedStartDate);
+        
+        applyFilter(formattedStartDate, effectiveTimeRange, {
+          startDate: formattedStartDate,
+          endDate: formatDate(endDate)
+        });
       }
     }
-  }, [showTodayDefault, activeChart]); // Only run when showTodayDefault or activeChart changes
+  }, [showTodayDefault, activeChart, applyFilter, isSingleDayChart, setDate]); // Run when relevant props change
   
   // Predefined time ranges
   const timeRanges = isSingleDayChart 

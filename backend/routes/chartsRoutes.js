@@ -280,20 +280,49 @@ router.get('/block-size', (req, res) => {
       data: []
     };
     
-    // Generate data points with the correct property names expected by the frontend
-    for (let i = 0; i < days; i++) {
-      const date = new Date();
-      date.setDate(date.getDate() - i);
-      
+    // For single day requests, generate more detailed hourly data
+    if (days === 1) {
+      // Generate hourly data points for a single day (24 hours)
+      for (let hour = 0; hour < 24; hour++) {
+        const date = new Date();
+        date.setHours(hour);
+        
+        // Use smaller increments for more detailed view
+        data.data.push({
+          blockHeight: 1545720 - (23 - hour), // Decreasing block height throughout the day
+          blockSize: Math.floor(Math.random() * 1000) + 500, // Random block size in bytes
+          timestamp: date.toISOString() // Include timestamp for tooltip display
+        });
+      }
+    } else {
+      // Generate daily data points for multiple days
+      for (let i = 0; i < days; i++) {
+        const date = new Date();
+        date.setDate(date.getDate() - i);
+        
+        data.data.push({
+          blockHeight: 1545720 - (i * 10), // Start from a reasonable block height
+          blockSize: Math.floor(Math.random() * 1000) + 500, // Random block size in bytes
+          timestamp: date.toISOString() // Include timestamp for tooltip display
+        });
+      }
+    }
+    
+    // Ensure we always have at least one data point
+    if (data.data.length === 0) {
+      const now = new Date();
       data.data.push({
-        blockHeight: 1545720 - (i * 10), // Start from a reasonable block height
-        blockSize: Math.floor(Math.random() * 1000) + 500, // Random block size in bytes
-        timestamp: date.toISOString() // Include timestamp for tooltip display
+        blockHeight: 1545720,
+        blockSize: Math.floor(Math.random() * 1000) + 500,
+        timestamp: now.toISOString()
       });
     }
     
     // Sort data by blockHeight (ascending)
     data.data.sort((a, b) => a.blockHeight - b.blockHeight);
+    
+    // Log the data being sent for debugging
+    logger.debug(`Sending block-size data for ${days} days: ${data.data.length} data points`);
     
     return res.json(data);
   } catch (error) {

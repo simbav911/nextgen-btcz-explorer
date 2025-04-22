@@ -21,6 +21,10 @@ const TIME_RANGES = {
   DAY: '24h'
 };
 
+// Transaction threshold for displaying the balance history chart
+const TX_THRESHOLD = 10000;
+
+
 // Services
 import { addressService } from '../services/api';
 import apiInstance from '../services/api';
@@ -721,31 +725,34 @@ const Address = () => {
         padding: 12,
         cornerRadius: 8,
         callbacks: {
-          label: function(context) {
-            return `Balance: ${formatBTCZ(context.raw)}`;
-          },
           title: function(tooltipItems) {
-            // Format the date in tooltip based on time range
-            const item = tooltipItems[0];
-            const dataPoint = filteredHistory[item.dataIndex];
-            if (!dataPoint) return '';
-            
-            // Use timestamp if available, otherwise parse date string
-            const date = dataPoint.timestamp ? 
-              moment.unix(dataPoint.timestamp) : 
-              moment(dataPoint.date);
-            
-            switch (timeRange) {
-              case TIME_RANGES.DAY:
-                return date.format('MMM D, h:mm a');
-              case TIME_RANGES.WEEK:
-                return date.format('ddd, MMM D');
-              case TIME_RANGES.MONTH:
-                return date.format('MMM D, YYYY');
-              case TIME_RANGES.ALL:
-              default:
-                return date.format('MMM D, YYYY');
+            if (tooltipItems.length > 0) {
+              const itemIndex = tooltipItems[0].dataIndex;
+              const historyData = getFilteredBalanceHistory(); // Use the function to get current data
+              if (itemIndex < historyData.length) {
+                const item = historyData[itemIndex];
+                // Use the timestamp for precise date/time in tooltip title
+                return moment.unix(item.timestamp).format('YYYY-MM-DD HH:mm:ss');
+              }
             }
+            return 'Date'; // Fallback title
+          },
+          label: function(context) {
+            let label = 'Balance'; // Default label
+            if (context.parsed.y !== null) {
+              label += `: ${context.parsed.y.toLocaleString()} BTCZ`;
+            }
+            
+            const itemIndex = context.dataIndex;
+            const historyData = getFilteredBalanceHistory(); // Use the function to get current data
+            if (itemIndex < historyData.length) {
+              const item = historyData[itemIndex];
+              // Add aggregation info if available (e.g., "Daily", "Weekly", "Monthly")
+              // The label from getFilteredBalanceHistory already provides context,
+              // so just showing the balance is sufficient for this simple fix.
+            }
+            
+            return label;
           }
         }
       }
@@ -758,7 +765,15 @@ const Address = () => {
         ticks: {
           maxRotation: 0,
           autoSkip: true,
-          maxTicksLimit: tickSettings.maxTicksLimit
+          maxTicksLimit: 10, // Allow more ticks for better date representation
+          callback: function(val, index) {
+            const item = filteredHistory[val]; // Use filteredHistory as the source
+            if (item && item.label) {
+              return item.label; // Use the pre-formatted label from the data
+            }
+            // Fallback to default if no label is available
+            return this.getLabelForValue(val);
+          }
         }
       },
       y: {
@@ -913,24 +928,30 @@ const Address = () => {
         </div>
         
         <div className="h-72">
-          {filteredHistory.length > 0 ? (
+          {addressInfo && addressInfo.txCount > TX_THRESHOLD ? (
+            <div className="flex items-center justify-center h-full bg-gray-50 rounded-lg">
+              <div className="text-center">
+                <p className="text-gray-500">Balance history chart is not available for addresses with over {TX_THRESHOLD.toLocaleString()} transactions.</p>
+              </div>
+            </div>
+          ) : filteredHistory.length > 0 ? (
             <Line data={chartData} options={chartOptions} />
           ) : (
             <div className="flex items-center justify-center h-full bg-gray-50 rounded-lg">
               <div className="text-center">
                 <FaHistory className="mx-auto text-gray-300 mb-3" size={30} />
                 <p className="text-gray-500">
-                  {timeRange === TIME_RANGES.DAY ? 
-                    'No transactions in the last 24 hours' : 
-                    timeRange === TIME_RANGES.WEEK ? 
-                      'No transactions in the last 7 days' : 
-                      timeRange === TIME_RANGES.MONTH ? 
-                        'No transactions in the last 30 days' : 
+                  {timeRange === TIME_RANGES.DAY ?
+                    'No transactions in the last 24 hours' :
+                    timeRange === TIME_RANGES.WEEK ?
+                      'No transactions in the last 7 days' :
+                      timeRange === TIME_RANGES.MONTH ?
+                        'No transactions in the last 30 days' :
                         'No transaction history available'
                   }
                 </p>
                 {timeRange !== TIME_RANGES.ALL && (
-                  <button 
+                  <button
                     onClick={() => setTimeRange(TIME_RANGES.ALL)}
                     className="mt-3 px-4 py-2 bg-blue-500 text-white rounded-md text-sm hover:bg-blue-600 transition-colors"
                   >

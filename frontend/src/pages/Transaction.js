@@ -552,13 +552,13 @@ const Transaction = () => {
                       <div>
                         <div className="flex flex-wrap justify-between">
                           <div className="w-full md:w-1/2 break-words">
-                            <p className="font-medium">
+                            <div className="font-medium"> {/* Changed p to div */}
                               {input.address ? (
                                 <HashLink hash={input.address} type="address" length={24} />
                               ) : (
                                 <span className="italic text-gray-500">Nonstandard Input (No Address or Shielded)</span>
                               )}
-                            </p>
+                            </div>
                             {input.value && (
                               <p className="text-sm text-gray-500 mt-1">
                                 {formatBTCZ(input.value)}
@@ -620,13 +620,13 @@ const Transaction = () => {
                           <span className="bg-gray-200 text-gray-700 text-xs px-2 py-1 rounded mr-2">
                             #{output.n}
                           </span>
-                          <p className="font-medium">
+                          <div className="font-medium"> {/* Changed p to div */}
                             {output.scriptPubKey && output.scriptPubKey.addresses && output.scriptPubKey.addresses.length > 0 ? (
                               <HashLink hash={output.scriptPubKey.addresses[0]} type="address" length={24} />
                             ) : (
                               <span className="text-gray-500">{output.scriptPubKey.type || 'Unknown'}</span>
                             )}
-                          </p>
+                          </div>
                         </div>
                         {output.value && (
                           <p className="text-sm text-gray-500 mt-1">

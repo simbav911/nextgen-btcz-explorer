@@ -164,8 +164,11 @@ const BlockList = () => {
           };
           
           setBlocks(prevBlocks => {
+            // Check if block already exists
+            if (prevBlocks.some(b => b.hash === blockWithPool.hash)) {
+              return prevBlocks; // Skip if block already exists
+            }
             // Add block to beginning and remove last block to keep page size consistent
-            // (Reverted to original logic as the API now fetches latest blocks directly)
             const newBlocks = [blockWithPool, ...prevBlocks.slice(0, BLOCKS_PER_PAGE - 1)];
             return newBlocks;
           });
@@ -173,9 +176,14 @@ const BlockList = () => {
           console.error('Error fetching mining pool info:', error);
           // Still add the block even if we couldn't get pool info
           setBlocks(prevBlocks => {
+            // Check if block already exists
+            const blockWithUnknownPool = { ...block, miningPoolName: 'Unknown Pool' };
+            if (prevBlocks.some(b => b.hash === block.hash)) {
+              return prevBlocks; // Skip if block already exists
+            }
             const newBlocks = [
-              { ...block, miningPoolName: 'Unknown Pool' }, 
-              ...prevBlocks.slice(0, -1)
+              blockWithUnknownPool,
+              ...prevBlocks.slice(0, BLOCKS_PER_PAGE - 1)
             ];
             return newBlocks;
           });

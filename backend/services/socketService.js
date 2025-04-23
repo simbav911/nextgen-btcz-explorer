@@ -1,8 +1,9 @@
 const logger = require('../utils/logger');
 const { getBestBlockHash, getBlock, getLatestTransactions } = require('./bitcoinzService');
 
-// Store active socket connections
+// Store active socket connections and last emitted block hash
 let io = null;
+let lastEmittedBlockHash = null;
 
 // Time intervals for different updates (in milliseconds)
 const UPDATE_INTERVALS = {
@@ -138,12 +139,20 @@ const startUpdateIntervals = () => {
       getBestBlockHash()
         .then(blockHash => getBlock(blockHash, 1))
         .then(block => {
-          io.to('blocks').emit('new_block', block);
+          // Only emit if this is a new block
+          if (block.hash !== lastEmittedBlockHash) {
+            lastEmittedBlockHash = block.hash;
+            io.to('blocks').emit('new_block', block);
+          }
         })
         .catch(error => {
           // If there's an error, use mock data
           logger.error('Error updating latest block:', error);
-          io.to('blocks').emit('new_block', generateMockBlock());
+          const mockBlock = generateMockBlock();
+          if (mockBlock.hash !== lastEmittedBlockHash) {
+            lastEmittedBlockHash = mockBlock.hash;
+            io.to('blocks').emit('new_block', mockBlock);
+          }
         });
     } catch (error) {
       logger.error('Error in block update interval:', error.message);

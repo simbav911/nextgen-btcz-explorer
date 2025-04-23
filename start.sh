@@ -84,11 +84,21 @@ else
 fi
 
 # Create logs directory
-echo -e "${BLUE}[4/7]${NC} Creating logs directory..."
+echo -e "${BLUE}[4/8]${NC} Creating logs directory..."
 mkdir -p ./backend/logs
 
+# Setup database
+echo -e "${BLUE}[5/8]${NC} Setting up database..."
+cd backend
+node setup-db.js
+if [ $? -ne 0 ]; then
+  echo -e "${RED}Failed to set up database. Exiting.${NC}"
+  exit 1
+fi
+cd ..
+
 # Install backend dependencies
-echo -e "${BLUE}[5/7]${NC} Installing backend dependencies..."
+echo -e "${BLUE}[6/8]${NC} Installing backend dependencies..."
 cd backend
 npm install
 if [ $? -ne 0 ]; then
@@ -97,7 +107,7 @@ if [ $? -ne 0 ]; then
 fi
 
 # Start the backend in the background
-echo -e "${BLUE}[6/7]${NC} Starting backend service..."
+echo -e "${BLUE}[7/8]${NC} Starting backend service..."
 npm run dev &
 BACKEND_PID=$!
 
@@ -128,7 +138,7 @@ done
 
 # Change to frontend directory and install dependencies
 cd ../frontend
-echo -e "${BLUE}[7/7]${NC} Installing frontend dependencies..."
+echo -e "${BLUE}[8/8]${NC} Installing frontend dependencies..."
 npm install --legacy-peer-deps
 if [ $? -ne 0 ]; then
   echo -e "${RED}Failed to install frontend dependencies. Exiting.${NC}"

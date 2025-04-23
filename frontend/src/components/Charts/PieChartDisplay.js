@@ -39,16 +39,48 @@ const PieChartDisplay = ({ chartData }) => {
   }
 
   const prepareChartData = () => {
+    // Fix to properly filter and aggregate pool data
     // Ensure data is valid and in correct format
     const validData = chartData.data.filter(pool => 
-      pool && typeof pool.percentage === 'number' && !isNaN(pool.percentage)
+      pool && 
+      typeof pool.percentage === 'number' && 
+      !isNaN(pool.percentage) &&
+      pool.name // Ensure the pool has a name
     );
     
+    // Group data by pool name and aggregate percentages
+    const aggregatedData = validData.reduce((acc, pool) => {
+      const existingPool = acc.find(p => p.name === pool.name);
+      if (existingPool) {
+        existingPool.percentage += pool.percentage;
+        existingPool.count += pool.count || 0;
+      } else {
+        acc.push({
+          name: pool.name,
+          percentage: pool.percentage,
+          count: pool.count || 0
+        });
+      }
+      return acc;
+    }, []);
+    
+    // Sort by percentage in descending order
+    aggregatedData.sort((a, b) => b.percentage - a.percentage);
+    
+    // Make sure percentages add up to 100%
+    const totalPercentage = aggregatedData.reduce((sum, pool) => sum + pool.percentage, 0);
+    if (totalPercentage > 0 && Math.abs(totalPercentage - 100) > 0.01) {
+      // Normalize to 100%
+      aggregatedData.forEach(pool => {
+        pool.percentage = (pool.percentage / totalPercentage) * 100;
+      });
+    }
+    
     return {
-      labels: validData.map(pool => pool.name || 'Unknown'),
+      labels: aggregatedData.map(pool => pool.name || 'Unknown'),
       datasets: [{
-        data: validData.map(pool => pool.percentage),
-        backgroundColor: poolColors.slice(0, validData.length),
+        data: aggregatedData.map(pool => Number(pool.percentage.toFixed(2))),
+        backgroundColor: poolColors.slice(0, aggregatedData.length),
         borderColor: 'rgba(255, 255, 255, 0.9)',
         borderWidth: 2,
         hoverOffset: 10,

@@ -206,9 +206,64 @@ const Charts = () => {
         // Show error message with fallback notice for non-pool charts
         setError(`Failed to load chart data from server (${err.message}). Showing sample data for demonstration purposes.`);
       } else {
-        // For pool stats, don't use mock data and show a different error message
-        setChartData(null);
-        setError(`Failed to load mining pool data from the blockchain (${err.message}). Please try again later.`);
+        // For pool stats, attempt to use alternative endpoint as fallback
+        try {
+          console.log("🔄 Primary endpoint failed, trying alternative pool data source");
+          
+          // For Pool Stat, try the mined blocks endpoint as a fallback
+          if (activeChart === chartTypes.POOL_STAT) {
+            const fallbackResponse = await chartService.getMinedBlocks({ 
+              date: displayDate, 
+              days: 1
+            });
+            
+            if (fallbackResponse.data && fallbackResponse.data.data) {
+              // Convert mined blocks data to pool stat format
+              const poolStats = [];
+              const poolMap = {};
+              
+              // Group by pool name
+              fallbackResponse.data.data.forEach(block => {
+                const poolName = block.pool || 'Unknown';
+                if (!poolMap[poolName]) {
+                  poolMap[poolName] = {
+                    name: poolName,
+                    count: 0,
+                    percentage: 0
+                  };
+                }
+                poolMap[poolName].count += 1;
+              });
+              
+              // Calculate percentages
+              const totalBlocks = fallbackResponse.data.data.length;
+              Object.values(poolMap).forEach(pool => {
+                pool.percentage = (pool.count / totalBlocks) * 100;
+                poolStats.push(pool);
+              });
+              
+              // Create a valid pool stat response
+              const poolStatData = {
+                ...fallbackResponse.data,
+                chartType: 'pool-stat',
+                date: displayDate,
+                data: poolStats
+              };
+              
+              console.log("🔄 Successfully created pool stats from mined blocks:", poolStatData);
+              setChartData(poolStatData);
+              return; // Success - don't show error
+            }
+          }
+          
+          // If we got here, the fallback also failed
+          throw new Error("Fallback data source also failed");
+        } catch (fallbackErr) {
+          console.error("Fallback data source failed:", fallbackErr);
+          // For pool stats, don't use mock data and show a different error message
+          setChartData(null);
+          setError(`Failed to load mining pool data from the blockchain. Please try again later.`);
+        }
       }
     } finally {
       setLoading(false);

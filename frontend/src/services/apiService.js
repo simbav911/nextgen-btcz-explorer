@@ -21,10 +21,10 @@ export const chartService = {
   getPoolStat: (params) => api.get('/charts/pool-stat', { params }),
   
   // New method to get real historical pool distribution data
-  getRealPoolStat: ({ date }) => api.get(`/pool-stats/real-pool-stat?date=${date}`),
+  getRealPoolStat: ({ date }) => api.get(`/pool-stats/real-pool-stat?date=${date}&_=${new Date().getTime()}`), // Added cache buster
   
   // Get mined blocks data
-  getMinedBlocks: ({ date, days = 1 }) => api.get(`/pool-stats/mined-blocks?date=${date}&days=${days}`),
+  getMinedBlocks: ({ date, days = 1 }) => api.get(`/pool-stats/mined-blocks?date=${date}&days=${days}&_=${new Date().getTime()}`), // Added cache buster
   
   // Generic method to fetch any chart data
   getChartData: (chartType, params) => api.get(`/charts/${chartType}`, { params })

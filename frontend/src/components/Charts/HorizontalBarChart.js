@@ -47,15 +47,31 @@ const HorizontalBarChart = ({ chartData }) => {
 
   // Process data to group blocks by pool
   const processData = () => {
+    // Enhanced data processing to handle the filtering issue
     const poolCounts = {};
     const poolBlocks = {};
     const poolFullNames = {}; // Store full names for tooltip display
     const unknownAddresses = []; // Store unknown addresses
     let totalUnknownCount = 0;
     
-    // Count blocks by pool
+    // Validation to ensure we have valid data
+    if (!chartData.data || !Array.isArray(chartData.data)) {
+      console.error("Invalid chart data structure:", chartData);
+      return { 
+        poolData: [], 
+        unknownAddresses: [], 
+        totalUnknownCount: 0 
+      };
+    }
+    
+    // Count blocks by pool with enhanced validation
     chartData.data.forEach(block => {
-      const poolName = block.pool || 'Unknown';
+      if (!block) return; // Skip invalid blocks
+      
+      // Default to 'Unknown' if pool name is missing
+      const poolName = (block.pool && typeof block.pool === 'string') 
+        ? block.pool 
+        : 'Unknown';
       
       // Check if this is an unknown pool with address
       if (poolName.startsWith('Unknown (t1') || poolName.startsWith('Unknown (t3')) {
@@ -81,7 +97,9 @@ const HorizontalBarChart = ({ chartData }) => {
           if (!poolBlocks['Unknown']) {
             poolBlocks['Unknown'] = [];
           }
-          poolBlocks['Unknown'].push(block.blockHeight);
+          if (block.blockHeight) {
+            poolBlocks['Unknown'].push(block.blockHeight);
+          }
           
           // Store full name
           poolFullNames['Unknown'] = 'Unknown (Solo Miners)';
@@ -93,7 +111,9 @@ const HorizontalBarChart = ({ chartData }) => {
           if (!poolBlocks[poolName]) {
             poolBlocks[poolName] = [];
           }
-          poolBlocks[poolName].push(block.blockHeight);
+          if (block.blockHeight) {
+            poolBlocks[poolName].push(block.blockHeight);
+          }
         }
       } else {
         // Regular pool counting
@@ -103,7 +123,9 @@ const HorizontalBarChart = ({ chartData }) => {
         if (!poolBlocks[poolName]) {
           poolBlocks[poolName] = [];
         }
-        poolBlocks[poolName].push(block.blockHeight);
+        if (block.blockHeight) {
+          poolBlocks[poolName].push(block.blockHeight);
+        }
       }
     });
     

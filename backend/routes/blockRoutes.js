@@ -17,26 +17,24 @@ router.get('/', async (req, res, next) => {
 
     logger.info(`Fetching latest blocks directly from node (height ${bestHeight}, offset ${offset}, limit ${limit})`);
 
-    // Get blocks directly from node, starting from latest and going back
-    const blocks = [];
-    const fetchPromises = [];
+    // Get blocks directly from node, starting from latest and going back (SEQUENTIALLY)
+    const fetchedBlocks = [];
     for (let i = 0; i < limit && (bestHeight - i - offset) >= 0; i++) {
       const height = bestHeight - i - offset;
-      // Fetch blocks concurrently
-      fetchPromises.push(
-        bitcoinzService.getBlockByHeight(height, 1) // Verbosity 1 for list view
-          .catch(err => {
-            logger.error(`Error fetching block at height ${height} via RPC: ${err.message}`);
-            return null; // Return null on error for this specific block
-          })
-      );
+      try {
+        // Fetch blocks one by one to avoid overloading the node
+        const block = await bitcoinzService.getBlockByHeight(height, 1); // Verbosity 1 for list view
+        if (block) {
+          fetchedBlocks.push(block);
+        }
+      } catch (err) {
+        logger.error(`Error fetching block at height ${height} via RPC: ${err.message}`);
+        // Optionally break the loop or continue trying next blocks depending on desired behavior
+        // For now, we log the error and continue to try fetching the rest
+      }
     }
 
-    const results = await Promise.all(fetchPromises);
-    // Filter out any null results from failed fetches
-    const fetchedBlocks = results.filter(block => block !== null);
-
-    logger.info(`Fetched ${fetchedBlocks.length} blocks via RPC`);
+    logger.info(`Fetched ${fetchedBlocks.length} blocks via RPC (sequentially)`);
 
     res.json({
       blocks: fetchedBlocks,

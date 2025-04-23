@@ -152,14 +152,16 @@ const HorizontalBarChart = ({ chartData }) => {
     setShowAddressList(!showAddressList);
   };
 
-  // ULTRA DIRECT DATE IMPLEMENTATION - No date transformations at all
-  // Direct access to the raw date string from chart data - no formatDate call
+  // DIRECT DATE IMPLEMENTATION WITH TODAY BUTTON FIX
+  // Direct access to the raw date string from chart data
   const rawDateString = chartData.date; 
-  
-  // Log the raw date string directly from the props
   console.log(`🔥 RAW DATE STRING FROM PROPS: ${rawDateString}`);
   
-  // Check localStorage for the most accurate date
+  // Get today's date string for comparison
+  const today = new Date();
+  const todayString = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`;
+  
+  // Check if there's a stored date in localStorage
   let storedDate;
   try {
     storedDate = localStorage.getItem('minedBlocks_selectedDate');
@@ -168,9 +170,19 @@ const HorizontalBarChart = ({ chartData }) => {
     console.error("Error accessing localStorage:", e);
   }
   
-  // CRITICAL: Use stored date from localStorage if available
-  // This is our source of truth for the date
-  const exactRequestedDate = storedDate || rawDateString || new Date().toISOString().split('T')[0];
+  // TODAY BUTTON FIX: If the raw date is today's date, use it directly
+  // Otherwise, prefer localStorage if available
+  let exactRequestedDate;
+  
+  if (rawDateString === todayString) {
+    // User clicked Today button - always show today's date
+    exactRequestedDate = todayString;
+    console.log("🔥 TODAY BUTTON USED - showing today's date:", todayString);
+  } else {
+    // For custom dates, use localStorage or fall back to props date
+    exactRequestedDate = storedDate || rawDateString || todayString;
+  }
+  
   console.log(`🔥 FINAL DATE USED FOR DISPLAY: ${exactRequestedDate}`);
   
   // Basic direct string formatting without any Date objects
@@ -195,9 +207,7 @@ const HorizontalBarChart = ({ chartData }) => {
     dateDisplay = exactRequestedDate; // Fallback to raw date if parsing fails
   }
   
-  // Simple string comparison for today check
-  const now = new Date();
-  const todayString = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
+  // Use the already defined today string for comparison
   const isTodayData = exactRequestedDate === todayString;
 
   return (

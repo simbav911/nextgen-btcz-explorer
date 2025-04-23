@@ -395,12 +395,35 @@ const Charts = () => {
 
   // Handle time filter change
   const handleTimeFilterChange = (newDate, newRange, dateRange) => {
-    console.log(`Time filter changed: date=${newDate}, range=${newRange}`, dateRange);
+    console.log(`⏱️ Time filter changed: date=${newDate}, range=${newRange}`, dateRange);
     
     // Make sure we have valid date and range values
     if (!newDate) {
       console.warn("handleTimeFilterChange called with empty date");
       return;
+    }
+    
+    // CRITICAL FIX: Today button handling
+    // If the user clicked "Today" button, clear any saved custom date
+    if (newRange === '1d' && !dateRange?.isCustom) {
+      console.log("⏱️ Today button selected - clearing saved dates");
+      
+      try {
+        // Clear the appropriate localStorage value based on current chart
+        if (activeChart === chartTypes.POOL_STAT) {
+          localStorage.removeItem('poolStats_selectedDate');
+        } 
+        else if (activeChart === chartTypes.MINED_BLOCK) {
+          localStorage.removeItem('minedBlocks_selectedDate');
+        }
+        
+        // Set today's date directly, bypassing any custom date selection
+        const today = formatDate(new Date());
+        newDate = today;
+        console.log("⏱️ Updated date to today:", today);
+      } catch (e) {
+        console.warn("Error clearing localStorage:", e);
+      }
     }
     
     // Always use 'custom' range for user-selected dates from calendar

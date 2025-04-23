@@ -61,8 +61,25 @@ const ChartSidebar = ({ activeChart, setActiveChart }) => {
     <div className="charts-sidebar">
       <div className="charts-header">
         <div className="chart-icon">
-          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" width="64" height="64">
-            <path d="M18.375 2.25c-1.035 0-1.875.84-1.875 1.875v15.75c0 1.035.84 1.875 1.875 1.875h.75c1.035 0 1.875-.84 1.875-1.875V4.125c0-1.036-.84-1.875-1.875-1.875h-.75zM9.75 8.625c0-1.036.84-1.875 1.875-1.875h.75c1.036 0 1.875.84 1.875 1.875v9.375c0 1.035-.84 1.875-1.875 1.875h-.75a1.875 1.875 0 01-1.875-1.875V8.625zM3 13.125c0-1.036.84-1.875 1.875-1.875h.75c1.036 0 1.875.84 1.875 1.875v4.875c0 1.035-.84 1.875-1.875 1.875h-.75A1.875 1.875 0 013 18v-4.875z" />
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" width="42" height="42">
+            {/* Semi-circle gauge at the top */}
+            <path d="M5 7.5a5.5 5.5 0 0 1 5.5-5.5 5.5 5.5 0 0 1 5.5 5.5" />
+            
+            {/* Gauge tick marks on the right */}
+            <path d="M17 4.5h2.5" />
+            <path d="M17 7h3" />
+            
+            {/* Monitor/dashboard in bottom left */}
+            <path d="M3 11v6h6v-6z" />
+            <path d="M3 14.5h6" />
+            
+            {/* Bar chart elements on the right */}
+            <rect x="11" y="15" width="2" height="5" stroke="none" fill="currentColor" />
+            <rect x="14" y="11" width="2" height="9" stroke="none" fill="currentColor" />
+            <rect x="17" y="13" width="2" height="7" stroke="none" fill="currentColor" />
+            
+            {/* Bottom line */}
+            <path d="M10 20h10" />
           </svg>
         </div>
         <h2>Charts</h2>

@@ -11,9 +11,9 @@
 /* Sidebar styling */
 .charts-sidebar {
   width: 280px;
-  background: linear-gradient(to bottom, #2b3f73, #192655);
-  border-radius: 16px;
-  box-shadow: 0 10px 25px rgba(0, 0, 50, 0.15);
+  background: linear-gradient(to right, #0c2e5c, #1e72c3);
+  border-radius: 12px;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
   overflow: hidden;
   display: flex;
   flex-direction: column;
@@ -21,123 +21,71 @@
   z-index: 1;
 }
 
-.charts-sidebar::before {
-  content: '';
-  position: absolute;
-  top: 0;
-  left: 0;
-  right: 0;
-  bottom: 0;
-  background: url("data:image/svg+xml,%3Csvg width='60' height='60' viewBox='0 0 60 60' xmlns='http://www.w3.org/2000/svg'%3E%3Cg fill='none' fill-rule='evenodd'%3E%3Cg fill='%23ffffff' fill-opacity='0.05'%3E%3Cpath d='M36 34v-4h-2v4h-4v2h4v4h2v-4h4v-2h-4zm0-30V0h-2v4h-4v2h4v4h2V6h4V4h-4zM6 34v-4H4v4H0v2h4v4h2v-4h4v-2H6zM6 4V0H4v4H0v2h4v4h2V6h4V4H6z'/%3E%3C/g%3E%3C/g%3E%3C/svg%3E");
-  z-index: -1;
-}
+/* Removed the decorative pattern overlay to make it cleaner */
 
 .charts-header {
-  background: rgba(22, 78, 255, 0.1);
+  background: rgba(255, 255, 255, 0.1);
   color: white;
-  padding: 28px 20px;
+  padding: 20px;
   text-align: center;
   border-bottom: 1px solid rgba(255, 255, 255, 0.1);
   position: relative;
-  overflow: hidden;
-}
-
-.charts-header::after {
-  content: '';
-  position: absolute;
-  bottom: 0;
-  left: 0;
-  right: 0;
-  height: 4px;
-  background: linear-gradient(90deg, #3b82f6, #1d4ed8, #6366f1);
 }
 
 .chart-icon {
   margin: 0 auto;
-  width: 70px;
-  height: 70px;
+  width: 64px;
+  height: 64px;
   display: flex;
   align-items: center;
   justify-content: center;
-  background: rgba(255, 255, 255, 0.1);
-  border-radius: 50%;
-  padding: 12px;
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
-  transition: transform 0.3s ease;
-}
-
-.chart-icon:hover {
-  transform: scale(1.05);
 }
 
 .charts-header h2 {
-  margin-top: 14px;
-  font-size: 26px;
-  font-weight: bold;
+  margin-top: 8px;
+  font-size: 22px;
+  font-weight: 600;
   letter-spacing: 0.5px;
-  text-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
 }
 
 .chart-buttons {
   display: flex;
   flex-direction: column;
-  padding: 16px;
-  gap: 10px;
+  padding: 12px;
+  gap: 8px;
 }
 
 .chart-buttons button {
-  background: linear-gradient(to right, #3b82f6, #2563eb);
-  color: white;
+  background: rgba(255, 255, 255, 0.1);
+  color: rgba(219, 234, 254, 1);
   border: none;
-  border-radius: 10px;
-  padding: 14px 20px;
-  font-size: 15px;
+  border-radius: 6px;
+  padding: 10px 16px;
+  font-size: 14px;
   font-weight: 500;
   cursor: pointer;
-  text-align: center;
+  text-align: left;
   transition: all 0.2s;
   display: flex;
   align-items: center;
   justify-content: flex-start;
-  position: relative;
-  overflow: hidden;
-  box-shadow: 0 4px 6px rgba(37, 99, 235, 0.2);
-}
-
-.chart-buttons button::before {
-  content: '';
-  position: absolute;
-  top: 0;
-  left: 0;
-  width: 100%;
-  height: 100%;
-  background: linear-gradient(rgba(255, 255, 255, 0.2), rgba(255, 255, 255, 0));
-  clip-path: polygon(0 0, 100% 0, 100% 30%, 0 70%);
 }
 
 .chart-buttons button:hover {
-  transform: translateY(-2px);
-  box-shadow: 0 6px 12px rgba(37, 99, 235, 0.25);
-  background: linear-gradient(to right, #2563eb, #1d4ed8);
+  background: rgba(30, 64, 175, 0.5);
+  color: white;
 }
 
 .chart-buttons button.active {
-  background: linear-gradient(to right, #1e40af, #1e3a8a);
-  box-shadow: inset 0 2px 4px rgba(0, 0, 0, 0.2), 0 2px 6px rgba(30, 64, 175, 0.3);
-  transform: translateY(0);
+  background: rgba(255, 255, 255, 0.15);
+  color: white;
+  font-weight: 600;
 }
 
-.chart-buttons button.active::after {
-  content: '';
-  position: absolute;
-  right: 14px;
-  top: 50%;
-  transform: translateY(-50%);
-  width: 8px;
-  height: 8px;
-  border-radius: 50%;
-  background: rgba(255, 255, 255, 0.8);
-  box-shadow: 0 0 8px rgba(255, 255, 255, 0.5);
+.button-icon {
+  margin-right: 10px;
+  display: flex;
+  align-items: center;
 }
 
 /* Main content area */
@@ -404,11 +352,18 @@
   
   .chart-buttons {
     display: grid;
-    grid-template-columns: repeat(2, 1fr);
+    grid-template-columns: repeat(3, 1fr);
+    gap: 6px;
   }
   
   .chart-display {
     height: 400px;
+  }
+}
+
+@media (max-width: 640px) {
+  .chart-buttons {
+    grid-template-columns: repeat(2, 1fr);
   }
 }
 

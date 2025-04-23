@@ -1,5 +1,5 @@
 import React from 'react';
-import { Charts } from '../components/Charts';
+import Charts from '../components/Charts';
 
 /**
  * Charts page component

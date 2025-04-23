@@ -59,15 +59,42 @@ const PieChartDisplay = ({ chartData }) => {
     };
   };
 
-  // CRITICAL FIX: Use the exact date string without date object conversion
-  // This avoids timezone issues that cause date shifting
-  const exactRequestedDate = chartData.date || formatDate(new Date());
-  console.log("🟢 PieChartDisplay - Exact requested date:", exactRequestedDate);
+  // Get today's date for comparison
+  const today = new Date();
+  const todayString = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`;
   
-  // Parse the date components directly from the string to avoid timezone shifts
+  // DIRECT DATE IMPLEMENTATION WITH TODAY BUTTON FIX
+  // Use the exact raw date from props
+  const rawDate = chartData.date || formatDate(new Date());
+  console.log("🟢 PieChartDisplay - Raw date from props:", rawDate);
+  
+  // Check localStorage for the Pool Stats date
+  let storedDate;
+  try {
+    storedDate = localStorage.getItem('poolStats_selectedDate');
+    console.log("🟢 PieChartDisplay - Stored date:", storedDate);
+  } catch (e) {
+    console.error("Error accessing localStorage:", e);
+  }
+  
+  // TODAY BUTTON FIX: If raw date is today's date, use it directly
+  // Otherwise, use localStorage if available
+  let exactRequestedDate;
+  
+  if (rawDate === todayString) {
+    // Today button was clicked - show today's date
+    exactRequestedDate = todayString;
+    console.log("🟢 TODAY BUTTON USED - showing today's date:", todayString);
+  } else {
+    // For custom dates, use localStorage or fall back to props date
+    exactRequestedDate = storedDate || rawDate || todayString;
+  }
+  
+  console.log("🟢 PieChartDisplay - Final date used:", exactRequestedDate);
+  
+  // Parse date components directly from string (no Date object)
   let dateDisplay;
   try {
-    // Parse the date string directly
     const parts = exactRequestedDate.split('-');
     const year = parts[0];
     const month = parseInt(parts[1]) - 1; // JS months are 0-based
@@ -80,19 +107,14 @@ const PieChartDisplay = ({ chartData }) => {
     // Format as "Apr 10, 2025" without timezone conversion
     dateDisplay = `${monthNames[month]} ${day}, ${year}`;
     
-    console.log(`🟢 PieChartDisplay - Formatted date for chart display: ${dateDisplay}`);
+    console.log(`🟢 PieChartDisplay - Formatted for display: ${dateDisplay}`);
   } catch (e) {
     console.error("Error formatting date:", e);
-    dateDisplay = exactRequestedDate; // Fallback to raw date if parsing fails
+    dateDisplay = exactRequestedDate; // Fallback to raw date
   }
   
-  // Is this today's data?
-  const today = new Date();
-  const isTodayData = (
-    today.getFullYear() === parseInt(exactRequestedDate.split('-')[0]) &&
-    today.getMonth() === parseInt(exactRequestedDate.split('-')[1]) - 1 &&
-    today.getDate() === parseInt(exactRequestedDate.split('-')[2])
-  );
+  // Check if this is today's data with direct string comparison
+  const isTodayData = exactRequestedDate === todayString;
 
   return (
     <div className="chart-3d-container pie-chart-container">

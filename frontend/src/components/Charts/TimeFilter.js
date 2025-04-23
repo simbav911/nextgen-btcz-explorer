@@ -189,20 +189,31 @@ const TimeFilter = ({ date, setDate, applyFilter, showTodayDefault = false, acti
   }, [showDatePicker]); // Re-add the listener whenever showDatePicker changes
 
   const handleTimeRangeChange = (range) => {
-    // If selecting custom and previously had a custom date, preserve it
-    const wasCustom = timeRange === 'custom';
-    const previousCustomDate = wasCustom ? date : null;
+    console.log(`⏰ Time range changed to: ${range}`);
     
+    // Set the new time range first
     setTimeRange(range);
+    
+    // CRITICAL FIX: Today button handling
+    // If user clicked on "Today" button, we need to clear any saved custom date
+    if (range === '1d') {
+      console.log("⏰ Today button clicked - CLEARING saved dates");
+      
+      try {
+        // Clear any saved custom dates to ensure Today button works
+        if (activeChart === chartTypes.POOL_STAT) {
+          localStorage.removeItem('poolStats_selectedDate');
+        } else if (activeChart === chartTypes.MINED_BLOCK) {
+          localStorage.removeItem('minedBlocks_selectedDate');
+        }
+      } catch (e) {
+        console.warn("Error clearing localStorage:", e);
+      }
+    }
     
     // Special handling for custom date range
     if (range === 'custom') {
-      console.log("Custom date range selected"); // Debug log
-      
-      // If we already had a custom date selected, preserve it
-      if (previousCustomDate) {
-        console.log("Preserving previous custom date:", previousCustomDate);
-      }
+      console.log("⏰ Custom date range selected");
       
       // Force showing the date picker with a slight delay 
       // to ensure any click events are processed first

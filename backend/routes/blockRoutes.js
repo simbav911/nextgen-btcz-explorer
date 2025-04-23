@@ -5,34 +5,48 @@ const models = require('../models'); // Import the models module
 const logger = require('../utils/logger');
 const { Op } = require('sequelize'); // Import Op for queries if needed
 
-// Get latest blocks (Prioritize Database)
+// Get latest blocks (Fetch directly from Node for real-time view)
 router.get('/', async (req, res, next) => {
   try {
     const limit = parseInt(req.query.limit) || 10;
     const offset = parseInt(req.query.offset) || 0;
-    logger.info(`Fetching latest blocks from DB (limit: ${limit}, offset: ${offset})`);
 
-    const Block = await models.getBlock(); // Get Block model instance
-    if (!Block) {
-      throw new Error('Block model not initialized');
+    // Get current blockchain info to know the latest block height
+    const info = await bitcoinzService.getBlockchainInfo();
+    const bestHeight = info.blocks;
+
+    logger.info(`Fetching latest blocks directly from node (height ${bestHeight}, offset ${offset}, limit ${limit})`);
+
+    // Get blocks directly from node, starting from latest and going back
+    const blocks = [];
+    const fetchPromises = [];
+    for (let i = 0; i < limit && (bestHeight - i - offset) >= 0; i++) {
+      const height = bestHeight - i - offset;
+      // Fetch blocks concurrently
+      fetchPromises.push(
+        bitcoinzService.getBlockByHeight(height, 1) // Verbosity 1 for list view
+          .catch(err => {
+            logger.error(`Error fetching block at height ${height} via RPC: ${err.message}`);
+            return null; // Return null on error for this specific block
+          })
+      );
     }
 
-    const { count, rows: blocks } = await Block.findAndCountAll({
-      order: [['height', 'DESC']],
-      limit: limit,
-      offset: offset,
-      raw: true // Get plain objects
-    });
+    const results = await Promise.all(fetchPromises);
+    // Filter out any null results from failed fetches
+    const fetchedBlocks = results.filter(block => block !== null);
 
-    logger.info(`Fetched ${blocks.length} blocks from DB, total count: ${count}`);
+    logger.info(`Fetched ${fetchedBlocks.length} blocks via RPC`);
 
     res.json({
-      blocks,
-      count: count, // Total count in the database
+      blocks: fetchedBlocks,
+      // Note: 'count' here reflects the number fetched, not total blocks in chain
+      // The frontend uses a separate call for total block count
+      count: fetchedBlocks.length,
       offset
     });
   } catch (error) {
-    logger.error('Error fetching blocks from DB:', error);
+    logger.error('Error fetching latest blocks via RPC:', error);
     next(error);
   }
 });

@@ -164,8 +164,9 @@ const BlockList = () => {
           };
           
           setBlocks(prevBlocks => {
-            // Add block to beginning and remove last block
-            const newBlocks = [blockWithPool, ...prevBlocks.slice(0, -1)];
+            // Add block to beginning and remove last block to keep page size consistent
+            // (Reverted to original logic as the API now fetches latest blocks directly)
+            const newBlocks = [blockWithPool, ...prevBlocks.slice(0, BLOCKS_PER_PAGE - 1)];
             return newBlocks;
           });
         } catch (error) {

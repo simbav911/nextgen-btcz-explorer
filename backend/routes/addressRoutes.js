@@ -74,8 +74,8 @@ router.get('/:address/balance', async (req, res, next) => {
     const { address } = req.params;
     logger.info(`Fetching balance for address ${address}`);
     
-    // Get real address data from the blockchain
-    const addressInfo = await getAddressInfo(address);
+    // Get address data using the service (DB first, then RPC fallback)
+    const addressInfo = await addressService.getAddressInfo(address);
     
     // Return just the balance information
     res.json({

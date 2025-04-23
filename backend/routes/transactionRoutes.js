@@ -1,100 +1,132 @@
 const express = require('express');
 const router = express.Router();
-const { 
-  getRawTransaction, 
-  getLatestTransactions,
-  getBestBlockHash,
-  getBlock
-} = require('../services/bitcoinzService');
-const { getTransaction: getTransactionModel } = require('../models');
+const bitcoinzService = require('../services/bitcoinzService'); // Keep for fallbacks
+const models = require('../models'); // Import the models module
 const logger = require('../utils/logger');
+const { Op } = require('sequelize'); // Import Op for queries
 
-// Get latest transactions
+// Get latest transactions (Prioritize Database)
 router.get('/', async (req, res, next) => {
   try {
     const limit = parseInt(req.query.limit) || 10;
     const offset = parseInt(req.query.offset) || 0;
-    logger.info(`Fetching latest transactions with limit ${limit} and offset ${offset}`);
-    
-    // Get directly from node
-    const transactions = await getLatestTransactions(limit + offset);
-    
-    // Apply offset
-    const paginatedTransactions = transactions.slice(offset, offset + limit);
-    
-    logger.info(`Fetched ${paginatedTransactions.length} transactions`);
-    
+    logger.info(`Fetching latest transactions from DB (limit: ${limit}, offset: ${offset})`);
+
+    const Transaction = await models.getTransaction(); // Get Transaction model instance
+    if (!Transaction) {
+       throw new Error('Transaction model not initialized');
+    }
+
+    // Fetch latest transactions from the database, ordered by block time
+    const { count, rows: transactions } = await Transaction.findAndCountAll({
+      order: [['blocktime', 'DESC']], // Order by blocktime (assuming it's reliably populated)
+      limit: limit,
+      offset: offset,
+      raw: true // Get plain objects
+    });
+
+    logger.info(`Fetched ${transactions.length} transactions from DB, total count: ${count}`);
+
     res.json({
-      transactions: paginatedTransactions,
-      count: paginatedTransactions.length,
+      transactions,
+      count: count, // Total count in the database
       offset
     });
   } catch (error) {
-    logger.error('Error fetching transactions:', error);
+    logger.error('Error fetching latest transactions from DB:', error);
     next(error);
   }
 });
 
-// Get specific transaction by txid
+// Get specific transaction by txid (DB first, then RPC fallback)
 router.get('/:txid', async (req, res, next) => {
+  const { txid } = req.params;
   try {
-    const { txid } = req.params;
-    logger.info(`Fetching transaction by txid: ${txid}`);
-    
-    // Get directly from node
-    const transaction = await getRawTransaction(txid, 1);
-    
-    if (!transaction) {
-      return res.status(404).json({ error: 'Transaction not found' });
+    logger.info(`Fetching transaction by txid from DB: ${txid}`);
+    const Transaction = await models.getTransaction(); // Get Transaction model instance
+     if (!Transaction) {
+       throw new Error('Transaction model not initialized');
     }
-    
-    res.json(transaction);
-  } catch (error) {
-    logger.error(`Error fetching transaction ${req.params.txid}:`, error);
-    
-    // Handle RPC specific errors
-    if (error.response && error.response.data && error.response.data.error) {
-      if (error.response.data.error.code === -5) {
-        return res.status(404).json({ error: 'Transaction not found' });
+    let transaction = await Transaction.findByPk(txid, { raw: true });
+
+    if (transaction) {
+      logger.info(`Found transaction ${txid} in DB`);
+      try {
+         if (typeof transaction.vin === 'string') transaction.vin = JSON.parse(transaction.vin);
+         if (typeof transaction.vout === 'string') transaction.vout = JSON.parse(transaction.vout);
+      } catch (e) { logger.warn(`Could not parse vin/vout for tx ${txid}`); }
+      res.json(transaction);
+    } else {
+      logger.warn(`Transaction ${txid} not found in DB, falling back to RPC`);
+      try {
+        transaction = await bitcoinzService.getRawTransaction(txid, 1);
+        if (!transaction) {
+          return res.status(404).json({ error: 'Transaction not found via DB or RPC' });
+        }
+        logger.info(`Found transaction ${txid} via RPC`);
+        res.json(transaction);
+      } catch (rpcError) {
+        logger.error(`Error fetching transaction ${txid} via RPC fallback:`, rpcError);
+        if (rpcError.response?.data?.error?.code === -5 || rpcError.message.includes('No such mempool or blockchain transaction')) {
+           return res.status(404).json({ error: 'Transaction not found via DB or RPC' });
+        }
+        next(rpcError);
       }
     }
-    
+  } catch (error) {
+    logger.error(`Error fetching transaction ${txid} (DB primary):`, error);
     next(error);
   }
 });
 
-// Get transactions by block hash
+// Get transactions by block hash (DB only)
 router.get('/block/:blockhash', async (req, res, next) => {
+  const { blockhash } = req.params;
   try {
-    const { blockhash } = req.params;
-    logger.info(`Fetching transactions for block: ${blockhash}`);
-    
-    // Get block and its transactions
-    const block = await getBlock(blockhash, 1);
-    
-    if (!block) {
-      return res.status(404).json({ error: 'Block not found' });
+    logger.info(`Fetching transactions for block from DB: ${blockhash}`);
+    const Transaction = await models.getTransaction(); // Get Transaction model instance
+    const Block = await models.getBlock(); // Get Block model instance
+     if (!Transaction || !Block) {
+       throw new Error('Required models (Transaction or Block) not initialized');
     }
-    
-    // Get transactions from txids
-    const transactions = [];
-    const txPromises = block.tx.slice(0, 20).map(txid => getRawTransaction(txid, 1));
-    
-    try {
-      const results = await Promise.all(txPromises);
-      transactions.push(...results);
-    } catch (err) {
-      logger.error(`Error fetching some transactions: ${err.message}`);
-    }
-    
-    res.json({
-      transactions,
-      count: transactions.length,
-      total: block.tx.length,
-      blockhash
+
+    // Fetch transactions directly from the Transaction table using the blockhash
+    const transactions = await Transaction.findAll({
+      where: { blockhash: blockhash },
+      order: [['time', 'ASC']], // Order transactions within the block if desired
+      raw: true
     });
+
+    if (!transactions || transactions.length === 0) {
+      const blockExists = await Block.count({ where: { hash: blockhash } });
+      if (blockExists === 0) {
+         logger.warn(`Block ${blockhash} not found in DB while fetching its transactions.`);
+         return res.status(404).json({ error: 'Block not found in database' });
+      }
+      logger.info(`No transactions found in DB for block ${blockhash} (block exists)`);
+       res.json({
+         transactions: [],
+         count: 0,
+         total: 0,
+         blockhash
+       });
+    } else {
+       logger.info(`Found ${transactions.length} transactions in DB for block ${blockhash}`);
+       transactions.forEach(tx => {
+          try {
+             if (typeof tx.vin === 'string') tx.vin = JSON.parse(tx.vin);
+             if (typeof tx.vout === 'string') tx.vout = JSON.parse(tx.vout);
+          } catch (e) { logger.warn(`Could not parse vin/vout for tx ${tx.txid}`); }
+       });
+       res.json({
+         transactions,
+         count: transactions.length,
+         total: transactions.length,
+         blockhash
+       });
+    }
   } catch (error) {
-    logger.error(`Error fetching transactions for block ${req.params.blockhash}:`, error);
+    logger.error(`Error fetching transactions for block ${blockhash} from DB:`, error);
     next(error);
   }
 });

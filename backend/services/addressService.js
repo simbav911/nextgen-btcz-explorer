@@ -1,79 +1,97 @@
 const logger = require('../utils/logger');
-const { executeRpcCommand } = require('./bitcoinzService');
+const bitcoinzService = require('./bitcoinzService'); // Use full service for fallbacks
+const { Address } = require('../models'); // Import Address model
+const { Op } = require('sequelize');
 
 /**
- * Get address details and transactions
+ * Get address details (balance, totals, tx count). Prioritizes DB, falls back to RPC.
  */
 const getAddressInfo = async (address) => {
+  logger.info(`Fetching address info for ${address} (DB first)`);
+  let addressRecord;
+
+  // 1. Try fetching from Database first
   try {
-    logger.info(`Fetching address info for ${address}`);
-    
-    // Initialize data
+    const AddressModel = await models.getAddress(); // Get Address model instance
+    if (!AddressModel) {
+      logger.warn('Address model not initialized, falling back to RPC.');
+    } else {
+      addressRecord = await AddressModel.findByPk(address, { raw: true });
+    }
+
+    if (addressRecord) {
+      // Optional: Check lastUpdated timestamp if staleness is a concern
+      // const isRecent = Date.now() - new Date(addressRecord.lastUpdated).getTime() < 3600000; // e.g., 1 hour
+      // if (isRecent) {
+      logger.info(`Found address info in DB for ${address}`);
+      return {
+        address: addressRecord.address,
+        balance: addressRecord.balance,
+        totalReceived: addressRecord.totalReceived,
+        totalSent: addressRecord.totalSent,
+        unconfirmedBalance: addressRecord.unconfirmedBalance || 0, // DB doesn't store this, default to 0
+        txCount: addressRecord.txCount
+      };
+      // } else {
+      //   logger.info(`DB record for ${address} is stale, proceeding to RPC fallback.`);
+      // }
+    } else {
+      logger.info(`Address ${address} not found in DB, proceeding to RPC fallback.`);
+    }
+  } catch (dbError) {
+    logger.error(`Error fetching address ${address} from DB: ${dbError.message}. Falling back to RPC.`);
+  }
+
+  // 2. Fallback to RPC if not found or DB error
+  try {
+    logger.info(`Fetching address info via RPC for ${address}`);
     let balance = 0;
     let totalReceived = 0;
     let totalSent = 0;
-    let unconfirmedBalance = 0;
+    let unconfirmedBalance = 0; // RPC might provide this, but often requires specific calls
     let txCount = 0;
-    
-    // Try to use getaddressbalance RPC to get accurate balances
+
+    // Try getaddressbalance first (more accurate if node has balanceindex)
     try {
-      const balanceResult = await executeRpcCommand('getaddressbalance', [{"addresses": [address]}], 60000);
-      
+      const balanceResult = await bitcoinzService.executeRpcCommand('getaddressbalance', [{"addresses": [address]}], 60000);
       if (balanceResult && typeof balanceResult.balance !== 'undefined' && typeof balanceResult.received !== 'undefined') {
-        // Convert satoshis to BTCZ (divide by 10^8)
         balance = parseFloat(balanceResult.balance) / 100000000;
         totalReceived = parseFloat(balanceResult.received) / 100000000;
-        totalSent = totalReceived - balance;
-        
-        logger.info(`Got balance from getaddressbalance for ${address}: ${balance} BTCZ, received: ${totalReceived} BTCZ`);
+        totalSent = totalReceived - balance; // Calculate sent
+        logger.info(`Got balance from getaddressbalance RPC for ${address}`);
       } else {
-        logger.warn(`Invalid getaddressbalance response for ${address}`);
+         logger.warn(`Invalid getaddressbalance RPC response for ${address}, trying listunspent`);
+         throw new Error('Invalid getaddressbalance response'); // Force fallback
       }
     } catch (balanceError) {
-      logger.warn(`Error getting address balance via RPC for ${address}: ${balanceError.message}`);
-      
-      // Fall back to using listunspent
+      logger.warn(`getaddressbalance RPC failed for ${address}: ${balanceError.message}. Trying listunspent.`);
+      // Fallback to listunspent (less accurate for total received/sent)
       try {
-        const utxos = await executeRpcCommand('listunspent', [0, 9999999, [address]], 60000);
-        logger.debug(`Found ${utxos.length} UTXOs for address ${address}`);
-        
-        for (const utxo of utxos) {
-          balance += utxo.amount;
-        }
-        
-        // For simplicity, assume totalReceived = balance since we don't have better data
-        totalReceived = balance;
+        const utxos = await bitcoinzService.executeRpcCommand('listunspent', [0, 9999999, [address]], 60000);
+        balance = utxos.reduce((sum, utxo) => sum + utxo.amount, 0);
+        // Cannot accurately get totalReceived/Sent from listunspent alone
+        totalReceived = balance; // Best guess/approximation
+        totalSent = 0;
+        logger.info(`Calculated balance from listunspent RPC for ${address}`);
       } catch (utxoError) {
-        logger.error(`Error fetching UTXOs for ${address}: ${utxoError.message}`);
+        logger.error(`Error fetching UTXOs via RPC for ${address}: ${utxoError.message}`);
+        // If both balance methods fail, we might return 0 or throw
       }
     }
-    
-    // Get transaction count using getaddresstxids
+
+    // Get transaction count using getaddresstxids (requires addressindex or import)
     try {
-      const txids = await executeRpcCommand('getaddresstxids', [{"addresses": [address]}], 60000);
+      const txids = await bitcoinzService.executeRpcCommand('getaddresstxids', [{"addresses": [address]}], 60000);
       txCount = txids ? txids.length : 0;
-      logger.info(`Found ${txCount} transactions for address ${address}`);
+      logger.info(`Found ${txCount} transactions via getaddresstxids RPC for ${address}`);
     } catch (txidsError) {
-      logger.warn(`Error getting txids for ${address}: ${txidsError.message}`);
-      
-      // If we can't get transaction count, try importing the address first
-      try {
-        logger.debug(`Trying importaddress for ${address}`);
-        await executeRpcCommand('importaddress', [address, '', false], 60000);
-        logger.debug(`Successfully imported address ${address}`);
-        
-        // Try getting txids again
-        const txids = await executeRpcCommand('getaddresstxids', [{"addresses": [address]}], 60000);
-        txCount = txids ? txids.length : 0;
-        logger.info(`After import: Found ${txCount} transactions for ${address}`);
-      } catch (importError) {
-        logger.error(`Error importing address ${address}: ${importError.message}`);
-      }
+      logger.warn(`Error getting txids via RPC for ${address}: ${txidsError.message}`);
+      // Don't attempt import here, as it's slow and might not be desired for simple info lookup
     }
-    
-    // Return the address information without transactions
-    // Transactions will be fetched separately with pagination
-    return {
+
+    // TODO: Add logic to fetch unconfirmedBalance if needed (e.g., getaddressutxos with 0 conf)
+
+    const rpcData = {
       address,
       balance,
       totalReceived,
@@ -81,9 +99,17 @@ const getAddressInfo = async (address) => {
       unconfirmedBalance,
       txCount
     };
+
+    // Optionally: Update DB in background with fetched RPC data
+    // Be careful not to overwrite potentially more complete data from syncService
+    // saveAddressToDb(db, address, txCount, rpcData).catch(...) // Need db instance and modified save function
+
+    return rpcData;
+
   } catch (error) {
-    logger.error(`Failed to get address info for ${address}:`, error.message);
-    throw error;
+    logger.error(`Failed to get address info for ${address} via RPC fallback:`, error.message);
+    // Re-throw the error if RPC fallback also fails completely
+    throw new Error(`Failed to retrieve address info for ${address} from both DB and RPC.`);
   }
 };
 
@@ -113,7 +139,7 @@ const getAddressTransactions = async (address, limit = 25, offset = 0) => {
           logger.info(`Found ${txCount} transactions in database for ${address}`);
           
           // If the address has been updated recently, use the database data
-          const lastUpdated = new Date(addressRecord.updated_at).getTime();
+          const lastUpdated = new Date(addressRecord.lastUpdated).getTime(); // Corrected field name
           const isRecent = Date.now() - lastUpdated < 3600000; // 1 hour
           
           if (isRecent) {
@@ -123,11 +149,13 @@ const getAddressTransactions = async (address, limit = 25, offset = 0) => {
             const pageTxids = txids.slice(offset, offset + hardLimit);
             
             if (pageTxids.length > 0) {
+              logger.debug(`Attempting to fetch ${pageTxids.length} transactions from DB for address ${address}`); // Added log
               // Get transactions from database
               const TransactionModel = await require('../models').getTransaction(db);
               const dbTransactions = await TransactionModel.findAll({
-                where: { txid: pageTxids }
+                where: { txid: pageTxids } // Reverted back to previous syntax
               });
+              logger.debug(`Found ${dbTransactions ? dbTransactions.length : 0} transactions in DB query result for address ${address}`); // Added log
               
               // If we found transactions in the database, return them
               if (dbTransactions && dbTransactions.length > 0) {
@@ -192,7 +220,7 @@ const getAddressTransactions = async (address, limit = 25, offset = 0) => {
       if (txCount === 0) {
         // Get transaction count from getaddressinfo if available
         try {
-          const addressInfo = await executeRpcCommand('getaddressinfo', [address], 30000);
+          const addressInfo = await bitcoinzService.executeRpcCommand('getaddressinfo', [address], 30000); // Prefixed
           if (addressInfo && typeof addressInfo.txcount === 'number') {
             txCount = addressInfo.txcount;
           }
@@ -203,7 +231,7 @@ const getAddressTransactions = async (address, limit = 25, offset = 0) => {
       
       // If we still don't have txCount, get it from getaddresstxids
       if (txCount === 0) {
-        let txids = await executeRpcCommand('getaddresstxids', [{"addresses": [address]}], 60000);
+        let txids = await bitcoinzService.executeRpcCommand('getaddresstxids', [{"addresses": [address]}], 60000); // Prefixed
         txCount = txids ? txids.length : 0;
       }
       
@@ -213,7 +241,7 @@ const getAddressTransactions = async (address, limit = 25, offset = 0) => {
       }
       
       // Get transaction IDs for this address
-      let txids = await executeRpcCommand('getaddresstxids', [{"addresses": [address]}], 60000);
+      let txids = await bitcoinzService.executeRpcCommand('getaddresstxids', [{"addresses": [address]}], 60000); // Prefixed
       
       if (txids && txids.length > 0) {
         logger.info(`Found ${txids.length} transaction IDs for ${address}`);
@@ -237,7 +265,7 @@ const getAddressTransactions = async (address, limit = 25, offset = 0) => {
           const batchPromises = batch.map(async (txid) => {
             try {
               // Get transaction details
-              const tx = await executeRpcCommand('getrawtransaction', [txid, 1], 30000);
+              const tx = await bitcoinzService.executeRpcCommand('getrawtransaction', [txid, 1], 30000); // Prefixed
               
               if (!tx) {
                 logger.warn(`No data returned for transaction ${txid}`);
@@ -283,7 +311,7 @@ const getAddressTransactions = async (address, limit = 25, offset = 0) => {
                   if (input.coinbase) continue;
                   
                   try {
-                    const prevTx = await executeRpcCommand('getrawtransaction', [input.txid, 1], 20000);
+                    const prevTx = await bitcoinzService.executeRpcCommand('getrawtransaction', [input.txid, 1], 20000); // Prefixed
                     if (prevTx && prevTx.vout && prevTx.vout[input.vout]) {
                       const prevOut = prevTx.vout[input.vout];
                       if (prevOut.scriptPubKey && 
@@ -339,11 +367,11 @@ const getAddressTransactions = async (address, limit = 25, offset = 0) => {
       // Try importing the address first
       try {
         logger.debug(`Trying importaddress for ${address}`);
-        await executeRpcCommand('importaddress', [address, '', false], 30000);
+        await bitcoinzService.executeRpcCommand('importaddress', [address, '', false], 30000); // Prefixed
         logger.debug(`Successfully imported address ${address}`);
         
         // Try getting txids again
-        let txids = await executeRpcCommand('getaddresstxids', [{"addresses": [address]}], 60000);
+        let txids = await bitcoinzService.executeRpcCommand('getaddresstxids', [{"addresses": [address]}], 60000); // Prefixed
         txCount = txids ? txids.length : 0;
         
         if (txids && txids.length > 0) {
@@ -360,7 +388,7 @@ const getAddressTransactions = async (address, limit = 25, offset = 0) => {
           // Get transaction details with simplified approach
           const samplePromises = sampleTxids.map(async (txid) => {
             try {
-              const tx = await executeRpcCommand('getrawtransaction', [txid, 1], 30000);
+              const tx = await bitcoinzService.executeRpcCommand('getrawtransaction', [txid, 1], 30000); // Prefixed
               
               if (!tx) return null;
               
@@ -450,7 +478,7 @@ const saveAddressToDb = async (db, address, txCount) => {
       // Get transaction IDs for this address
       let txids = [];
       try {
-        txids = await executeRpcCommand('getaddresstxids', [{"addresses": [address]}], 60000);
+        txids = await bitcoinzService.executeRpcCommand('getaddresstxids', [{"addresses": [address]}], 60000); // Prefixed
       } catch (error) {
         logger.debug(`Could not get txids for address ${address}: ${error.message}`);
         // Continue with empty txids array

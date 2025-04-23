@@ -56,10 +56,21 @@ if command -v lsof &> /dev/null; then
     echo -e "Do you want to try to kill the process using port $BACKEND_PORT? [y/N]"
     read -r response
     if [[ "$response" =~ ^([yY][eE][sS]|[yY])$ ]]; then
-      PID=$(lsof -i :$BACKEND_PORT -t)
-      echo -e "Killing process $PID..."
-      kill -9 $PID
-      sleep 2
+      echo -e "Attempting to kill processes using port $BACKEND_PORT and related node/nodemon processes..."
+      # Kill specific process using the port
+      lsof -i :$BACKEND_PORT -t | xargs kill -9 > /dev/null 2>&1
+      sleep 1 # Give a moment for the process to terminate
+      # Kill any lingering nodemon or node instances for this specific backend
+      pkill -f "nodemon index.js" > /dev/null 2>&1
+      pkill -f "node index.js" > /dev/null 2>&1
+      sleep 1 # Another brief pause
+      echo -e "${GREEN}Attempted to clear port $BACKEND_PORT. Checking again...${NC}"
+      if lsof -i :$BACKEND_PORT -t >/dev/null; then
+        echo -e "${RED}Failed to clear port $BACKEND_PORT. Please check manually.${NC}"
+        exit 1
+      else
+        echo -e "${GREEN}Port $BACKEND_PORT is now clear.${NC}"
+      fi
     else
       echo -e "${YELLOW}Please update the PORT in backend/.env and REACT_APP_API_URL in frontend/.env${NC}"
       echo -e "${YELLOW}Then try starting the application again.${NC}"

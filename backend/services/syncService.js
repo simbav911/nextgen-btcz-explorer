@@ -120,7 +120,7 @@ const syncBlockchain = async () => {
     logger.info(`Syncing blocks from ${lastSyncedBlock + 1} to ${currentHeight}`);
     
     // Sync blocks in batches of 10
-    const batchSize = 10;
+    const batchSize = 100; // Increased batch size for potentially faster sync
     for (let height = lastSyncedBlock + 1; height <= currentHeight; height += batchSize) {
       const endHeight = Math.min(height + batchSize - 1, currentHeight);
       
@@ -150,15 +150,21 @@ const syncBlockchain = async () => {
  * Synchronize a specific block and its transactions
  */
 const syncBlock = async (height) => {
+  const sequelize = getSequelize(); // Get Sequelize instance
+  let transaction; // Define transaction variable
+
   try {
+    // Start a database transaction
+    transaction = await sequelize.transaction();
+
     // Get block hash for the height
     const blockHash = await bitcoinzService.executeRpcCommand('getblockhash', [height]);
     
-    // Get block details
-    const block = await bitcoinzService.getBlock(blockHash, 1);
+    // Get block details with transaction data (verbosity 2)
+    const block = await bitcoinzService.getBlock(blockHash, 2); // Use verbosity 2
     
-    // Store block in database
-    await Block.upsert({
+    // Prepare block data for DB
+    const blockData = {
       hash: block.hash,
       height: block.height,
       confirmations: block.confirmations,
@@ -168,7 +174,7 @@ const syncBlock = async (height) => {
       version: block.version,
       versionHex: block.versionHex,
       merkleroot: block.merkleroot,
-      tx: block.tx,
+      tx: block.tx.map(tx => tx.txid), // Store only txids in Block model
       time: block.time,
       mediantime: block.mediantime,
       nonce: block.nonce,
@@ -177,36 +183,52 @@ const syncBlock = async (height) => {
       chainwork: block.chainwork,
       previousblockhash: block.previousblockhash,
       nextblockhash: block.nextblockhash
+    };
+    
+    // Upsert block within the transaction
+    await Block.upsert(blockData, { transaction });
+    
+    // Sync each transaction concurrently, passing detailed tx data and the transaction object
+    const txSyncPromises = block.tx.map(txData => {
+      // Pass the detailed transaction data directly and the transaction object
+      return syncTransaction(txData, block.hash, block.height, block.time, transaction);
     });
     
-    // Sync each transaction
-    for (const txid of block.tx) {
-      await syncTransaction(txid, block.hash, block.height, block.time);
-    }
+    // Wait for all transaction syncs to complete within the transaction
+    await Promise.all(txSyncPromises);
+
+    // Commit the transaction if everything succeeded
+    await transaction.commit();
+
+    // Broadcast to connected clients (consider sending less data if block object is large)
+    broadcastEvent('new_block', blockData, 'blocks'); // Send processed block data
     
-    // Broadcast to connected clients
-    broadcastEvent('new_block', block, 'blocks');
-    
-    return block;
+    return blockData; // Return processed block data
   } catch (error) {
+    // Rollback the transaction in case of any error
+    if (transaction) await transaction.rollback();
     logger.error(`Error syncing block at height ${height}:`, error);
-    throw error;
+    throw error; // Re-throw the error after rollback
   }
 };
 
 /**
  * Synchronize a specific transaction
  */
-const syncTransaction = async (txid, blockhash, blockHeight, blockTime) => {
+const syncTransaction = async (txData, blockhash, blockHeight, blockTime, transaction) => { // Added transaction param
+  const txid = txData.txid; // Get txid from the passed data
   try {
-    // Check if transaction already exists
-    const existingTx = await Transaction.findByPk(txid);
+    // Check if transaction already exists within the transaction
+    const existingTx = await Transaction.findByPk(txid, { transaction });
+    // Ensure blockhash matches if tx exists, handles reorgs where tx might be in a different block now
     if (existingTx && existingTx.blockhash === blockhash) {
-      return; // Transaction already synced
+      // Even if it exists, we might need to update address balances if this block confirms it differently
+      // For simplicity now, we skip if found in the same block context. Revisit if needed.
+      return; // Transaction already synced for this block
     }
     
-    // Get transaction details
-    const tx = await bitcoinzService.getRawTransaction(txid, 1);
+    // Use the detailed transaction data passed from syncBlock
+    const tx = txData;
     
     // Check if it's a coinbase transaction
     const isCoinbase = tx.vin && tx.vin.length > 0 && tx.vin[0].coinbase;
@@ -221,35 +243,41 @@ const syncTransaction = async (txid, blockhash, blockHeight, blockTime) => {
       valueOut = tx.vout.reduce((sum, output) => sum + (output.value || 0), 0);
     }
     
-    // Sum input values (for non-coinbase)
+    // Sum input values (for non-coinbase) using prevout data
     if (!isCoinbase && tx.vin) {
+      // Use prevout data if available from getblock verbosity 2
       for (const input of tx.vin) {
-        if (input.txid && input.vout !== undefined) {
-          try {
-            const prevTx = await bitcoinzService.getRawTransaction(input.txid, 1);
-            if (prevTx && prevTx.vout && prevTx.vout[input.vout]) {
-              const inputValue = prevTx.vout[input.vout].value || 0;
-              valueIn += inputValue;
-              
-              // Add address and value info to the input
-              if (prevTx.vout[input.vout].scriptPubKey && prevTx.vout[input.vout].scriptPubKey.addresses) {
-                input.address = prevTx.vout[input.vout].scriptPubKey.addresses[0];
-                input.value = inputValue;
-              }
-            }
-          } catch (err) {
-            logger.error(`Error getting previous transaction ${input.txid}:`, err);
+        // Check if prevout details are included (should be with verbosity 2)
+        if (input.prevout && input.prevout.value !== undefined) {
+          const inputValue = input.prevout.value; // Use value directly
+          valueIn += inputValue;
+          // Add address and value info to the input object for updateAddressesFromTransaction
+          // This assumes the structure from getblock verbosity 2 includes scriptPubKey and addresses in prevout
+          if (input.prevout.scriptPubKey && input.prevout.scriptPubKey.addresses) {
+            input.address = input.prevout.scriptPubKey.addresses[0];
+            input.value = inputValue; // Add value for consistency if needed later
           }
+        } else if (input.txid) {
+            // Fallback or log if prevout data is missing unexpectedly
+            logger.warn(`Missing prevout data for input in tx ${txid}, vin index ${input.sequence}. Cannot calculate input value accurately.`);
         }
       }
       
       // Calculate fee
       fee = valueIn - valueOut;
-      if (fee < 0) fee = 0; // Sanity check
+      // Allow for small floating point inaccuracies, treat negative fees as 0
+      if (fee < 0 && Math.abs(fee) > 1e-8) {
+          logger.warn(`Calculated negative fee for tx ${txid}: ${fee}. Setting fee to 0. valueIn: ${valueIn}, valueOut: ${valueOut}`);
+          fee = 0;
+      } else if (fee < 0) {
+          fee = 0; // Set small negative fees (rounding errors) to 0
+      }
     }
     
-    // Store transaction in database
-    await Transaction.upsert({
+    // Store transaction in database within the transaction
+    // Note: Storing the full vin/vout objects can consume significant space.
+    // Consider storing only necessary fields if space becomes an issue.
+    const txRecord = {
       txid: tx.txid,
       hash: tx.hash,
       version: tx.version,
@@ -257,141 +285,146 @@ const syncTransaction = async (txid, blockhash, blockHeight, blockTime) => {
       vsize: tx.vsize,
       weight: tx.weight,
       locktime: tx.locktime,
-      blockhash: tx.blockhash || blockhash,
-      confirmations: tx.confirmations || 1,
-      time: tx.time || blockTime,
-      blocktime: tx.blocktime || blockTime,
-      vin: tx.vin,
-      vout: tx.vout,
+      blockhash: blockhash, // Use the blockhash from the current block sync
+      confirmations: tx.confirmations || 1, // Confirmations might not be accurate from getblock, rely on block height
+      time: tx.time || blockTime, // Prefer tx time if available
+      blocktime: blockTime, // Always use the block's time
+      vin: tx.vin, // Store potentially large vin array
+      vout: tx.vout, // Store potentially large vout array
       isCoinbase: isCoinbase,
       fee: fee,
       valueIn: valueIn,
       valueOut: valueOut,
-      valueBalance: tx.valueBalance,
+      // valueBalance might not be present in getblock results, handle potential undefined
+      valueBalance: tx.valueBalance !== undefined ? tx.valueBalance : null,
       fOverwintered: tx.fOverwintered,
-      vShieldedSpend: tx.vShieldedSpend,
-      vShieldedOutput: tx.vShieldedOutput,
+      // Shielded data might not be present, handle potential undefined
+      vShieldedSpend: tx.vShieldedSpend || [],
+      vShieldedOutput: tx.vShieldedOutput || [],
       bindingSig: tx.bindingSig
-    });
+    };
+    await Transaction.upsert(txRecord, { transaction }); // Pass transaction object
     
-    // Update address records for inputs and outputs
-    await updateAddressesFromTransaction(tx, isCoinbase, valueIn, valueOut);
+    // Update address records for inputs and outputs within the transaction
+    // Pass the modified tx object which now includes address/value in vin inputs
+    await updateAddressesFromTransaction(tx, isCoinbase, valueIn, valueOut, transaction); // Pass transaction object
     
-    return tx;
+    return txRecord; // Return the data that was upserted
   } catch (error) {
-    logger.error(`Error syncing transaction ${txid}:`, error);
-    throw error;
+    // Log the specific txid where the error occurred
+    // The transaction will be rolled back in syncBlock's catch block
+    logger.error(`Error syncing transaction ${txid} (within block transaction):`, error);
+    throw error; // Re-throw to allow Promise.all and syncBlock to catch it
   }
 };
 
 /**
  * Update address records from transaction inputs and outputs
  */
-const updateAddressesFromTransaction = async (tx, isCoinbase, valueIn, valueOut) => {
+const updateAddressesFromTransaction = async (tx, isCoinbase, valueIn, valueOut, transaction) => {
   try {
-    const addressMap = new Map();
-    
+    const addressChanges = new Map(); // Map to store changes per address { received: X, sent: Y, txids: Set }
+
+    // 1. Aggregate changes from the transaction
     // Process outputs (funds received)
     if (tx.vout) {
       for (const output of tx.vout) {
-        if (output.scriptPubKey && output.scriptPubKey.addresses && output.value) {
+        if (output.scriptPubKey?.addresses?.length > 0 && output.value > 0) {
           const address = output.scriptPubKey.addresses[0];
-          
-          if (!addressMap.has(address)) {
-            addressMap.set(address, {
-              address,
-              totalReceived: 0,
-              totalSent: 0,
-              txids: new Set()
-            });
+          if (!addressChanges.has(address)) {
+            addressChanges.set(address, { received: 0, sent: 0, txids: new Set() });
           }
-          
-          const addrData = addressMap.get(address);
-          addrData.totalReceived += output.value;
-          addrData.txids.add(tx.txid);
+          const change = addressChanges.get(address);
+          change.received += output.value;
+          change.txids.add(tx.txid);
         }
       }
     }
-    
+
     // Process inputs (funds sent)
     if (!isCoinbase && tx.vin) {
       for (const input of tx.vin) {
-        if (input.address && input.value) {
+        if (input.address && input.value > 0) {
           const address = input.address;
-          
-          if (!addressMap.has(address)) {
-            addressMap.set(address, {
-              address,
-              totalReceived: 0,
-              totalSent: 0,
-              txids: new Set()
-            });
+          if (!addressChanges.has(address)) {
+            addressChanges.set(address, { received: 0, sent: 0, txids: new Set() });
           }
-          
-          const addrData = addressMap.get(address);
-          addrData.totalSent += input.value;
-          addrData.txids.add(tx.txid);
+          const change = addressChanges.get(address);
+          change.sent += input.value;
+          change.txids.add(tx.txid);
         }
       }
     }
-    
-    // Update addresses in database
-    for (const [address, data] of addressMap.entries()) {
-      await updateAddressData(
-        address,
-        data.totalReceived,
-        data.totalSent,
-        Array.from(data.txids)
-      );
+
+    if (addressChanges.size === 0) {
+      return; // No addresses affected by this transaction
     }
+
+    const affectedAddresses = Array.from(addressChanges.keys());
+
+    // 2. Fetch existing address records in bulk
+    const existingAddresses = await Address.findAll({
+      where: { address: { [Op.in]: affectedAddresses } },
+      transaction
+    });
+
+    const existingAddressMap = new Map(existingAddresses.map(addr => [addr.address, addr]));
+    const addressesToCreate = [];
+    const addressesToSave = [];
+    const now = new Date();
+
+    // 3. Process updates and prepare bulk create/save lists
+    for (const [address, change] of addressChanges.entries()) {
+      const existingData = existingAddressMap.get(address);
+      const newTxidsArray = Array.from(change.txids);
+
+      if (existingData) {
+        // Update existing record instance
+        existingData.totalReceived = (Number(existingData.totalReceived) || 0) + change.received;
+        existingData.totalSent = (Number(existingData.totalSent) || 0) + change.sent;
+        existingData.balance = existingData.totalReceived - existingData.totalSent;
+        
+        const currentTxids = new Set(existingData.transactions || []);
+        newTxidsArray.forEach(txid => currentTxids.add(txid));
+        existingData.transactions = Array.from(currentTxids);
+        existingData.txCount = existingData.transactions.length;
+        existingData.lastUpdated = now;
+        
+        addressesToSave.push(existingData);
+      } else {
+        // Prepare data for new record creation
+        const balance = change.received - change.sent;
+        addressesToCreate.push({
+          address,
+          balance,
+          totalReceived: change.received,
+          totalSent: change.sent,
+          unconfirmedBalance: 0,
+          txCount: newTxidsArray.length,
+          transactions: newTxidsArray,
+          lastUpdated: now
+        });
+      }
+    }
+
+    // 4. Perform bulk create for new addresses
+    if (addressesToCreate.length > 0) {
+      await Address.bulkCreate(addressesToCreate, { transaction });
+    }
+
+    // 5. Save updated existing addresses (individual saves within the transaction)
+    if (addressesToSave.length > 0) {
+      // Consider further optimization here if needed (e.g., bulk update if supported well)
+      await Promise.all(addressesToSave.map(addr => addr.save({ transaction })));
+    }
+
   } catch (error) {
-    logger.error('Error updating addresses from transaction:', error);
+    logger.error(`Error bulk updating addresses from transaction ${tx.txid} (within block transaction):`, error);
+    throw error; // Re-throw error to ensure transaction rollback
   }
 };
 
-/**
- * Update address data in the database
- */
-const updateAddressData = async (address, received, sent, txids) => {
-  try {
-    // Get existing address data
-    let addressData = await Address.findByPk(address);
-    
-    if (addressData) {
-      // Update existing record
-      addressData.totalReceived += received;
-      addressData.totalSent += sent;
-      addressData.balance = addressData.totalReceived - addressData.totalSent;
-      
-      // Add new transactions
-      const existingTxids = new Set(addressData.transactions);
-      txids.forEach(txid => existingTxids.add(txid));
-      addressData.transactions = Array.from(existingTxids);
-      addressData.txCount = addressData.transactions.length;
-      
-      // Save updates
-      await addressData.save();
-    } else {
-      // Create new address record
-      const balance = received - sent;
-      addressData = await Address.create({
-        address,
-        balance,
-        totalReceived: received,
-        totalSent: sent,
-        unconfirmedBalance: 0,
-        txCount: txids.length,
-        transactions: txids,
-        lastUpdated: new Date()
-      });
-    }
-    
-    return addressData;
-  } catch (error) {
-    logger.error(`Error updating address ${address}:`, error);
-    throw error;
-  }
-};
+// Remove the old updateAddressData function as it's now handled within updateAddressesFromTransaction
 
 /**
  * Update network statistics

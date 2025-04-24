@@ -35,27 +35,27 @@ const ModernHeader = () => {
       {/* Animated gradient background div */}
       <div className="animated-gradient"></div>
       
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+      <div className="max-w-7xl mx-auto px-2 sm:px-3 lg:px-4">
         <div className="flex justify-between items-center h-14">
           {/* Logo and Title - Entire area clickable with enhanced hover effect */}
-          <Link to="/" className="flex items-center cursor-pointer logo-hover" title="Go to Home Page">
-            <div className="flex-shrink-0 w-10">
+          <Link to="/" className="flex items-center cursor-pointer logo-hover ml-0 pl-1" title="Go to Home Page">
+            <div className="flex-shrink-0 w-12">
               <img 
                 src="/logo.png" 
                 alt="BitcoinZ" 
-                className="h-10 w-10 logo-image"
+                className="h-12 w-12 logo-image"
                 onError={(e) => {
                   e.target.onerror = null;
                   e.target.src = 'https://bitcoinz.global/wp-content/uploads/branding/btcz-website-logo.png';
                 }}
               />
             </div>
-            <div className="ml-3 flex flex-col">
-              <h1 className="font-bold text-lg tracking-wide sharp-text">
+            <div className="ml-2 flex flex-col justify-center">
+              <h1 className="font-bold text-lg tracking-wide sharp-text" style={{ textShadow: '0 0 2px rgba(255, 255, 255, 0.9), 0 1px 3px rgba(0, 0, 0, 0.7)' }}>
                 <span className="text-white">Bitcoin</span>
-                <span className="text-yellow-300" style={{ textShadow: '0 0 5px rgba(251, 191, 36, 0.7)' }}>Z</span>
+                <span className="text-yellow-300" style={{ textShadow: '0 0 5px rgba(251, 191, 36, 0.9), 0 0 10px rgba(251, 191, 36, 0.5)' }}>Z</span>
               </h1>
-              <span className="text-xs text-white opacity-90 tracking-wider sharp-text">Explorer</span>
+              <span className="text-xs text-white opacity-95 tracking-wider sharp-text" style={{ textShadow: '0 0 2px rgba(255, 255, 255, 0.8), 0 1px 2px rgba(0, 0, 0, 0.6)', letterSpacing: '0.05em', fontWeight: '600' }}>Explorer</span>
             </div>
           </Link>
 

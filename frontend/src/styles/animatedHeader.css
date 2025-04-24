@@ -61,10 +61,11 @@
 /* Sharper text with enhanced contrast and definition */
 .sharp-text {
   text-shadow: 
-    0 0 1px rgba(255, 255, 255, 0.9),
-    0 1px 2px rgba(0, 0, 0, 0.5);
-  font-weight: 600;
-  letter-spacing: 0.02em;
+    0 0 1px rgba(255, 255, 255, 1),
+    0 1px 3px rgba(0, 0, 0, 0.7),
+    0 0 5px rgba(255, 255, 255, 0.3);
+  font-weight: 700;
+  letter-spacing: 0.03em;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
 }
@@ -79,7 +80,7 @@
 /* Logo hover effect */
 .logo-hover {
   position: relative;
-  padding: 4px 8px;
+  padding: 2px 4px;
   border-radius: 8px;
   transition: all 0.3s ease;
 }

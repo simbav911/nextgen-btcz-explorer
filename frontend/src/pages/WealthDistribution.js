@@ -319,16 +319,16 @@ const WealthDistribution = () => {
   };
 
   return (
-    <div className="wealth-distribution-container w-full max-w-none px-4 mx-auto">
-      <div className="bg-white rounded-lg shadow-md p-6 mb-8">
-        <div className="flex justify-between items-center mb-4">
-          <h1 className="text-3xl font-bold text-gray-800">
+    <div className="wealth-distribution-container w-full max-w-6xl px-2 mx-auto">
+      <div className="bg-white rounded-lg shadow-md p-4 mb-6">
+        <div className="flex justify-between items-center mb-3">
+          <h1 className="text-2xl font-bold text-gray-800">
             <FaCoins className="inline-block mr-2 text-yellow-500" />
             BitcoinZ Wealth Distribution
           </h1>
           <button 
             onClick={handleRefreshData}
-            className="bg-blue-500 hover:bg-blue-600 text-white px-4 py-2 rounded-md text-sm flex items-center"
+            className="bg-blue-500 hover:bg-blue-600 text-white px-3 py-1 rounded-md text-sm flex items-center"
           >
             <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 mr-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
@@ -336,7 +336,7 @@ const WealthDistribution = () => {
             Refresh Data
           </button>
         </div>
-        <p className="text-gray-600 mb-6">
+        <p className="text-gray-600 mb-4 text-sm">
           Explore the distribution of BitcoinZ across addresses and analyze the top holders.
         </p>
         
@@ -408,11 +408,11 @@ const WealthDistribution = () => {
           <>
             {activeTab === 'topHolders' && (
               <div>
-                <div className="grid grid-cols-1 xl:grid-cols-3 gap-6 mb-8">
-                  {/* Pie Chart - Larger and 3D */}
-                  <div className="bg-gray-50 p-4 rounded-lg shadow-sm xl:col-span-2">
-                    <h3 className="text-lg font-semibold mb-4">Top Holders Distribution</h3>
-                    <div className="h-96"> {/* Increased height for larger chart */}
+                <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 mb-6">
+                  {/* Pie Chart - Adjusted size */}
+                  <div className="bg-gray-50 p-3 rounded-lg shadow-sm lg:col-span-2">
+                    <h3 className="text-md font-semibold mb-2">Top Holders Distribution</h3>
+                    <div className="h-80"> {/* Reduced height */}
                       <ResponsiveContainer width="100%" height="100%">
                         <PieChart>
                           <Pie
@@ -420,12 +420,12 @@ const WealthDistribution = () => {
                             cx="50%"
                             cy="50%"
                             labelLine={false}
-                            outerRadius={120} /* Increased size */
-                            innerRadius={40} /* Added inner radius for 3D effect */
+                            outerRadius={100} /* Reduced size */
+                            innerRadius={30} /* Reduced inner radius */
                             fill="#8884d8"
                             dataKey="value"
                             nameKey="name"
-                            paddingAngle={2} /* Added padding for 3D effect */
+                            paddingAngle={2}
                             label={({ name, percent }) => `${name} (${(percent * 100).toFixed(1)}%)`}
                           >
                             {preparePieChartData().map((entry, index) => (
@@ -442,73 +442,80 @@ const WealthDistribution = () => {
                             layout="vertical" 
                             verticalAlign="middle" 
                             align="right"
-                            wrapperStyle={{ fontSize: '12px' }}
+                            wrapperStyle={{ fontSize: '11px' }}
                           />
                         </PieChart>
                       </ResponsiveContainer>
                     </div>
                   </div>
                   
-                  {/* Summary Stats */}
-                  <div className="bg-gray-50 p-4 rounded-lg shadow-sm">
-                    <h3 className="text-lg font-semibold mb-4">Wealth Summary</h3>
-                    <div className="space-y-4">
-                      <div className="p-3 bg-white rounded-md shadow-sm">
-                        <p className="text-sm text-gray-500">Total Supply</p>
-                        <p className="text-xl font-bold">{formatNumber(totalSupply)} BTCZ</p>
+                  {/* Summary Stats - More compact layout */}
+                  <div className="bg-gray-50 p-3 rounded-lg shadow-sm">
+                    <h3 className="text-md font-semibold mb-2">Wealth Summary</h3>
+                    <div className="grid grid-cols-2 gap-2">
+                      <div className="p-2 bg-white rounded-md shadow-sm">
+                        <p className="text-xs text-gray-500">Current Supply</p>
+                        <p className="text-sm font-bold">{formatNumber(totalSupply)} BTCZ</p>
                       </div>
-                      <div className="p-3 bg-white rounded-md shadow-sm">
-                        <p className="text-sm text-gray-500">Top 10 Holders Control</p>
-                        <p className="text-xl font-bold">
+                      <div className="p-2 bg-white rounded-md shadow-sm">
+                        <p className="text-xs text-gray-500">Maximum Supply</p>
+                        <p className="text-sm font-bold">21,000,000 BTCZ</p>
+                        <p className="text-xs text-gray-500 mt-0.5">
+                          {formatPercentage((totalSupply / 21000000) * 100)} in circulation
+                        </p>
+                      </div>
+                      <div className="p-2 bg-white rounded-md shadow-sm">
+                        <p className="text-xs text-gray-500">Top 10 Holders</p>
+                        <p className="text-sm font-bold">
                           {formatPercentage(
                             topHolders.slice(0, 10).reduce((sum, h) => sum + h.percentageOfSupply, 0)
                           )}
                         </p>
                       </div>
-                      <div className="p-3 bg-white rounded-md shadow-sm">
-                        <p className="text-sm text-gray-500">Top 100 Holders Control</p>
-                        <p className="text-xl font-bold">
+                      <div className="p-2 bg-white rounded-md shadow-sm">
+                        <p className="text-xs text-gray-500">Top 100 Holders</p>
+                        <p className="text-sm font-bold">
                           {formatPercentage(
                             topHolders.reduce((sum, h) => sum + h.percentageOfSupply, 0)
                           )}
                         </p>
                       </div>
-                      <div className="p-3 bg-white rounded-md shadow-sm">
-                        <p className="text-sm text-gray-500">Total Addresses Analyzed</p>
-                        <p className="text-xl font-bold">{formatNumber(totalAddresses)}</p>
+                      <div className="p-2 bg-white rounded-md shadow-sm col-span-2">
+                        <p className="text-xs text-gray-500">Total Addresses Analyzed</p>
+                        <p className="text-sm font-bold">{formatNumber(totalAddresses)}</p>
                       </div>
                     </div>
                   </div>
                 </div>
                 
-                {/* Top Holders Table - Improved readability */}
-                <div className="overflow-x-auto">
-                  <table className="min-w-full bg-white rounded-lg overflow-hidden">
+                {/* Top Holders Table - More compact */}
+                <div className="overflow-x-auto bg-white rounded-lg shadow-sm">
+                  <table className="min-w-full">
                     <thead className="bg-gray-100">
                       <tr>
-                        <th className="py-3 px-4 text-left text-xs font-medium text-gray-500 uppercase tracking-wider w-16">Rank</th>
-                        <th className="py-3 px-4 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Address</th>
-                        <th className="py-3 px-4 text-left text-xs font-medium text-gray-500 uppercase tracking-wider w-1/5">Balance (BTCZ)</th>
-                        <th className="py-3 px-4 text-left text-xs font-medium text-gray-500 uppercase tracking-wider w-1/6">% of Supply</th>
-                        <th className="py-3 px-4 text-left text-xs font-medium text-gray-500 uppercase tracking-wider w-1/6">Transactions</th>
+                        <th className="py-2 px-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider w-10">Rank</th>
+                        <th className="py-2 px-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Address</th>
+                        <th className="py-2 px-2 text-right text-xs font-medium text-gray-500 uppercase tracking-wider w-28">Balance (BTCZ)</th>
+                        <th className="py-2 px-2 text-right text-xs font-medium text-gray-500 uppercase tracking-wider w-20">% of Supply</th>
+                        <th className="py-2 px-2 text-right text-xs font-medium text-gray-500 uppercase tracking-wider w-20">Transactions</th>
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-gray-200">
                       {topHolders.map((holder, index) => (
-                        <tr key={holder.address} className={index % 2 === 0 ? 'bg-white' : 'bg-gray-50'}>
-                          <td className="py-3 px-4 text-sm font-medium text-gray-900">{index + 1}</td>
-                          <td className="py-3 px-4 text-sm">
+                        <tr key={holder.address} className={index % 2 === 0 ? 'bg-white hover:bg-blue-50' : 'bg-gray-50 hover:bg-blue-50'}>
+                          <td className="py-1.5 px-2 text-xs font-medium text-gray-900">{index + 1}</td>
+                          <td className="py-1.5 px-2 text-xs">
                             <a 
                               href={`/address/${holder.address}`}
-                              className="text-blue-600 hover:text-blue-800 font-mono text-xs break-all"
+                              className="text-blue-600 hover:text-blue-800 font-mono text-xs"
                               title={holder.address}
                             >
                               {holder.address}
                             </a>
                           </td>
-                          <td className="py-3 px-4 text-sm text-gray-900 font-medium">{formatNumber(holder.balance)}</td>
-                          <td className="py-3 px-4 text-sm text-gray-900">{formatPercentage(holder.percentageOfSupply)}</td>
-                          <td className="py-3 px-4 text-sm text-gray-900">{formatNumber(holder.txCount)}</td>
+                          <td className="py-1.5 px-2 text-xs text-gray-900 font-medium text-right">{formatNumber(holder.balance)}</td>
+                          <td className="py-1.5 px-2 text-xs text-gray-900 text-right">{formatPercentage(holder.percentageOfSupply)}</td>
+                          <td className="py-1.5 px-2 text-xs text-gray-900 text-right">{formatNumber(holder.txCount)}</td>
                         </tr>
                       ))}
                     </tbody>

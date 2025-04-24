@@ -52,6 +52,7 @@ const WealthDistribution = () => {
   const [totalSupply, setTotalSupply] = useState(0);
   const [totalAddresses, setTotalAddresses] = useState(0);
   const [usingMockData, setUsingMockData] = useState(false);
+  const [searchTerm, setSearchTerm] = useState('');
   const [dataVersion, setDataVersion] = useState(0); // Add a version to prevent data changing on refresh
   const [syncStatus, setSyncStatus] = useState(null); // State for sync status
   const { showToast } = useContext(ToastContext);
@@ -190,38 +191,35 @@ const WealthDistribution = () => {
     return percent.toFixed(4) + '%';
   };
 
-  // Format address for better readability
+  // Format address for display
   const formatAddress = (address) => {
-    if (!address) return '';
-    // Take first 6 and last 4 characters
-    return `${address.substring(0, 6)}...${address.substring(address.length - 4)}`;
+    return `${address.substring(0, 10)}...${address.substring(address.length - 4)}`;
   };
 
   // Prepare data for pie chart
   const preparePieChartData = () => {
-    // Take top 7 holders and group the rest as "Others"
-    const topN = topHolders.slice(0, 7);
-    const others = topHolders.slice(7);
+    if (topHolders.length === 0) return [];
     
-    const othersSum = others.reduce((sum, holder) => sum + holder.balance, 0);
-    const othersPercentage = (othersSum / totalSupply) * 100;
+    // Take top 10 holders
+    const top10 = topHolders.slice(0, 10);
     
-    const chartData = [
-      ...topN.map(holder => ({
-        name: formatAddress(holder.address),
-        fullAddress: holder.address,
-        value: holder.balance,
-        percentage: holder.percentageOfSupply
-      })),
-      {
+    // Calculate "Others" percentage
+    const othersPercentage = topHolders.slice(10).reduce((sum, holder) => sum + holder.percentageOfSupply, 0);
+    
+    const data = top10.map(holder => ({
+      name: holder.address,
+      value: holder.percentageOfSupply
+    }));
+    
+    // Add "Others" if there are more than 10 holders
+    if (othersPercentage > 0) {
+      data.push({
         name: 'Others',
-        fullAddress: 'Multiple addresses',
-        value: othersSum,
-        percentage: othersPercentage
-      }
-    ];
+        value: othersPercentage
+      });
+    }
     
-    return chartData;
+    return data;
   };
 
   // Prepare data for bar chart
@@ -246,6 +244,35 @@ const WealthDistribution = () => {
       );
     }
     return null;
+  };
+
+  // Custom legend for pie chart
+  const CustomLegend = (props) => {
+    const { payload } = props;
+    
+    return (
+      <ul className="recharts-default-legend" style={{ padding: 0, margin: 0, textAlign: 'left' }}>
+        {payload.map((entry, index) => (
+          <li 
+            key={`item-${index}`} 
+            className="recharts-legend-item" 
+            style={{ display: 'block', marginBottom: '10px', cursor: 'pointer' }}
+            onClick={() => {
+              if (entry.value !== 'Others') {
+                window.open(`/address/${entry.value}`, '_blank');
+              }
+            }}
+          >
+            <svg className="recharts-surface" width="14" height="14" viewBox="0 0 32 32" style={{ display: 'inline-block', verticalAlign: 'middle', marginRight: '10px' }}>
+              <path stroke="none" fill={entry.color} d="M0,4h32v24h-32z" className="recharts-legend-icon" />
+            </svg>
+            <span className="recharts-legend-item-text font-mono text-xs" style={{ color: entry.color, paddingLeft: '4px' }}>
+              {entry.value === 'Others' ? 'Others' : formatAddress(entry.value)}
+            </span>
+          </li>
+        ))}
+      </ul>
+    );
   };
 
   // Force refresh data
@@ -428,7 +455,11 @@ const WealthDistribution = () => {
                             dataKey="value"
                             nameKey="name"
                             paddingAngle={2}
-                            label={({ name, percent }) => `${name} (${(percent * 100).toFixed(1)}%)`}
+                            label={({ name, percent }) => 
+                              name === 'Others' 
+                                ? `Others (${(percent * 100).toFixed(1)}%)` 
+                                : `${formatAddress(name)} (${(percent * 100).toFixed(1)}%)`
+                            }
                           >
                             {preparePieChartData().map((entry, index) => (
                               <Cell 
@@ -441,10 +472,10 @@ const WealthDistribution = () => {
                           </Pie>
                           <Tooltip content={<CustomTooltip />} />
                           <Legend 
+                            content={<CustomLegend />}
                             layout="vertical" 
                             verticalAlign="middle" 
                             align="right"
-                            wrapperStyle={{ fontSize: '11px' }}
                           />
                         </PieChart>
                       </ResponsiveContainer>
@@ -490,7 +521,19 @@ const WealthDistribution = () => {
                   </div>
                 </div>
                 
-                {/* Top Holders Table - Mobile responsive */}
+                {/* Top Holders Table - With search and full addresses */}
+                <div className="mb-4">
+                  <div className="flex items-center bg-white rounded-lg shadow-sm p-2 mb-2">
+                    <input
+                      type="text"
+                      placeholder="Search by address..."
+                      className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                      value={searchTerm}
+                      onChange={(e) => setSearchTerm(e.target.value)}
+                    />
+                  </div>
+                </div>
+                
                 <div className="overflow-x-auto bg-white rounded-lg shadow-sm">
                   <table className="w-full table-fixed">
                     <thead className="bg-gray-100">
@@ -503,19 +546,21 @@ const WealthDistribution = () => {
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-gray-200">
-                      {topHolders.map((holder, index) => (
+                      {topHolders
+                        .filter(holder => 
+                          holder.address.toLowerCase().includes(searchTerm.toLowerCase())
+                        )
+                        .map((holder, index) => (
                         <tr key={holder.address} className={index % 2 === 0 ? 'bg-white hover:bg-blue-50' : 'bg-gray-50 hover:bg-blue-50'}>
                           <td className="py-1.5 px-2 text-xs font-medium text-gray-900">{index + 1}</td>
                           <td className="py-1.5 px-2 text-xs overflow-hidden">
-                            <div className="truncate">
-                              <a 
-                                href={`/address/${holder.address}`}
-                                className="text-blue-600 hover:text-blue-800 font-mono text-xs"
-                                title={holder.address}
-                              >
-                                {holder.address.substring(0, 6)}...{holder.address.substring(holder.address.length - 4)}
-                              </a>
-                            </div>
+                            <a 
+                              href={`/address/${holder.address}`}
+                              className="text-blue-600 hover:text-blue-800 font-mono text-xs"
+                              title={holder.address}
+                            >
+                              {holder.address}
+                            </a>
                           </td>
                           <td className="py-1.5 px-2 text-xs text-gray-900 font-medium text-right">{formatNumber(holder.balance)}</td>
                           <td className="py-1.5 px-2 text-xs text-gray-900 text-right">{formatPercentage(holder.percentageOfSupply)}</td>

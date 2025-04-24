@@ -6,13 +6,44 @@ const Footer = () => {
   const currentYear = new Date().getFullYear();
 
   return (
-    <footer className="bg-gray-800 text-white py-8">
-      <div className="container-custom">
+    <footer className="relative text-white py-8 z-10 mt-12">
+      {/* Background gradient with animated overlay */}
+      <div className="absolute inset-0 bg-gradient-to-r from-blue-600 via-purple-600 to-blue-600 opacity-90"></div>
+      
+      {/* Animated light waves overlay */}
+      <div className="absolute inset-0 overflow-hidden">
+        <div className="absolute w-full" style={{ 
+          height: '80px', 
+          top: '0', 
+          background: 'linear-gradient(90deg, rgba(255,255,255,0.1) 0%, rgba(255,255,255,0.05) 50%, rgba(255,255,255,0.1) 100%)',
+          transform: 'translateY(-40px) rotate(-2deg)',
+          transformOrigin: 'center',
+          animation: 'wave 15s infinite linear'
+        }}></div>
+        <div className="absolute w-full" style={{ 
+          height: '50px', 
+          top: '20px', 
+          background: 'linear-gradient(90deg, rgba(255,255,255,0.08) 0%, rgba(255,255,255,0.03) 50%, rgba(255,255,255,0.08) 100%)',
+          transform: 'translateY(-20px) rotate(1deg)',
+          transformOrigin: 'center',
+          animation: 'wave 12s infinite linear reverse'
+        }}></div>
+      </div>
+      
+      <style jsx>{`
+        @keyframes wave {
+          0% { transform: translateX(-50%) rotate(-1deg); }
+          50% { transform: translateX(0%) rotate(1deg); }
+          100% { transform: translateX(50%) rotate(-1deg); }
+        }
+      `}</style>
+      
+      <div className="container-custom relative z-10">
         <div className="grid grid-cols-1 md:grid-cols-4 gap-8">
           {/* About */}
           <div>
             <h3 className="text-lg font-bold mb-4">BitcoinZ Explorer</h3>
-            <p className="text-gray-300 text-sm">
+            <p className="text-white text-opacity-90 text-sm">
               A modern, open-source block explorer for the BitcoinZ community.
               Explore blocks, transactions, and addresses on the BitcoinZ blockchain.
             </p>
@@ -23,16 +54,16 @@ const Footer = () => {
             <h3 className="text-lg font-bold mb-4">Quick Links</h3>
             <ul className="space-y-2">
               <li>
-                <Link to="/" className="text-gray-300 hover:text-white text-sm">Home</Link>
+                <Link to="/" className="text-white text-opacity-90 hover:text-opacity-100 text-sm">Home</Link>
               </li>
               <li>
-                <Link to="/blocks" className="text-gray-300 hover:text-white text-sm">Latest Blocks</Link>
+                <Link to="/blocks" className="text-white text-opacity-90 hover:text-opacity-100 text-sm">Latest Blocks</Link>
               </li>
               <li>
-                <Link to="/transactions" className="text-gray-300 hover:text-white text-sm">Latest Transactions</Link>
+                <Link to="/transactions" className="text-white text-opacity-90 hover:text-opacity-100 text-sm">Latest Transactions</Link>
               </li>
               <li>
-                <Link to="/stats" className="text-gray-300 hover:text-white text-sm">Network Statistics</Link>
+                <Link to="/stats" className="text-white text-opacity-90 hover:text-opacity-100 text-sm">Network Statistics</Link>
               </li>
             </ul>
           </div>
@@ -46,7 +77,7 @@ const Footer = () => {
                   href="https://bitcoinz.global" 
                   target="_blank" 
                   rel="noopener noreferrer"
-                  className="text-gray-300 hover:text-white text-sm"
+                  className="text-white text-opacity-90 hover:text-opacity-100 text-sm"
                 >
                   BitcoinZ Website
                 </a>
@@ -92,7 +123,7 @@ const Footer = () => {
                 href="https://github.com/btcz" 
                 target="_blank" 
                 rel="noopener noreferrer"
-                className="text-gray-300 hover:text-white"
+                className="text-white text-opacity-90 hover:text-opacity-100"
               >
                 <FaGithub size={20} />
               </a>
@@ -113,13 +144,13 @@ const Footer = () => {
                 <FaDiscord size={20} />
               </a>
             </div>
-            <p className="mt-4 text-gray-300 text-sm">
+            <p className="mt-4 text-white text-opacity-90 text-sm">
               Join the community to stay updated with the latest news and developments.
             </p>
           </div>
         </div>
 
-        <div className="mt-8 pt-6 border-t border-gray-700 text-center text-gray-400 text-sm">
+        <div className="mt-8 pt-6 border-t border-white border-opacity-30 text-center text-white text-sm">
           <p>© {currentYear} BitcoinZ Explorer. All rights reserved.</p>
           <p className="mt-2">
             BitcoinZ - Community driven development, Decentralized Cryptocurrency

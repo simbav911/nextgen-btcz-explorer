@@ -1,0 +1,70 @@
+/* Custom styles for Wealth Distribution page */
+
+/* Shadow - Main container width */
+#root .min-h-screen .content-container .wealth-distribution-container .shadow-md {
+  width: 60% !important;
+}
+
+/* Shadow - Positioning and width constraints */
+.min-h-screen .shadow-md {
+  min-width: 0px;
+  max-width: 1250px;
+  transform: translatex(642px) translatey(-5px);
+}
+
+/* Mobile responsive styles */
+@media (max-width: 1280px) {
+  #root .min-h-screen .content-container .wealth-distribution-container .shadow-md {
+    width: 80% !important;
+    margin-left: auto;
+    margin-right: auto;
+  }
+  
+  .min-h-screen .shadow-md {
+    transform: none;
+    max-width: 100%;
+  }
+}
+
+@media (max-width: 768px) {
+  #root .min-h-screen .content-container .wealth-distribution-container .shadow-md {
+    width: 95% !important;
+  }
+  
+  /* Make table more mobile-friendly */
+  .wealth-distribution-container table {
+    table-layout: fixed;
+  }
+  
+  .wealth-distribution-container th,
+  .wealth-distribution-container td {
+    padding: 0.5rem 0.25rem;
+    font-size: 0.7rem;
+  }
+  
+  /* Adjust column widths for mobile */
+  .wealth-distribution-container th:first-child,
+  .wealth-distribution-container td:first-child {
+    width: 8% !important;
+  }
+  
+  .wealth-distribution-container th:nth-child(2),
+  .wealth-distribution-container td:nth-child(2) {
+    width: 40% !important;
+  }
+  
+  .wealth-distribution-container th:nth-child(3),
+  .wealth-distribution-container td:nth-child(3) {
+    width: 22% !important;
+  }
+  
+  .wealth-distribution-container th:nth-child(4),
+  .wealth-distribution-container td:nth-child(4) {
+    width: 15% !important;
+  }
+  
+  .wealth-distribution-container th:nth-child(5),
+  .wealth-distribution-container td:nth-child(5) {
+    width: 15% !important;
+  }
+}

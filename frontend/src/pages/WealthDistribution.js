@@ -2,6 +2,7 @@ import React, { useState, useEffect, useContext } from 'react';
 import { FaCoins, FaChartPie, FaListOl, FaInfoCircle } from 'react-icons/fa';
 import { ToastContext } from '../contexts/ToastContext';
 import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip, Legend, BarChart, Bar, XAxis, YAxis, CartesianGrid } from 'recharts';
+import './wealthDistribution.css';
 
 // Mock data for top holders (used when API is not available)
 const MOCK_TOP_HOLDERS = [
@@ -275,6 +276,7 @@ const WealthDistribution = () => {
           // If no valid data, use mock data
           setTopHolders(MOCK_TOP_HOLDERS);
           setTotalSupply(MOCK_TOTAL_SUPPLY);
+          setTotalAddresses(MOCK_TOTAL_ADDRESSES);
           setUsingMockData(true);
         }
         
@@ -319,7 +321,7 @@ const WealthDistribution = () => {
   };
 
   return (
-    <div className="wealth-distribution-container w-full max-w-6xl px-2 mx-auto">
+    <div className="wealth-distribution-container">
       <div className="bg-white rounded-lg shadow-md p-4 mb-6">
         <div className="flex justify-between items-center mb-3">
           <h1 className="text-2xl font-bold text-gray-800">
@@ -488,30 +490,32 @@ const WealthDistribution = () => {
                   </div>
                 </div>
                 
-                {/* Top Holders Table - More compact */}
+                {/* Top Holders Table - Mobile responsive */}
                 <div className="overflow-x-auto bg-white rounded-lg shadow-sm">
-                  <table className="min-w-full">
+                  <table className="w-full table-fixed">
                     <thead className="bg-gray-100">
                       <tr>
-                        <th className="py-2 px-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider w-10">Rank</th>
+                        <th className="py-2 px-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider w-10">#</th>
                         <th className="py-2 px-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Address</th>
-                        <th className="py-2 px-2 text-right text-xs font-medium text-gray-500 uppercase tracking-wider w-28">Balance (BTCZ)</th>
-                        <th className="py-2 px-2 text-right text-xs font-medium text-gray-500 uppercase tracking-wider w-20">% of Supply</th>
-                        <th className="py-2 px-2 text-right text-xs font-medium text-gray-500 uppercase tracking-wider w-20">Transactions</th>
+                        <th className="py-2 px-2 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">Balance</th>
+                        <th className="py-2 px-2 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">%</th>
+                        <th className="py-2 px-2 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">Txs</th>
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-gray-200">
                       {topHolders.map((holder, index) => (
                         <tr key={holder.address} className={index % 2 === 0 ? 'bg-white hover:bg-blue-50' : 'bg-gray-50 hover:bg-blue-50'}>
                           <td className="py-1.5 px-2 text-xs font-medium text-gray-900">{index + 1}</td>
-                          <td className="py-1.5 px-2 text-xs">
-                            <a 
-                              href={`/address/${holder.address}`}
-                              className="text-blue-600 hover:text-blue-800 font-mono text-xs"
-                              title={holder.address}
-                            >
-                              {holder.address}
-                            </a>
+                          <td className="py-1.5 px-2 text-xs overflow-hidden">
+                            <div className="truncate">
+                              <a 
+                                href={`/address/${holder.address}`}
+                                className="text-blue-600 hover:text-blue-800 font-mono text-xs"
+                                title={holder.address}
+                              >
+                                {holder.address.substring(0, 6)}...{holder.address.substring(holder.address.length - 4)}
+                              </a>
+                            </div>
                           </td>
                           <td className="py-1.5 px-2 text-xs text-gray-900 font-medium text-right">{formatNumber(holder.balance)}</td>
                           <td className="py-1.5 px-2 text-xs text-gray-900 text-right">{formatPercentage(holder.percentageOfSupply)}</td>

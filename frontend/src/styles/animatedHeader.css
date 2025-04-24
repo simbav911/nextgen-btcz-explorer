@@ -8,9 +8,9 @@
 
 /* Glass effect for the header */
 .glass-header {
-  background: rgba(255, 255, 255, 0.15);
-  backdrop-filter: blur(8px);
-  -webkit-backdrop-filter: blur(8px);
+  background: rgba(255, 255, 255, 0.12);
+  backdrop-filter: blur(6px);
+  -webkit-backdrop-filter: blur(6px);
   border-bottom: 1px solid rgba(255, 255, 255, 0.2);
 }
 
@@ -26,8 +26,10 @@
     45deg,
     #ff00cc, #3333ff, #00ccff, #33cc33, #ffcc00, #ff3399
   );
-  background-size: 600% 600%;
+  background-size: 400% 400%;
   animation: gradientAnimation 240s ease infinite;
+  opacity: 0.9;
+  mix-blend-mode: screen;
 }
 
 /* Gradient animation keyframes */
@@ -47,7 +49,8 @@
 .header-shadow {
   box-shadow: 
     0 10px 20px rgba(0, 0, 0, 0.1),
-    0 6px 6px rgba(0, 0, 0, 0.1);
+    0 6px 6px rgba(0, 0, 0, 0.1),
+    0 0 20px rgba(255, 0, 204, 0.2);
 }
 
 /* Improve text readability with text shadow */
@@ -55,9 +58,69 @@
   text-shadow: 0 1px 2px rgba(0, 0, 0, 0.3);
 }
 
+/* Sharper text with enhanced contrast and definition */
+.sharp-text {
+  text-shadow: 
+    0 0 1px rgba(255, 255, 255, 0.9),
+    0 1px 2px rgba(0, 0, 0, 0.5);
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
 /* Hover effect for navigation items */
 .nav-item-hover:hover {
   background: rgba(255, 255, 255, 0.2);
   box-shadow: 0 0 10px rgba(255, 255, 255, 0.3);
   transition: all 0.3s ease;
+}
+
+/* Logo hover effect */
+.logo-hover {
+  position: relative;
+  padding: 4px 8px;
+  border-radius: 8px;
+  transition: all 0.3s ease;
+}
+
+.logo-hover::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: transparent;
+  border-radius: 8px;
+  z-index: -1;
+  transition: all 0.3s ease;
+}
+
+.logo-hover:hover {
+  transform: translateY(-2px);
+}
+
+.logo-hover:hover::before {
+  background: rgba(255, 255, 255, 0.15);
+  box-shadow: 
+    0 0 15px rgba(255, 255, 255, 0.3),
+    0 0 5px rgba(255, 255, 255, 0.2);
+}
+
+/* Pulse animation for logo on hover */
+@keyframes pulse {
+  0% {
+    box-shadow: 0 0 0 0 rgba(255, 255, 255, 0.4);
+  }
+  70% {
+    box-shadow: 0 0 0 10px rgba(255, 255, 255, 0);
+  }
+  100% {
+    box-shadow: 0 0 0 0 rgba(255, 255, 255, 0);
+  }
+}
+
+.logo-hover:hover .logo-image {
+  animation: pulse 1.5s infinite;
 }

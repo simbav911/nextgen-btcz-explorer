@@ -219,7 +219,7 @@ const BlockList = () => {
   };
   
   return (
-    <div className="flex flex-col min-h-screen bg-gradient-to-b from-slate-50 via-white to-slate-100">
+    <div className="flex flex-col min-h-screen">
       <div className="flex-1 flex flex-col justify-center">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 pt-6 pb-24">
           <div className="flex flex-col md:flex-row items-center justify-between mb-8">
@@ -239,18 +239,18 @@ const BlockList = () => {
           ) : (
             <>
               {/* Mobile-optimized Block List with blue shadow effect */}
-              <div className="rounded-2xl shadow-xl border border-gray-100 overflow-hidden mb-10 min-h-[600px] bg-white blue-shadow-effect blocks-table-container">
+              <div className="rounded-2xl shadow-xl border border-gray-100 overflow-hidden mb-10 min-h-[600px] bg-white bg-opacity-90 blue-shadow-effect blocks-table-container">
                 {/* Desktop version - hidden on mobile */}
                 <div className="hidden md:block overflow-x-auto">
                   <table className="min-w-full text-base">
                     <thead className="bg-slate-100">
                       <tr>
-                        <th className="py-4 px-6 text-left font-bold text-slate-600 w-1/6">Height</th>
-                        <th className="py-4 px-6 text-left font-bold text-slate-600 w-1/6">Timestamp</th>
-                        <th className="py-4 px-6 text-left font-bold text-slate-600 w-1/12">Transactions</th>
-                        <th className="py-4 px-6 text-left font-bold text-slate-600 w-1/6">Size</th>
-                        <th className="py-4 px-6 text-center font-bold text-slate-600 w-1/5">Mining Pool</th>
-                        <th className="py-4 px-6 text-left font-bold text-slate-600 w-1/4">Hash</th>
+                        <th className="py-4 px-6 text-left font-bold text-slate-700 w-1/6">Height</th>
+                        <th className="py-4 px-6 text-left font-bold text-slate-700 w-1/6">Timestamp</th>
+                        <th className="py-4 px-6 text-left font-bold text-slate-700 w-1/12">Transactions</th>
+                        <th className="py-4 px-6 text-left font-bold text-slate-700 w-1/6">Size</th>
+                        <th className="py-4 px-6 text-center font-bold text-slate-700 w-1/5">Mining Pool</th>
+                        <th className="py-4 px-6 text-left font-bold text-slate-700 w-1/4">Hash</th>
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-slate-100 bg-white">
@@ -258,8 +258,8 @@ const BlockList = () => {
                         <tr
                           key={block.hash}
                           className={
-                            (i % 2 === 1 ? 'bg-slate-50 ' : '') +
-                            'hover:bg-slate-200 cursor-pointer transition-colors duration-100'
+                            (i % 2 === 1 ? 'bg-slate-50' : '') +
+                            ' hover:bg-blue-200 hover:bg-opacity-50 hover:shadow-inner cursor-pointer transition-all duration-200'
                           }
                           onClick={() => window.location.assign(`/blocks/${block.hash}`)}
                         >
@@ -270,7 +270,7 @@ const BlockList = () => {
                             </Link>
                           </td>
                           <td className="py-3 px-6">
-                            <div className="flex items-center text-sm text-gray-500">
+                            <div className="flex items-center text-sm text-gray-700">
                               <FaClock className="mr-1" />
                               <span title={formatTimestamp(block.time)}>
                                 {formatRelativeTime(block.time)}
@@ -305,14 +305,14 @@ const BlockList = () => {
                       <Link 
                         to={`/blocks/${block.hash}`} 
                         key={block.hash}
-                        className={`block ${i % 2 === 1 ? 'bg-slate-50' : ''}`}
+                        className={`block ${i % 2 === 1 ? 'bg-slate-50' : ''} hover:bg-blue-200 hover:bg-opacity-50 hover:shadow-inner transition-all duration-200`}
                       >
                         <div className="mobile-blocks-row items-center">
                           <div className="font-semibold text-bitcoinz-600 flex items-center">
                             <FaCube className="mr-1 flex-shrink-0" size={12} />
                             <span className="truncate">{formatNumber(block.height)}</span>
                           </div>
-                          <div className="text-xs text-gray-600 flex items-center">
+                          <div className="text-xs text-gray-700 flex items-center">
                             <FaClock className="mr-1 flex-shrink-0" size={10} />
                             <span className="truncate">
                               {formatRelativeTime(block.time)}

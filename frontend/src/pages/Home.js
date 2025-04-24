@@ -236,11 +236,57 @@ const Home = () => {
     ));
   }, [latestTransactions]);
   
+  useEffect(() => {
+    // Create a style element
+    const styleEl = document.createElement('style');
+    
+    // Define the animation keyframes
+    const animationCSS = `
+      @keyframes electricTilePulse {
+        0% {
+          opacity: 0.4;
+          filter: blur(10px);
+          box-shadow: 0 0 20px rgba(37, 99, 235, 0.6);
+        }
+        50% {
+          opacity: 0.8;
+          filter: blur(15px);
+          box-shadow: 0 0 40px rgba(37, 99, 235, 0.8);
+        }
+        100% {
+          opacity: 0.4;
+          filter: blur(10px);
+          box-shadow: 0 0 20px rgba(37, 99, 235, 0.6);
+        }
+      }
+    `;
+    
+    // Set the CSS content
+    styleEl.textContent = animationCSS;
+    
+    // Append to document head
+    document.head.appendChild(styleEl);
+    
+    // Clean up on unmount
+    return () => {
+      document.head.removeChild(styleEl);
+    };
+  }, []);
+
   return (
     <div className="container-custom py-4">
       {/* Hero Section with Search - Enhanced with shadow effects */}
-      <div className="bg-gradient-to-r from-blue-600 to-bitcoinz-600 rounded-xl shadow-lg mb-5 p-4 sm:p-5"
-           style={{ boxShadow: '0 10px 25px rgba(59, 130, 246, 0.3)' }}>
+      <div className="bg-gradient-to-r from-blue-600 to-bitcoinz-600 rounded-xl shadow-lg mb-5 p-4 sm:p-5 relative"
+           style={{ 
+             boxShadow: `
+               0 10px 25px rgba(59, 130, 246, 0.3),
+               0 15px 30px rgba(37, 99, 235, 0.4),
+               0 0 40px rgba(59, 130, 246, 0.25),
+               0 0 70px rgba(37, 99, 235, 0.15),
+               0 0 5px #3b82f6,
+               0 0 2px #60a5fa
+             `
+           }}>
         <div className="text-center mb-3">
           <h1 className="text-xl sm:text-2xl font-bold text-white mb-1" style={{ textShadow: '0 2px 4px rgba(0,0,0,0.2)' }}>
             BitcoinZ Blockchain Explorer
@@ -248,6 +294,22 @@ const Home = () => {
           <p className="text-white text-sm opacity-90 mb-3">Search for blocks, transactions, and addresses on the BitcoinZ blockchain</p>
         </div>
         <SearchBox />
+        
+        {/* Electric glow effect under the tile */}
+        <div 
+          className="electric-glow-tile" 
+          style={{
+            position: 'absolute',
+            width: '90%',
+            height: '10px',
+            background: 'linear-gradient(90deg, rgba(37, 99, 235, 0), rgba(37, 99, 235, 0.8), rgba(37, 99, 235, 0))',
+            borderRadius: '50%',
+            filter: 'blur(10px)',
+            left: '5%',
+            bottom: '-15px',
+            animation: 'electricTilePulse 3s infinite'
+          }}
+        />
       </div>
 
       {/* Stats Overview - Equal sized cards with colored shadow effects */}

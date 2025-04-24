@@ -275,95 +275,14 @@ const WealthDistribution = () => {
     );
   };
 
-  // Force refresh data
-  const handleRefreshData = () => {
-    setLoading(true);
-    showToast('Refreshing data...', 'info');
-    
-    // Use timestamp to bypass cache
-    const timestamp = Date.now();
-    
-    // Fetch top holders data with no-cache headers
-    fetch(`${API_BASE_URL}/wealth/top-holders?limit=100&v=${timestamp}`, {
-      headers: {
-        'Cache-Control': 'no-cache, no-store, must-revalidate',
-        'Pragma': 'no-cache',
-        'Expires': '0'
-      }
-    })
-      .then(response => response.json())
-      .then(holdersData => {
-        // Process top holders data
-        if (holdersData && holdersData.topHolders && holdersData.topHolders.length > 0) {
-          setTopHolders(holdersData.topHolders);
-          setTotalSupply(holdersData.totalSupply || MOCK_TOTAL_SUPPLY);
-          setTotalAddresses(holdersData.totalAddressesAnalyzed || MOCK_TOTAL_ADDRESSES);
-          setUsingMockData(false);
-        } else {
-          // If no valid data, use mock data
-          setTopHolders(MOCK_TOP_HOLDERS);
-          setTotalSupply(MOCK_TOTAL_SUPPLY);
-          setTotalAddresses(MOCK_TOTAL_ADDRESSES);
-          setUsingMockData(true);
-        }
-        
-        // Fetch distribution data with no-cache headers
-        return fetch(`${API_BASE_URL}/wealth/distribution?v=${timestamp}`, {
-          headers: {
-            'Cache-Control': 'no-cache, no-store, must-revalidate',
-            'Pragma': 'no-cache',
-            'Expires': '0'
-          }
-        });
-      })
-      .then(response => response.json())
-      .then(distributionData => {
-        // Process distribution data
-        if (distributionData && distributionData.distribution && distributionData.distribution.length > 0) {
-          setDistribution(distributionData.distribution);
-          // Only update totalAddresses if we haven't already got a value
-          if (!topHolders.length) {
-            setTotalAddresses(distributionData.totalAddresses || MOCK_TOTAL_ADDRESSES);
-          }
-        } else {
-          // If no valid data, use mock data
-          setDistribution(MOCK_DISTRIBUTION);
-          setUsingMockData(true);
-        }
-        
-        setLoading(false);
-        showToast('Data refreshed successfully', 'success');
-      })
-      .catch(error => {
-        console.error('Error refreshing data:', error);
-        // Fall back to mock data on error
-        setTopHolders(MOCK_TOP_HOLDERS);
-        setDistribution(MOCK_DISTRIBUTION);
-        setTotalSupply(MOCK_TOTAL_SUPPLY);
-        setTotalAddresses(MOCK_TOTAL_ADDRESSES);
-        setUsingMockData(true);
-        setLoading(false);
-        showToast('Failed to refresh data, using simulated data', 'warning');
-      });
-  };
-
   return (
     <div className="wealth-distribution-container">
       <div className="bg-white rounded-lg shadow-md p-4 mb-6">
         <div className="flex justify-between items-center mb-3">
-          <h1 className="text-2xl font-bold text-gray-800">
+          <h1 className="text-2xl font-bold text-gray-800 flex items-center">
             <FaCoins className="inline-block mr-2 text-yellow-500" />
             BitcoinZ Wealth Distribution
           </h1>
-          <button 
-            onClick={handleRefreshData}
-            className="bg-blue-500 hover:bg-blue-600 text-white px-3 py-1 rounded-md text-sm flex items-center"
-          >
-            <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 mr-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
-            </svg>
-            Refresh Data
-          </button>
         </div>
         <p className="text-gray-600 mb-4 text-sm">
           Explore the distribution of BitcoinZ across addresses and analyze the top holders.
@@ -523,14 +442,21 @@ const WealthDistribution = () => {
                 
                 {/* Top Holders Table - With search and full addresses */}
                 <div className="mb-4">
-                  <div className="flex items-center bg-white rounded-lg shadow-sm p-2 mb-2">
-                    <input
-                      type="text"
-                      placeholder="Search by address..."
-                      className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-                      value={searchTerm}
-                      onChange={(e) => setSearchTerm(e.target.value)}
-                    />
+                  <div className="flex items-center bg-white rounded-lg shadow-sm p-3">
+                    <div className="relative w-full">
+                      <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                        <svg className="h-5 w-5 text-gray-400" fill="currentColor" viewBox="0 0 20 20">
+                          <path fillRule="evenodd" d="M8 4a4 4 0 100 8 4 4 0 000-8zM2 8a6 6 0 1110.89 3.476l4.817 4.817a1 1 0 01-1.414 1.414l-4.816-4.816A6 6 0 012 8z" clipRule="evenodd" />
+                        </svg>
+                      </div>
+                      <input
+                        type="text"
+                        placeholder="Search by address..."
+                        className="w-full pl-10 pr-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                        value={searchTerm}
+                        onChange={(e) => setSearchTerm(e.target.value)}
+                      />
+                    </div>
                   </div>
                 </div>
                 

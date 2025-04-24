@@ -3,13 +3,80 @@
 /* Shadow - Main container width */
 #root .min-h-screen .content-container .wealth-distribution-container .shadow-md {
   width: 60% !important;
+  box-shadow: 0 10px 25px rgba(0, 0, 0, 0.08);
+  transition: all 0.3s ease;
+  margin-left: auto !important;
+  margin-right: auto !important;
+  left: 0 !important;
+  right: 0 !important;
+  position: relative !important;
+  transform: none !important;
+}
+
+#root .min-h-screen .content-container .wealth-distribution-container .shadow-md:hover {
+  box-shadow: 0 15px 30px rgba(0, 0, 0, 0.12);
 }
 
 /* Shadow - Positioning and width constraints */
 .min-h-screen .shadow-md {
   min-width: 0px;
   max-width: 1250px;
-  transform: translatex(642px) translatey(-5px);
+  /* Remove the transform that was causing positioning issues */
+  /* transform: translatex(642px) translatey(-5px); */
+}
+
+/* Center the container */
+.wealth-distribution-container {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  width: 100%;
+}
+
+/* Enhanced styling for tables and cards */
+.wealth-distribution-container .bg-white {
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.05);
+  transition: transform 0.2s ease, box-shadow 0.2s ease;
+}
+
+.wealth-distribution-container .bg-white:hover {
+  box-shadow: 0 6px 16px rgba(0, 0, 0, 0.08);
+}
+
+/* Pie chart container enhancements */
+.wealth-distribution-container .recharts-wrapper {
+  filter: drop-shadow(0 4px 6px rgba(0, 0, 0, 0.1));
+}
+
+/* Table row hover effects */
+.wealth-distribution-container tbody tr {
+  transition: background-color 0.15s ease, transform 0.15s ease;
+}
+
+.wealth-distribution-container tbody tr:hover {
+  transform: translateY(-1px);
+  background-color: rgba(59, 130, 246, 0.08) !important;
+}
+
+/* Search input styling */
+.wealth-distribution-container input[type="text"] {
+  transition: all 0.2s ease;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.04);
+}
+
+.wealth-distribution-container input[type="text"]:focus {
+  box-shadow: 0 4px 8px rgba(59, 130, 246, 0.15);
+  transform: translateY(-1px);
+}
+
+/* Wealth summary cards */
+.wealth-distribution-container .grid-cols-2 > div {
+  transition: all 0.2s ease;
+}
+
+.wealth-distribution-container .grid-cols-2 > div:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 6px 12px rgba(0, 0, 0, 0.08);
 }
 
 /* Mobile responsive styles */
@@ -18,11 +85,6 @@
     width: 80% !important;
     margin-left: auto;
     margin-right: auto;
-  }
-  
-  .min-h-screen .shadow-md {
-    transform: none;
-    max-width: 100%;
   }
 }
 

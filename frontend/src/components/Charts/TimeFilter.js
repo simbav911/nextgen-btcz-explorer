@@ -52,6 +52,22 @@ const TimeFilter = ({ date, setDate, applyFilter, showTodayDefault = false, acti
   // Check if this is a single-day chart (Pool Distribution or Mined Block)
   const isSingleDayChart = activeChart === chartTypes.POOL_STAT || activeChart === chartTypes.MINED_BLOCK;
   
+  // CRITICAL FIX: Reset timeRange when activeChart changes
+  // This ensures we don't show the date picker when navigating between charts
+  useEffect(() => {
+    // When chart type changes, reset to appropriate default
+    if (isSingleDayChart) {
+      setTimeRange('1d'); // Reset to Today for single-day charts
+    } else {
+      setTimeRange('30d'); // Reset to 30 days for multi-day charts
+    }
+    
+    // Always hide date picker when changing chart types
+    setShowDatePicker(false);
+    
+    console.log(` Chart type changed to ${activeChart}, reset timeRange to ${isSingleDayChart ? '1d' : '30d'}`);
+  }, [activeChart, isSingleDayChart]);
+  
   // For mined blocks, we need to ensure date consistency
   useEffect(() => {
     if (activeChart === chartTypes.MINED_BLOCK) {
@@ -132,7 +148,7 @@ const TimeFilter = ({ date, setDate, applyFilter, showTodayDefault = false, acti
             startDate = new Date('2017-09-09'); // BitcoinZ inception date
             break;
           default:
-            startDate.setDate(endDate.getDate() - 30);
+            startDate.setDate(endDate.getDate() - 30); // Default to 30 days
         }
         
         const formattedStartDate = formatDate(startDate);
@@ -202,6 +218,22 @@ const TimeFilter = ({ date, setDate, applyFilter, showTodayDefault = false, acti
 
   const handleTimeRangeChange = (range) => {
     console.log(` Time range changed to: ${range}`);
+    
+    // CRITICAL FIX: If we're already in custom mode and user clicks custom again,
+    // simply refresh the chart instead of showing the date picker
+    if (range === 'custom' && timeRange === 'custom') {
+      console.log(" Already in custom mode - refreshing chart instead of showing date picker");
+      
+      // Apply the current date with the current range to refresh the chart
+      applyFilter(date, 'custom', {
+        startDate: date,
+        endDate: date,
+        isCustom: true,
+        forceRefresh: true
+      });
+      
+      return;
+    }
     
     // Set the new time range first
     setTimeRange(range);

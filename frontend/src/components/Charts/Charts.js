@@ -405,49 +405,97 @@ const Charts = () => {
 
   // Handle chart type change
   const handleChartTypeChange = (chartType) => {
-    // Save current chart type before changing
-    const previousChart = activeChart;
+    // CRITICAL FIX: Direct approach to ensure charts always load on first click
+    console.log(`🔄 Chart navigation: ${activeChart} -> ${chartType}`);
     
-    // CRITICAL FIX: Always reset state completely when changing chart types
-    console.log(`🔄 Chart navigation: ${previousChart} -> ${chartType}`);
-    
-    // First, set the new active chart
-    setActiveChart(chartType);
-    
-    // Force clean state for ALL chart type changes
+    // Force clean slate for all chart transitions
     setLoading(true);
     setChartData(null);
     setError(null);
     
-    // CRITICAL FIX: Reset date and time range based on chart type
+    // Set the chart type first
+    setActiveChart(chartType);
+    
+    // Set appropriate default date based on chart type
     if (chartType === chartTypes.POOL_STAT || chartType === chartTypes.MINED_BLOCK) {
-      // For single-day charts, always use today's date
+      // For single-day charts, use today's date
       const today = formatDate(new Date());
       setDate(today);
       setTimeRange('1d');
       
-      // Clear any stored dates to prevent issues
+      // Clear any stored dates
       try {
         localStorage.removeItem('poolStats_selectedDate');
         localStorage.removeItem('minedBlocks_selectedDate');
       } catch (e) {
-        console.warn("Could not clear localStorage dates:", e);
+        console.warn("Error clearing localStorage:", e);
       }
     } else {
-      // For multi-day charts, always use 30-day view
+      // For multi-day charts, use 30-day range
       setTimeRange('30d');
       
-      // Calculate date 30 days ago for the start date
+      // Set date to 30 days ago
       const thirtyDaysAgo = new Date();
       thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
       setDate(formatDate(thirtyDaysAgo));
     }
     
-    // Force immediate data fetch with a delay to ensure state updates are complete
+    // CRITICAL FIX: Use direct API call instead of fetchChartData
+    // This bypasses any state issues that might prevent the chart from loading
     setTimeout(() => {
-      console.log(`⚡ Forcing immediate data fetch for ${chartType}`);
-      fetchChartData();
-    }, 100);
+      console.log(`⚡ Direct API call for ${chartType}`);
+      
+      let params;
+      if (chartType === chartTypes.POOL_STAT || chartType === chartTypes.MINED_BLOCK) {
+        // For single-day charts
+        const today = formatDate(new Date());
+        params = { date: today };
+      } else {
+        // For multi-day charts
+        const days = 30; // Always use 30 days
+        const thirtyDaysAgo = new Date();
+        thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
+        params = { 
+          days: days,
+          date: formatDate(thirtyDaysAgo)
+        };
+      }
+      
+      // Use the appropriate service based on chart type
+      let apiPromise;
+      if (chartType === chartTypes.POOL_STAT) {
+        apiPromise = chartService.getRealPoolStat(params);
+      } else if (chartType === chartTypes.MINED_BLOCK) {
+        apiPromise = chartService.getMinedBlocks({ ...params, days: 1 });
+      } else {
+        apiPromise = chartService.getChartData(chartType, params);
+      }
+      
+      // Process the API response
+      apiPromise
+        .then(response => {
+          console.log(`✅ Direct API call successful for ${chartType}:`, response.data);
+          setChartData(response.data);
+          setLoading(false);
+        })
+        .catch(err => {
+          console.error(`Error in direct API call for ${chartType}:`, err);
+          
+          // Generate mock data as fallback for non-pool charts
+          if (chartType !== chartTypes.POOL_STAT && chartType !== chartTypes.MINED_BLOCK) {
+            const mockData = generateMockData(chartType);
+            if (mockData) {
+              setChartData(mockData);
+              setError(`Failed to load chart data from server. Showing sample data.`);
+            } else {
+              setError(`Failed to load ${chartType} data. Please try again.`);
+            }
+          } else {
+            setError(`Failed to load data for ${chartType}. Please try again.`);
+          }
+          setLoading(false);
+        });
+    }, 50);
   };
 
   // Handle time filter change

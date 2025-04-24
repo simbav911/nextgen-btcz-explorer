@@ -121,10 +121,39 @@ div#portal-root {
   display: none !important;
 }
 
+/* Home page card optimizations */
+.stats-card {
+  @apply bg-white rounded-lg shadow-sm border border-gray-100 p-2 flex flex-col justify-center;
+  min-height: 70px;
+}
+
+.stats-card-icon {
+  @apply rounded-full p-1.5 flex-shrink-0 mr-2;
+  width: 28px;
+  height: 28px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.stats-card-value {
+  @apply font-bold text-sm sm:text-base md:text-lg truncate;
+  max-width: 90%;
+}
+
+.block-card-compact {
+  @apply bg-white rounded-lg p-2 shadow-sm hover:shadow-md transition-all duration-200;
+  max-height: 80px;
+}
+
+.home-section-container {
+  @apply bg-white rounded-lg shadow-sm p-2 border border-gray-100;
+}
+
 /* Transaction tile optimizations */
 .transaction-tile {
   @apply rounded-lg overflow-hidden shadow-sm transition-all duration-200 border border-gray-100 hover:shadow-md;
-  max-height: 160px;
+  max-height: 140px;
 }
 
 .transaction-tile-compact {
@@ -150,7 +179,33 @@ div#portal-root {
 
 .transaction-address {
   @apply font-mono text-xs truncate;
-  max-width: 180px;
+  max-width: 160px;
+}
+
+/* Style for home page transaction section */
+.home-transactions {
+  @apply space-y-2;
+}
+
+.home-transaction-card {
+  @apply bg-white rounded-lg shadow-sm hover:shadow-md transition-all duration-200 p-2 border-l-4;
+  max-height: 110px;
+}
+
+/* Coinbase transaction styling */
+.coinbase-indicator {
+  @apply bg-yellow-100 text-yellow-700 text-xs px-2 py-0.5 rounded-full;
+}
+
+/* Stats cards on homepage */
+.stats-grid {
+  @apply grid grid-cols-2 lg:grid-cols-4 gap-2;
+  margin-bottom: 16px;
+}
+
+.stat-card-equal {
+  @apply bg-white rounded-lg shadow-sm border border-gray-100 p-3;
+  height: 90px; /* Force all stat cards to be the same height */
 }
 
 /* Mobile-specific transaction optimizations */

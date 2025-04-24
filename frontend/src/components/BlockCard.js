@@ -148,58 +148,47 @@ const BlockCard = ({ block }) => {
   return (
     <Link 
       to={`/blocks/${hash}`} 
-      className="block card hover:shadow-lg transition-shadow duration-200 hover:border-bitcoinz-200"
+      className="block card p-2 hover:shadow-md transition-shadow duration-200 hover:border-bitcoinz-200 border border-gray-100 rounded-lg"
     >
-      <div className="flex flex-col md:flex-row md:items-center justify-between">
+      <div className="flex items-center justify-between mb-2">
         <div className="flex items-center">
-          <div className="bg-bitcoinz-100 p-2 sm:p-3 rounded-full mr-3 sm:mr-4 flex-shrink-0">
-            <FaCube className="text-bitcoinz-600" size={16} />
+          <div className="bg-bitcoinz-100 p-1.5 rounded-full mr-2 flex-shrink-0">
+            <FaCube className="text-bitcoinz-600" size={14} />
           </div>
-          <div className="min-w-0">
-            <h3 className="text-base sm:text-lg font-semibold truncate-mobile">
-              Block {formatNumber(height)}
-            </h3>
-            <p className="text-xs sm:text-sm text-gray-500 flex items-center">
-              <FaClock className="mr-1 flex-shrink-0" size={12} />
-              {formatRelativeTime(time)}
-            </p>
-            {/* Show mining pool info when available */}
-            {(miner || !isLoading) && (
-              <p className="text-xs text-blue-600 flex items-center mt-1 truncate-mobile max-w-full">
-                <FaHammer className="mr-1 flex-shrink-0" size={10} />
-                <span className="truncate">Mined by {miner || 'Unknown Pool'}</span>
-              </p>
-            )}
+          <div>
+            <h3 className="text-sm font-semibold">Block {formatNumber(height)}</h3>
           </div>
         </div>
-        
-        <div className="mt-2 md:mt-0 text-right">
-          <div className="text-xs sm:text-sm">
-            <span className="text-gray-500">Hash:</span> 
-            <span className="font-mono text-xs ml-1 text-gray-700">{hash.substring(0, 8)}...</span>
-          </div>
-          <div className="text-xs sm:text-sm text-gray-500">
-            {tx_count} {tx_count === 1 ? 'tx' : 'txs'}
-          </div>
+        <div className="text-xs text-gray-500">
+          {tx_count} {tx_count === 1 ? 'tx' : 'txs'}
         </div>
       </div>
       
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-2 sm:gap-4 mt-3 sm:mt-4 text-xs sm:text-sm">
-        <div>
-          <div className="text-gray-500">Size</div>
-          <div>{formatNumber(size)} bytes</div>
+      <div className="grid grid-cols-3 gap-1 mb-1.5">
+        <div className="flex items-center text-xs">
+          <FaClock className="mr-1 flex-shrink-0 text-gray-400" size={10} />
+          <span className="text-gray-500 truncate">{formatRelativeTime(time)}</span>
         </div>
-        <div>
-          <div className="text-gray-500">Difficulty</div>
-          <div className="truncate">{typeof difficulty === 'number' ? difficulty.toFixed(2) : difficulty}</div>
+        
+        <div className="text-xs text-center">
+          <span className="text-gray-500">{formatNumber(size)} bytes</span>
         </div>
-        <div>
-          <div className="text-gray-500">Bits</div>
-          <div className="font-mono truncate">{bits}</div>
+        
+        <div className="text-xs text-right">
+          <span className="text-gray-500 truncate">{typeof difficulty === 'number' ? difficulty.toFixed(2) : difficulty}</span>
         </div>
-        <div>
-          <div className="text-gray-500">Nonce</div>
-          <div className="font-mono truncate">{nonce}</div>
+      </div>
+      
+      <div className="flex justify-between items-center text-xs">
+        {(miner || !isLoading) && (
+          <div className="flex items-center text-blue-600 truncate max-w-[60%]">
+            <FaHammer className="mr-1 flex-shrink-0" size={10} />
+            <span className="truncate">{miner || 'Unknown Pool'}</span>
+          </div>
+        )}
+        
+        <div className="font-mono text-xs text-gray-500 truncate text-right">
+          {hash.substring(0, 6)}...
         </div>
       </div>
     </Link>

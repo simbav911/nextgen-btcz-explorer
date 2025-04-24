@@ -46,25 +46,27 @@ const StatCard = ({ title, value, icon, color = 'blue', change }) => {
 
   return (
     <motion.div 
-      whileHover={{ y: -5 }}
+      whileHover={{ y: -2 }}
       transition={{ type: "spring", stiffness: 300 }}
-      className={`card border ${colors.border} ${colors.shadow} hover:shadow-lg transition-all duration-300 h-auto min-h-24 sm:h-32 flex flex-col justify-center`}
+      className={`card bg-white rounded-lg shadow-sm hover:shadow-md border border-gray-100 flex flex-col justify-center p-2.5`}
+      style={{ height: '90px' }}
     >
       <div className="flex items-center justify-between">
-        <div className="mr-2">
-          <p className="text-gray-500 text-xs sm:text-sm font-medium">{title}</p>
-          <h3 className={`text-base sm:text-lg md:text-2xl font-bold mt-1 ${colors.text} break-words`}>{value}</h3>
+        <div className="flex-grow">
+          <div className="flex items-center mb-1">
+            <div className={`${colors.bg} p-1.5 rounded-full flex-shrink-0 mr-2 shadow-sm`}>
+              {React.cloneElement(icon, { size: 16 })}
+            </div>
+            <p className="text-gray-600 text-xs font-medium">{title}</p>
+          </div>
+          <h3 className={`text-base sm:text-lg font-bold ${colors.text} break-words`}>{value}</h3>
           
           {change && (
-            <div className={`text-xs sm:text-sm mt-1 flex items-center ${change.positive ? 'text-green-600' : 'text-red-600'}`}>
+            <div className={`text-xs mt-0.5 flex items-center ${change.positive ? 'text-green-600' : 'text-red-600'}`}>
               <span className="font-medium">{change.positive ? '↑' : '↓'} {change.value}</span>
               {change.period && <span className="text-gray-500 ml-1 text-xs">{change.period}</span>}
             </div>
           )}
-        </div>
-        
-        <div className={`${colors.bg} p-2 sm:p-3 rounded-full flex-shrink-0`}>
-          {icon}
         </div>
       </div>
     </motion.div>

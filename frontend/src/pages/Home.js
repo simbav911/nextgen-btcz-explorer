@@ -9,7 +9,10 @@ import {
   FaHashtag,
   FaMountain,
   FaLayerGroup,
-  FaBalanceScale
+  FaBalanceScale,
+  FaCoins,
+  FaArrowRight,
+  FaClock
 } from 'react-icons/fa';
 
 // Components
@@ -27,7 +30,7 @@ import { ToastContext } from '../contexts/ToastContext';
 import { blockService, transactionService, statsService, priceService } from '../services/api';
 
 // Utils
-import { formatNumber, formatBTCZ, formatDifficulty } from '../utils/formatting';
+import { formatNumber, formatBTCZ, formatDifficulty, formatRelativeTime } from '../utils/formatting';
 
 // Define icons outside the component for stable references
 const latestBlockIcon = <FaLayerGroup className="text-blue-600" size={24} />;
@@ -183,6 +186,41 @@ const Home = () => {
     // Format with commas for better readability
     return difficulty.toLocaleString(undefined, { maximumFractionDigits: 2 });
   };
+  
+  // Transaction type classifier
+  const classifyTxType = (tx) => {
+    const isCoinbase = tx.vin && tx.vin.length > 0 && !!tx.vin[0].coinbase;
+    if (isCoinbase) return 'coinbase';
+
+    // Shielded fields
+    const hasValueBalance = typeof tx.valueBalance === 'number' && tx.valueBalance !== 0;
+    const hasVJoinSplit = tx.vjoinsplit && tx.vjoinsplit.length > 0;
+    const hasShieldedSpends = tx.vShieldedSpend && tx.vShieldedSpend.length > 0;
+    const hasShieldedOutputs = tx.vShieldedOutput && tx.vShieldedOutput.length > 0;
+
+    // Transparent fields
+    const hasTransparentInputs = tx.vin && tx.vin.some(v => v.address);
+    const hasTransparentOutputs = tx.vout && tx.vout.some(v => v.scriptPubKey && v.scriptPubKey.addresses);
+
+    // t->z: Shielding
+    if ((hasTransparentInputs || tx.vin?.length > 0) && (hasValueBalance && tx.valueBalance < 0 || hasShieldedOutputs || hasVJoinSplit) && !hasShieldedSpends) {
+      return 't2z';
+    }
+    // z->t: Deshielding
+    if ((hasShieldedSpends || hasVJoinSplit || (hasValueBalance && tx.valueBalance > 0)) && (hasTransparentOutputs || tx.vout?.length > 0)) {
+      return 'z2t';
+    }
+    // z->z: Fully shielded
+    if ((hasShieldedSpends || hasVJoinSplit) && (hasShieldedOutputs || hasVJoinSplit) && !hasTransparentInputs && !hasTransparentOutputs) {
+      return 'z2z';
+    }
+    // t->t: Fully transparent
+    if (hasTransparentInputs && hasTransparentOutputs && !hasShieldedSpends && !hasShieldedOutputs && !hasVJoinSplit && !hasValueBalance) {
+      return 't2t';
+    }
+    // Fallback
+    return 'other';
+  };
 
   // Memoize the rendered list of blocks
   const blockCards = useMemo(() => {
@@ -200,17 +238,17 @@ const Home = () => {
   
   return (
     <div className="container-custom py-4">
-      {/* Hero Section with Search */}
-      <div className="bg-gradient-to-r from-blue-600 to-bitcoinz-600 rounded-lg shadow-md mb-6 p-4 sm:p-6">
-        <div className="text-center mb-3">
-          <h1 className="text-xl sm:text-2xl font-bold text-white mb-1">BitcoinZ Blockchain Explorer</h1>
-          <p className="text-white text-sm opacity-90 mb-3">Search for blocks, transactions, and addresses on the BitcoinZ blockchain</p>
+      {/* Hero Section with Search - More compact */}
+      <div className="bg-gradient-to-r from-blue-600 to-bitcoinz-600 rounded-lg shadow-sm mb-4 p-3 sm:p-4">
+        <div className="text-center mb-2">
+          <h1 className="text-lg sm:text-xl font-bold text-white mb-1">BitcoinZ Blockchain Explorer</h1>
+          <p className="text-white text-xs opacity-90 mb-2">Search for blocks, transactions, and addresses on the BitcoinZ blockchain</p>
         </div>
         <SearchBox />
       </div>
 
-      {/* Stats Overview */}
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-2 sm:gap-4 mb-6">
+      {/* Stats Overview - Equal sized cards */}
+      <div className="stats-grid">
         <Link to="/blocks" className="block">
           <StatCard
             title="Latest Block"
@@ -253,46 +291,171 @@ const Home = () => {
         </Link>
       </div>
 
-      {/* Latest Blocks and Transactions */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+      {/* Latest Blocks and Transactions - Styling consistent with transactions page */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
         {/* Latest Blocks */}
         <div>
-          <div className="flex justify-between items-center mb-4">
-            <h2 className="text-2xl font-bold">Latest Blocks</h2>
+          <div className="flex justify-between items-center mb-2">
+            <h2 className="text-lg font-bold flex items-center">
+              <FaCube className="text-bitcoinz-600 mr-2" size={18} />
+              Latest Blocks
+            </h2>
             <Link 
               to="/blocks" 
-              className="text-bitcoinz-600 hover:text-bitcoinz-800 text-sm font-medium transition-colors duration-200 relative group"
+              className="text-blue-600 hover:text-blue-800 text-sm font-medium"
             >
               View All
-              <span className="absolute -bottom-1 left-0 w-0 h-0.5 bg-bitcoinz-600 transition-all duration-200 group-hover:w-full"></span>
             </Link>
           </div>
-          <div className="space-y-4">
+          <div className="space-y-2">
             {blockCards.length > 0 ? (
               blockCards
             ) : (
-              <div className="text-center py-8 text-gray-500">No blocks found</div>
+              <div className="text-center py-4 text-gray-500">No blocks found</div>
             )}
           </div>
         </div>
         
-        {/* Latest Transactions */}
+        {/* Latest Transactions - Match the style from transactions page */}
         <div>
-          <div className="flex justify-between items-center mb-4">
-            <h2 className="text-2xl font-bold">Latest Transactions</h2>
+          <div className="flex justify-between items-center mb-2">
+            <h2 className="text-lg font-bold flex items-center">
+              <FaExchangeAlt className="text-blue-600 mr-2" size={18} />
+              Latest Transactions
+            </h2>
             <Link 
               to="/transactions" 
-              className="text-bitcoinz-600 hover:text-bitcoinz-800 text-sm font-medium transition-colors duration-200 relative group"
+              className="text-blue-600 hover:text-blue-800 text-sm font-medium"
             >
               View All
-              <span className="absolute -bottom-1 left-0 w-0 h-0.5 bg-bitcoinz-600 transition-all duration-200 group-hover:w-full"></span>
             </Link>
           </div>
-          <div className="space-y-4">
-            {transactionCards.length > 0 ? (
-              transactionCards
-            ) : (
-              <div className="text-center py-8 text-gray-500">No transactions found</div>
+          <div className="space-y-2">
+            {latestTransactions.map(tx => {
+              // Use the same styling logic as in the TransactionList component
+              const txType = classifyTxType(tx);
+              const isCoinbase = txType === 'coinbase';
+              
+              // Style map - same as in TransactionList
+              const styleMap = {
+                coinbase: {
+                  bg: 'bg-gradient-to-br from-yellow-50 via-yellow-100 to-white',
+                  border: '6px solid #facc15',
+                  iconBg: 'bg-yellow-200',
+                  icon: <FaCoins className="text-yellow-600" size={16} />,
+                  label: 'Coinbase',
+                  labelClass: 'bg-yellow-100 text-yellow-700',
+                  shadow: '0 4px 12px rgba(250, 204, 21, 0.2)'
+                },
+                t2z: {
+                  bg: 'bg-gradient-to-br from-purple-50 via-purple-100 to-white',
+                  border: '6px solid #a78bfa',
+                  iconBg: 'bg-purple-200',
+                  icon: <FaArrowRight className="text-purple-600" size={16} />,
+                  label: 't→z',
+                  labelClass: 'bg-purple-100 text-purple-700',
+                  shadow: '0 4px 12px rgba(167, 139, 250, 0.2)'
+                },
+                z2t: {
+                  bg: 'bg-gradient-to-br from-teal-50 via-green-100 to-white',
+                  border: '6px solid #14b8a6',
+                  iconBg: 'bg-teal-200',
+                  icon: <FaArrowRight className="text-teal-600" size={16} />,
+                  label: 'z→t',
+                  labelClass: 'bg-teal-100 text-teal-700',
+                  shadow: '0 4px 12px rgba(20, 184, 166, 0.2)'
+                },
+                z2z: {
+                  bg: 'bg-gradient-to-br from-blue-50 via-blue-200 to-white',
+                  border: '6px solid #2563eb',
+                  iconBg: 'bg-blue-300',
+                  icon: <FaArrowRight className="text-blue-800" size={16} />,
+                  label: 'z→z',
+                  labelClass: 'bg-blue-200 text-blue-800',
+                  shadow: '0 4px 12px rgba(37, 99, 235, 0.2)'
+                },
+                t2t: {
+                  bg: 'bg-gradient-to-br from-blue-50 via-white to-blue-100',
+                  border: '6px solid #38bdf8',
+                  iconBg: 'bg-blue-200',
+                  icon: <FaExchangeAlt className="text-blue-600" size={16} />,
+                  label: 't→t',
+                  labelClass: 'bg-blue-100 text-blue-700',
+                  shadow: '0 4px 12px rgba(56, 189, 248, 0.2)'
+                },
+                other: {
+                  bg: 'bg-gradient-to-br from-gray-50 via-gray-100 to-white',
+                  border: '6px solid #a3a3a3',
+                  iconBg: 'bg-gray-200',
+                  icon: <FaExchangeAlt className="text-gray-600" size={16} />,
+                  label: 'Other',
+                  labelClass: 'bg-gray-100 text-gray-700',
+                  shadow: '0 4px 12px rgba(163, 163, 163, 0.2)'
+                },
+              };
+              const style = styleMap[txType] || styleMap.other;
+              
+              return (
+                <div
+                  key={tx.txid}
+                  className="transaction-tile"
+                  style={{
+                    borderLeft: style.border,
+                    boxShadow: style.shadow
+                  }}
+                >
+                  <Link to={`/tx/${tx.txid}`} className="block">
+                    <div className="transaction-tile-compact">
+                      {/* Top section with icon and type */}
+                      <div className="transaction-header">
+                        <div className="flex items-center">
+                          <div className={`transaction-type-indicator ${style.iconBg}`}>
+                            {style.icon}
+                          </div>
+                          <span className="text-sm font-medium">{isCoinbase ? 'Coinbase' : 'Transaction'}</span>
+                          <span className={`ml-2 text-xs py-0.5 px-1.5 rounded-full font-medium ${style.labelClass}`}>{style.label}</span>
+                        </div>
+                        <span className="text-xs py-0.5 px-1.5 rounded font-medium bg-gray-50 text-gray-500 border border-gray-100">
+                          {tx.confirmations > 0 ? `${tx.confirmations} Confirms` : 'Unconfirmed'}
+                        </span>
+                      </div>
+                      
+                      {/* Transaction ID and time */}
+                      <div className="flex justify-between items-center text-xs text-gray-500 mb-1">
+                        <div className="font-mono overflow-hidden text-overflow-ellipsis">
+                          <span className="text-gray-600">ID:</span> {tx.txid.substring(0, 10)}...
+                        </div>
+                        <div className="flex items-center">
+                          <FaClock className="mr-1" size={10} />
+                          {formatRelativeTime(tx.time)}
+                        </div>
+                      </div>
+                      
+                      {/* From/To section - simplified for homepage */}
+                      <div className="mt-1 flex justify-between text-xs">
+                        <div className="flex-grow">
+                          <span className="text-gray-500 font-medium">
+                            {isCoinbase ? 'Mining Reward' : `${tx.vout ? formatBTCZ(tx.vout.reduce((sum, output) => sum + (output.value || 0), 0)) : '0.00 BTCZ'}`}
+                          </span>
+                        </div>
+                        <div className="flex items-center">
+                          <span className="text-xs text-gray-500 mr-1">Block:</span>
+                          <Link 
+                            to={tx.blockhash ? `/blocks/${tx.blockhash}` : '#'} 
+                            className="text-blue-600 hover:underline"
+                            onClick={(e) => tx.blockhash ? e.stopPropagation() : e.preventDefault()}
+                          >
+                            {tx.height || (tx.blockhash ? tx.blockhash.substring(0, 6) + '...' : 'Pending')}
+                          </Link>
+                        </div>
+                      </div>
+                    </div>
+                  </Link>
+                </div>
+              );
+            })}
+            {latestTransactions.length === 0 && (
+              <div className="text-center py-4 text-gray-500">No transactions found</div>
             )}
           </div>
         </div>

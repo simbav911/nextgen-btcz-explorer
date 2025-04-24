@@ -45,6 +45,12 @@ const Home = () => {
   const [stats, setStats] = useState(null);
   const [btczPrice, setBtczPrice] = useState(null);
   
+  // Use a ref to track the desired count of items to display
+  const displayCountRef = useRef(8);
+  
+  // Use a separate ref for transaction count
+  const transactionCountRef = useRef(10);
+  
   const socket = useContext(SocketContext);
   const { showToast } = useContext(ToastContext);
   const notifiedBlockHeights = useRef(new Set()); // Track notified block heights
@@ -55,16 +61,46 @@ const Home = () => {
       try {
         setLoading(true);
         
+        // Set the initial display count - increasing to 8 for both blocks and transactions
+        const initialDisplayCount = 8;
+        displayCountRef.current = initialDisplayCount;
+        
         // Fetch latest blocks, transactions, stats, and price in parallel
         const [blocksResponse, txResponse, statsResponse, priceData] = await Promise.all([
-          blockService.getLatestBlocks(5),
-          transactionService.getLatestTransactions(5),
+          blockService.getLatestBlocks(initialDisplayCount),
+          transactionService.getLatestTransactions(transactionCountRef.current * 2), // Fetch more to have a buffer
           statsService.getNetworkStats(),
           priceService.getBitcoinZPrice()
         ]);
         
-        setLatestBlocks(blocksResponse.data.blocks);
-        setLatestTransactions(txResponse.data.transactions);
+        // Update the display count based on how many blocks we actually got
+        displayCountRef.current = blocksResponse.data.blocks.length;
+        
+        // Set blocks limited to our display count
+        setLatestBlocks(blocksResponse.data.blocks.slice(0, displayCountRef.current));
+        
+        // Ensure we always have enough transactions to match block tiles
+        let transactions = txResponse.data.transactions;
+        if (transactions.length < transactionCountRef.current) {
+          // Create placeholder transactions to fill the list
+          const placeholdersNeeded = transactionCountRef.current - transactions.length;
+          const placeholders = Array(placeholdersNeeded).fill().map((_, index) => ({
+            txid: `placeholder-${Date.now()}-${index}`,
+            time: Math.floor(Date.now() / 1000),
+            confirmations: 0,
+            vin: [],
+            vout: [],
+            isPlaceholder: true
+          }));
+          
+          // Add placeholders to the transactions list
+          transactions = [...transactions, ...placeholders];
+        } else {
+          // Limit transactions to our display count
+          transactions = transactions.slice(0, transactionCountRef.current);
+        }
+        
+        setLatestTransactions(transactions);
         setStats(statsResponse.data);
         setBtczPrice(priceData.bitcoinz);
       } catch (error) {
@@ -106,8 +142,42 @@ const Home = () => {
         let uniqueBlocksArray = Array.from(uniqueBlocksMap.values());
         // Ensure blocks are sorted by height descending
         uniqueBlocksArray.sort((a, b) => b.height - a.height);
-        // Slice to limit (e.g., 5)
-        const finalBlocks = uniqueBlocksArray.slice(0, 5);
+        // Slice to limit based on our display count
+        const finalBlocks = uniqueBlocksArray.slice(0, displayCountRef.current);
+
+        // Update our display count if the number of blocks has changed
+        if (finalBlocks.length !== displayCountRef.current) {
+          displayCountRef.current = finalBlocks.length;
+          
+          // Force an update of transactions to match the new block count
+          setTimeout(() => {
+            setLatestTransactions(prevTxs => {
+              // If we already have the right number, no need to update
+              if (prevTxs.length === transactionCountRef.current) {
+                return prevTxs;
+              }
+              
+              // Otherwise, adjust the transaction list to match
+              if (prevTxs.length > transactionCountRef.current) {
+                // If we have too many, slice them down
+                return prevTxs.slice(0, transactionCountRef.current);
+              } else {
+                // If we have too few, add placeholders
+                const placeholdersNeeded = transactionCountRef.current - prevTxs.length;
+                const placeholders = Array(placeholdersNeeded).fill().map((_, index) => ({
+                  txid: `placeholder-${Date.now()}-${index}`,
+                  time: Math.floor(Date.now() / 1000),
+                  confirmations: 0,
+                  vin: [],
+                  vout: [],
+                  isPlaceholder: true
+                }));
+                
+                return [...prevTxs, ...placeholders];
+              }
+            });
+          }, 0);
+        }
 
         // Compare hashes to see if the list actually changed
         const newHashes = finalBlocks.map(b => b.hash);
@@ -137,8 +207,41 @@ const Home = () => {
         const uniqueTxsMap = new Map(combined.map(tx => [tx.txid, tx]));
         // Convert back to an array
         const uniqueTxsArray = Array.from(uniqueTxsMap.values());
-        // Slice to limit (e.g., 5)
-        const finalTxs = uniqueTxsArray.slice(0, 5);
+        
+        // Use our consistent display count
+        const currentDisplayCount = transactionCountRef.current;
+        
+        // Ensure we always have exactly the right number of transactions
+        let finalTxs = uniqueTxsArray.slice(0, currentDisplayCount);
+        
+        // If we have fewer transactions than needed, add placeholder transactions
+        if (finalTxs.length < currentDisplayCount) {
+          // Get the number of placeholders needed
+          const placeholdersNeeded = currentDisplayCount - finalTxs.length;
+          
+          // Create placeholders with loading state
+          // We'll use the existing transactions as templates if available
+          const placeholders = Array(placeholdersNeeded).fill().map((_, index) => {
+            // Use a template transaction if available, otherwise create a basic one
+            const template = prevTxs[index] || {
+              txid: `placeholder-${Date.now()}-${index}`,
+              time: Math.floor(Date.now() / 1000),
+              confirmations: 0,
+              vin: [],
+              vout: []
+            };
+            
+            // Return a placeholder based on the template
+            return {
+              ...template,
+              txid: `placeholder-${Date.now()}-${index}`,
+              isPlaceholder: true
+            };
+          });
+          
+          // Add placeholders to the final list
+          finalTxs = [...finalTxs, ...placeholders];
+        }
 
         // Compare txids to see if the list actually changed
         const newTxids = finalTxs.map(tx => tx.txid);
@@ -158,8 +261,8 @@ const Home = () => {
       socket.off('new_block');
       socket.off('new_transactions');
     };
-  }, [socket, showToast]);
-
+  }, [socket, showToast, latestBlocks]);
+  
   // Format price with change indicator
   const formatPrice = (price) => {
     if (!price) return 'Loading...';
@@ -407,7 +510,7 @@ const Home = () => {
               View All
             </Link>
           </div>
-          <div className="space-y-3 green-glow p-3 rounded-xl bg-white shadow-lg">
+          <div className="space-y-5 green-glow p-3 rounded-xl bg-white shadow-lg">
             {latestTransactions.map(tx => {
               // Use the same styling logic as in the TransactionList component
               const txType = classifyTxType(tx);

@@ -45,8 +45,40 @@ const TransactionCard = ({ transaction }) => {
     vin,
     vout,
     confirmations,
-    blockhash
+    blockhash,
+    isPlaceholder
   } = transaction;
+  
+  // If this is a placeholder transaction, show a loading state
+  if (isPlaceholder) {
+    return (
+      <div className="block card p-3 sm:p-6 border-l-4 border-gray-200 max-w-5xl mx-auto bg-white animate-pulse">
+        <div className="flex flex-col md:flex-row md:items-center justify-between">
+          <div className="flex items-center">
+            <div className="bg-gray-200 p-2 rounded-full mr-2 sm:mr-3 flex-shrink-0 w-8 h-8"></div>
+            <div className="min-w-0">
+              <div className="h-4 bg-gray-200 rounded w-24 mb-2"></div>
+              <div className="h-3 bg-gray-200 rounded w-32"></div>
+            </div>
+          </div>
+          
+          <div className="mt-2 md:mt-0 text-right">
+            <div className="h-3 bg-gray-200 rounded w-20 mb-1 ml-auto"></div>
+            <div className="h-3 bg-gray-200 rounded w-16 mb-1 ml-auto"></div>
+            <div className="h-3 bg-gray-200 rounded w-12 ml-auto"></div>
+          </div>
+        </div>
+        
+        <div className="flex flex-col md:flex-row gap-2 mt-3 items-center">
+          <div className="bg-gray-50 p-2 rounded w-full md:w-2/5 h-12"></div>
+          <div className="hidden md:flex items-center justify-center">
+            <div className="bg-gray-200 rounded-full p-2 w-8 h-8"></div>
+          </div>
+          <div className="bg-gray-50 p-2 rounded w-full md:w-2/5 h-12"></div>
+        </div>
+      </div>
+    );
+  }
   
   // Classify transaction type
   const txType = classifyTxType(transaction);

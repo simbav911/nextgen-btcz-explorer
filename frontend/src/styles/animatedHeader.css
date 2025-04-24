@@ -24,7 +24,7 @@
   z-index: -1;
   background: linear-gradient(
     45deg,
-    #ff00cc, #3333ff, #00ccff, #33cc33, #ffcc00, #ff3399
+    #9900ff, #3333ff, #00ccff, #00ffff, #6600cc, #cc00ff
   );
   background-size: 400% 400%;
   animation: gradientAnimation 240s ease infinite;
@@ -93,7 +93,7 @@
   right: 0;
   bottom: 0;
   background: transparent;
-  border-radius: 8px;
+  border-radius: 50%;
   z-index: -1;
   transition: all 0.3s ease;
 }
@@ -103,25 +103,240 @@
 }
 
 .logo-hover:hover::before {
-  background: rgba(255, 255, 255, 0.15);
-  box-shadow: 
-    0 0 15px rgba(255, 255, 255, 0.3),
-    0 0 5px rgba(255, 255, 255, 0.2);
+  background: transparent;
+  box-shadow: none;
 }
 
-/* Pulse animation for logo on hover */
-@keyframes pulse {
+/* Star animation for logo */
+.star-animation {
+  position: relative;
+}
+
+.star-animation::after {
+  content: '';
+  position: absolute;
+  top: -5px;
+  left: -5px;
+  width: calc(100% + 10px);
+  height: calc(100% + 10px);
+  border-radius: 50%;
+  border: 2px dashed rgba(255, 255, 255, 0.7);
+  animation: spin 10s linear infinite;
+  z-index: -1;
+  pointer-events: none;
+}
+
+.star-animation::before {
+  content: '';
+  position: absolute;
+  top: -10px;
+  left: -10px;
+  width: calc(100% + 20px);
+  height: calc(100% + 20px);
+  border-radius: 50%;
+  background: transparent;
+  box-shadow: 
+    0 0 5px 2px rgba(255, 255, 255, 0.3),
+    0 0 10px 4px rgba(153, 0, 255, 0.2);
+  animation: pulse-glow 3s ease-in-out infinite alternate;
+  z-index: -1;
+  pointer-events: none;
+}
+
+/* Add 8 star points around the logo */
+.logo-hover:hover .star-animation::after {
+  content: '';
+  border: none;
+  background-image: 
+    radial-gradient(circle at center, transparent 60%, rgba(255, 255, 255, 0) 61%, rgba(255, 255, 255, 0.7) 62%, transparent 63%),
+    radial-gradient(circle at center, transparent 68%, rgba(153, 0, 255, 0) 69%, rgba(153, 0, 255, 0.7) 70%, transparent 71%),
+    radial-gradient(circle at center, transparent 76%, rgba(0, 102, 255, 0) 77%, rgba(0, 102, 255, 0.7) 78%, transparent 79%);
+  background-size: 200% 200%;
+  animation: spin 8s linear infinite;
+}
+
+@keyframes spin {
   0% {
-    box-shadow: 0 0 0 0 rgba(255, 255, 255, 0.4);
-  }
-  70% {
-    box-shadow: 0 0 0 10px rgba(255, 255, 255, 0);
+    transform: rotate(0deg);
   }
   100% {
-    box-shadow: 0 0 0 0 rgba(255, 255, 255, 0);
+    transform: rotate(360deg);
   }
 }
 
-.logo-hover:hover .logo-image {
-  animation: pulse 1.5s infinite;
+@keyframes pulse-glow {
+  0% {
+    opacity: 0.3;
+    box-shadow: 
+      0 0 5px 2px rgba(255, 255, 255, 0.3),
+      0 0 10px 4px rgba(153, 0, 255, 0.2);
+  }
+  50% {
+    opacity: 0.7;
+    box-shadow: 
+      0 0 10px 4px rgba(255, 0, 0, 0.3),
+      0 0 20px 8px rgba(0, 102, 255, 0.2);
+  }
+  100% {
+    opacity: 0.3;
+    box-shadow: 
+      0 0 5px 2px rgba(255, 255, 255, 0.3),
+      0 0 10px 4px rgba(153, 0, 255, 0.2);
+  }
+}
+
+/* Create a star shape that rotates around the logo on hover */
+.logo-hover:hover .star-animation {
+  position: relative;
+}
+
+.logo-hover:hover .star-animation::before {
+  content: '';
+  position: absolute;
+  top: -15px;
+  left: -15px;
+  width: calc(100% + 30px);
+  height: calc(100% + 30px);
+  background-image: 
+    radial-gradient(ellipse 10px 50px at center, rgba(255, 255, 255, 0.7) 5%, transparent 50%),
+    radial-gradient(ellipse 50px 10px at center, rgba(255, 255, 255, 0.7) 5%, transparent 50%),
+    radial-gradient(ellipse 35px 35px at center, rgba(153, 0, 255, 0.7) 5%, transparent 50%),
+    radial-gradient(ellipse 35px 35px at center, rgba(0, 102, 255, 0.7) 5%, transparent 50%);
+  background-size: 100% 100%;
+  transform-origin: center;
+  animation: spin 5s linear infinite;
+  z-index: -1;
+  pointer-events: none;
+}
+
+/* Add a star-like glow effect around the logo on hover */
+.logo-image {
+  position: relative;
+  z-index: 2;
+}
+
+.logo-image::before {
+  content: '';
+  position: absolute;
+  top: -5px;
+  left: -5px;
+  right: -5px;
+  bottom: -5px;
+  border-radius: 50%;
+  background: transparent;
+  z-index: -1;
+  opacity: 0;
+  transition: opacity 0.3s ease;
+}
+
+.logo-hover:hover .logo-image::before {
+  opacity: 1;
+  box-shadow: 
+    0 0 15px 5px rgba(255, 255, 255, 0.3),
+    0 0 30px 10px rgba(153, 0, 255, 0.2),
+    0 0 45px 15px rgba(0, 102, 255, 0.1);
+}
+
+/* Logo container with star effects */
+.logo-container {
+  position: relative;
+}
+
+.star-wrapper {
+  position: relative;
+  width: 100%;
+  height: 100%;
+}
+
+/* Star elements */
+.star {
+  position: absolute;
+  width: 0;
+  height: 0;
+  border-left: 5px solid transparent;
+  border-right: 5px solid transparent;
+  border-bottom: 10px solid white;
+  opacity: 0;
+  z-index: 1;
+  transform-origin: center;
+  transition: opacity 0.3s ease;
+}
+
+.star:after {
+  content: '';
+  position: absolute;
+  top: 3px;
+  left: -5px;
+  width: 0;
+  height: 0;
+  border-left: 5px solid transparent;
+  border-right: 5px solid transparent;
+  border-top: 10px solid white;
+}
+
+/* Star positions */
+.star1 { top: -5px; left: 50%; transform: translateX(-50%); }
+.star2 { top: 50%; right: -5px; transform: translateY(-50%) rotate(90deg); }
+.star3 { bottom: -5px; left: 50%; transform: translateX(-50%) rotate(180deg); }
+.star4 { top: 50%; left: -5px; transform: translateY(-50%) rotate(270deg); }
+.star5 { top: 0; right: 0; transform: rotate(45deg); }
+.star6 { bottom: 0; right: 0; transform: rotate(135deg); }
+.star7 { bottom: 0; left: 0; transform: rotate(225deg); }
+.star8 { top: 0; left: 0; transform: rotate(315deg); }
+
+/* Show stars on hover */
+.logo-hover:hover .star {
+  opacity: 1;
+  animation: twinkle 1.5s infinite alternate;
+}
+
+/* Different colors and timing for each star */
+.logo-hover:hover .star1 { border-bottom-color: #ff00ff; animation-delay: 0s; }
+.logo-hover:hover .star1:after { border-top-color: #ff00ff; }
+
+.logo-hover:hover .star2 { border-bottom-color: #3333ff; animation-delay: 0.2s; }
+.logo-hover:hover .star2:after { border-top-color: #3333ff; }
+
+.logo-hover:hover .star3 { border-bottom-color: #00ccff; animation-delay: 0.4s; }
+.logo-hover:hover .star3:after { border-top-color: #00ccff; }
+
+.logo-hover:hover .star4 { border-bottom-color: #9900ff; animation-delay: 0.6s; }
+.logo-hover:hover .star4:after { border-top-color: #9900ff; }
+
+.logo-hover:hover .star5 { border-bottom-color: #cc00ff; animation-delay: 0.1s; }
+.logo-hover:hover .star5:after { border-top-color: #cc00ff; }
+
+.logo-hover:hover .star6 { border-bottom-color: #6600cc; animation-delay: 0.3s; }
+.logo-hover:hover .star6:after { border-top-color: #6600cc; }
+
+.logo-hover:hover .star7 { border-bottom-color: #ff0066; animation-delay: 0.5s; }
+.logo-hover:hover .star7:after { border-top-color: #ff0066; }
+
+.logo-hover:hover .star8 { border-bottom-color: #0066ff; animation-delay: 0.7s; }
+.logo-hover:hover .star8:after { border-top-color: #0066ff; }
+
+/* Star twinkling animation */
+@keyframes twinkle {
+  0% {
+    opacity: 0.3;
+    transform: scale(0.8) rotate(var(--rotation, 0deg));
+  }
+  100% {
+    opacity: 1;
+    transform: scale(1.2) rotate(var(--rotation, 0deg));
+  }
+}
+
+/* Rotating animation for the entire star wrapper */
+.logo-hover:hover .star-wrapper {
+  animation: rotate-stars 8s linear infinite;
+}
+
+@keyframes rotate-stars {
+  0% {
+    transform: rotate(0deg);
+  }
+  100% {
+    transform: rotate(360deg);
+  }
 }

@@ -12,8 +12,8 @@ class HeaderAnimationManager {
         'rgba(255, 0, 204, 0.85)', // Pink
         'rgba(51, 51, 255, 0.85)', // Blue
         'rgba(0, 204, 255, 0.85)', // Cyan
-        'rgba(51, 204, 51, 0.85)', // Green
-        'rgba(255, 204, 0, 0.85)', // Yellow
+        'rgba(153, 0, 255, 0.85)', // Purple
+        'rgba(102, 0, 255, 0.85)', // Deep Purple
         'rgba(255, 51, 153, 0.85)' // Magenta
       ],
       // Cool color set
@@ -25,14 +25,14 @@ class HeaderAnimationManager {
         'rgba(153, 51, 255, 0.85)', // Violet
         'rgba(0, 153, 204, 0.85)' // Dark Cyan
       ],
-      // Warm color set
+      // Electric color set
       [
-        'rgba(255, 102, 0, 0.85)', // Orange
-        'rgba(255, 51, 51, 0.85)', // Red
-        'rgba(255, 153, 51, 0.85)', // Light Orange
-        'rgba(204, 51, 0, 0.85)', // Dark Red
-        'rgba(255, 204, 51, 0.85)', // Gold
-        'rgba(204, 0, 102, 0.85)' // Dark Pink
+        'rgba(153, 0, 255, 0.85)', // Purple
+        'rgba(51, 51, 255, 0.85)', // Blue
+        'rgba(0, 204, 255, 0.85)', // Cyan
+        'rgba(204, 0, 255, 0.85)', // Magenta
+        'rgba(102, 0, 204, 0.85)', // Deep Purple
+        'rgba(0, 102, 255, 0.85)' // Royal Blue
       ]
     ];
     this.currentColorSet = 0;

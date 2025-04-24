@@ -39,21 +39,36 @@ const ModernHeader = () => {
         <div className="flex justify-between items-center h-14">
           {/* Logo and Title - Entire area clickable with enhanced hover effect */}
           <Link to="/" className="flex items-center cursor-pointer logo-hover ml-0 pl-1" title="Go to Home Page">
-            <div className="flex-shrink-0 w-12">
-              <img 
-                src="/logo.png" 
-                alt="BitcoinZ" 
-                className="h-12 w-12 logo-image"
-                onError={(e) => {
-                  e.target.onerror = null;
-                  e.target.src = 'https://bitcoinz.global/wp-content/uploads/branding/btcz-website-logo.png';
-                }}
-              />
+            <div className="flex-shrink-0 w-12 logo-container">
+              <div className="star-wrapper">
+                <div className="star star1"></div>
+                <div className="star star2"></div>
+                <div className="star star3"></div>
+                <div className="star star4"></div>
+                <div className="star star5"></div>
+                <div className="star star6"></div>
+                <div className="star star7"></div>
+                <div className="star star8"></div>
+                <img 
+                  src="/logo.png" 
+                  alt="BitcoinZ" 
+                  className="h-12 w-12 logo-image"
+                  onError={(e) => {
+                    e.target.onerror = null;
+                    e.target.src = 'https://bitcoinz.global/wp-content/uploads/branding/btcz-website-logo.png';
+                  }}
+                />
+              </div>
             </div>
             <div className="ml-2 flex flex-col justify-center">
               <h1 className="font-bold text-lg tracking-wide sharp-text" style={{ textShadow: '0 0 2px rgba(255, 255, 255, 0.9), 0 1px 3px rgba(0, 0, 0, 0.7)' }}>
                 <span className="text-white">Bitcoin</span>
-                <span className="text-yellow-300" style={{ textShadow: '0 0 5px rgba(251, 191, 36, 0.9), 0 0 10px rgba(251, 191, 36, 0.5)' }}>Z</span>
+                <span className="text-red-600" style={{ 
+                  textShadow: '0 0 2px #ffffff, 0 0 5px #ff0000, 0 0 10px #ff0000, 0 0 15px #ff0000',
+                  fontWeight: '800',
+                  letterSpacing: '0.05em',
+                  filter: 'drop-shadow(0 0 2px rgba(255, 0, 0, 0.8))'
+                }}>Z</span>
               </h1>
               <span className="text-xs text-white opacity-95 tracking-wider sharp-text flex items-center" style={{ textShadow: '0 0 2px rgba(255, 255, 255, 0.8), 0 1px 2px rgba(0, 0, 0, 0.6)', letterSpacing: '0.05em', fontWeight: '600' }}>
                 Explorer <FaSearch className="ml-1" size={10} style={{ filter: 'drop-shadow(0 0 1px rgba(255, 255, 255, 0.8))' }} />

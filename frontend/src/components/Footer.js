@@ -9,7 +9,7 @@ const Footer = () => {
   const currentYear = new Date().getFullYear();
 
   return (
-    <footer className="relative text-white py-8 z-10 mt-32 glass-header">
+    <footer className="relative text-white py-8 z-10 mt-32">
       {/* Content container */}
       <div className="container-custom relative z-10 pt-12">
         <div className="grid grid-cols-1 md:grid-cols-4 gap-8">

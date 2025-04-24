@@ -405,6 +405,70 @@ const Charts = () => {
 
   // Handle chart type change
   const handleChartTypeChange = (chartType) => {
+    // Save current chart type before changing
+    const previousChart = activeChart;
+    
+    // CRITICAL FIX: For Mining Revenue, we need to completely reset the component state
+    if (chartType === chartTypes.MINING_REVENUE) {
+      console.log(`⚠️ Navigating to Mining Revenue from ${previousChart}`);
+      
+      // First, set the active chart
+      setActiveChart(chartType);
+      
+      // Completely reset the state
+      setLoading(true);
+      setChartData(null);
+      setError(null);
+      
+      // Reset to default 30-day view for Mining Revenue
+      setTimeRange('30d');
+      
+      // Calculate date 30 days ago for the start date
+      const thirtyDaysAgo = new Date();
+      thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
+      const newDate = formatDate(thirtyDaysAgo);
+      setDate(newDate);
+      
+      // Clear any localStorage values that might interfere
+      try {
+        localStorage.removeItem('poolStats_selectedDate');
+        localStorage.removeItem('minedBlocks_selectedDate');
+      } catch (e) {
+        console.warn("Could not clear localStorage dates:", e);
+      }
+      
+      // Force data fetch with a longer delay to ensure all state updates are complete
+      setTimeout(() => {
+        console.log(`🔄 Forcing Mining Revenue data fetch with date: ${newDate}`);
+        
+        // Use a direct API call instead of the fetchChartData function
+        // This bypasses any potential state issues
+        const days = getDaysFromRange('30d');
+        chartService.getChartData(chartTypes.MINING_REVENUE, { days, date: newDate })
+          .then(response => {
+            console.log(`✅ Direct API call successful for Mining Revenue:`, response.data);
+            setChartData(response.data);
+            setLoading(false);
+          })
+          .catch(err => {
+            console.error('Error in direct API call for Mining Revenue:', err);
+            // Try to generate mock data as fallback
+            const mockData = generateMockData(chartTypes.MINING_REVENUE);
+            if (mockData) {
+              setChartData(mockData);
+              setError(`Failed to load chart data from server. Showing sample data.`);
+            } else {
+              setError(`Failed to load Mining Revenue data. Please try again.`);
+            }
+            setLoading(false);
+          });
+      }, 150);
+      
+      // Skip the rest of the function
+      return;
+    }
+    
+    // For all other chart types, use the original logic
     setActiveChart(chartType);
     
     // Save current date for both chart types when switching away

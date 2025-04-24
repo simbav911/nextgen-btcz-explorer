@@ -238,9 +238,10 @@ const BlockList = () => {
             <Spinner message="Loading blocks..." />
           ) : (
             <>
-              {/* Block List with blue shadow effect */}
-              <div className="rounded-2xl shadow-xl border border-gray-100 overflow-hidden mb-10 min-h-[1600px] bg-white blue-shadow-effect blocks-table-container">
-                <div className="overflow-x-auto">
+              {/* Mobile-optimized Block List with blue shadow effect */}
+              <div className="rounded-2xl shadow-xl border border-gray-100 overflow-hidden mb-10 min-h-[600px] bg-white blue-shadow-effect blocks-table-container">
+                {/* Desktop version - hidden on mobile */}
+                <div className="hidden md:block overflow-x-auto">
                   <table className="min-w-full text-base">
                     <thead className="bg-slate-100">
                       <tr>
@@ -288,23 +289,44 @@ const BlockList = () => {
                           </td>
                         </tr>
                       ))}
-                      {/* Filler rows to ensure at least 40 lines visually */}
-                      {Array.from({ length: Math.max(0, 40 - blocks.length) }).map((_, i) => (
-                        <tr key={"filler-" + i} className={((blocks.length + i) % 2 === 1) ? 'bg-slate-50' : ''}>
-                          <td className="py-3 px-6">&nbsp;</td>
-                          <td className="py-3 px-6">&nbsp;</td>
-                          <td className="py-3 px-6">&nbsp;</td>
-                          <td className="py-3 px-6">&nbsp;</td>
-                          <td className="py-3 px-6">&nbsp;</td>
-                          <td className="py-3 px-6">&nbsp;</td>
-                        </tr>
-                      ))}
                     </tbody>
                   </table>
                 </div>
+                
+                {/* Mobile-optimized version - shown only on mobile */}
+                <div className="block md:hidden mobile-blocks-table">
+                  <div className="mobile-blocks-header">
+                    <div>Height</div>
+                    <div>Timestamp</div>
+                    <div className="text-center">Txs</div>
+                  </div>
+                  <div className="divide-y divide-slate-100 bg-white">
+                    {blocks.map((block, i) => (
+                      <Link 
+                        to={`/blocks/${block.hash}`} 
+                        key={block.hash}
+                        className={`block ${i % 2 === 1 ? 'bg-slate-50' : ''}`}
+                      >
+                        <div className="mobile-blocks-row items-center">
+                          <div className="font-semibold text-bitcoinz-600 flex items-center">
+                            <FaCube className="mr-1 flex-shrink-0" size={12} />
+                            <span className="truncate">{formatNumber(block.height)}</span>
+                          </div>
+                          <div className="text-xs text-gray-600 flex items-center">
+                            <FaClock className="mr-1 flex-shrink-0" size={10} />
+                            <span className="truncate">
+                              {formatRelativeTime(block.time)}
+                            </span>
+                          </div>
+                          <div className="text-center">{formatNumber(block.tx.length)}</div>
+                        </div>
+                      </Link>
+                    ))}
+                  </div>
+                </div>
               </div>
               {/* Pagination */}
-              <div className="flex justify-center pb-36">
+              <div className="flex justify-center pb-12 sm:pb-36">
                 <Pagination
                   currentPage={currentPage}
                   totalPages={totalPages}

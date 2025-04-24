@@ -110,24 +110,24 @@ const TransactionCard = ({ transaction }) => {
   return (
     <Link 
       to={`/tx/${txid}`} 
-      className={`block card hover:shadow-lg transition-shadow duration-200 border-l-4 ${style.borderColor} hover:border-bitcoinz-200 max-w-5xl mx-auto`}
+      className={`block card p-3 sm:p-6 hover:shadow-lg transition-shadow duration-200 border-l-4 ${style.borderColor} hover:border-bitcoinz-200 max-w-5xl mx-auto`}
     >
       <div className="flex flex-col md:flex-row md:items-center justify-between">
         <div className="flex items-center">
-          <div className={`${style.bgColor} p-2 rounded-full mr-3 flex-shrink-0`}>
+          <div className={`${style.bgColor} p-2 rounded-full mr-2 sm:mr-3 flex-shrink-0`}>
             {style.icon}
           </div>
           <div className="min-w-0">
-            <h3 className="text-base font-semibold flex items-center">
-              {isCoinbase ? 'Coinbase Transaction (Newly Mined)' : 'Transaction'}
-              <span className={`ml-2 text-xs px-2 py-0.5 rounded-full ${style.bgColor} ${style.textColor}`}>
+            <h3 className="text-sm sm:text-base font-semibold flex items-center flex-wrap">
+              <span className="mr-2">{isCoinbase ? 'Coinbase' : 'Transaction'}</span>
+              <span className={`text-xs px-2 py-0.5 rounded-full ${style.bgColor} ${style.textColor}`}>
                 {style.label}
               </span>
             </h3>
-            <p className="text-xs text-gray-500 flex items-center">
+            <p className="text-xs text-gray-500 flex items-center flex-wrap">
               <FaClock className="mr-1 flex-shrink-0" size={10} />
-              {formatRelativeTime(time)}
-              <span className="ml-2 text-xs text-gray-500">{style.description}</span>
+              <span className="mr-2">{formatRelativeTime(time)}</span>
+              <span className="text-xs text-gray-500">{style.description}</span>
             </p>
           </div>
         </div>
@@ -135,12 +135,12 @@ const TransactionCard = ({ transaction }) => {
         <div className="mt-2 md:mt-0 text-right">
           <div className="text-xs">
             <span className="text-gray-500">TxID:</span> 
-            <span className="font-mono text-xs ml-1 text-gray-700">{txid.substring(0, 10)}...</span>
+            <span className="font-mono text-xs ml-1 text-gray-700">{txid.substring(0, 8)}...</span>
           </div>
           {blockhash && (
             <div className="text-xs text-gray-500">
               Block: <Link to={`/blocks/${blockhash}`} className="text-bitcoinz-600 hover:underline" onClick={(e) => e.stopPropagation()}>
-                {transaction.height || blockhash.substring(0, 8)}...
+                {transaction.height || blockhash.substring(0, 6)}...
               </Link>
             </div>
           )}
@@ -148,7 +148,7 @@ const TransactionCard = ({ transaction }) => {
             {confirmations > 0 && (
               <div className="flex items-center text-xs text-green-600">
                 <FaCheck className="mr-1" size={10} />
-                <span>{confirmations} {confirmations === 1 ? 'Confirmation' : 'Confirmations'}</span>
+                <span>{confirmations} conf.</span>
               </div>
             )}
             {confirmations === 0 && (
@@ -169,16 +169,25 @@ const TransactionCard = ({ transaction }) => {
             </div>
           ) : (
             <>
-              {vin && vin.length > 0 && vin.map((input, index) => (
-                <div key={index} className="font-mono text-xs overflow-hidden text-overflow-ellipsis">
+              {vin && vin.length > 0 && vin.slice(0, 2).map((input, index) => (
+                <div key={index} className="font-mono text-xs truncate">
                   {input.address || 'Unknown Address'}
                 </div>
               ))}
+              {vin && vin.length > 2 && (
+                <div className="text-xs text-gray-500">{vin.length - 2} more input(s)...</div>
+              )}
               {(!vin || vin.length === 0) && (
                 <div className="text-gray-400">No inputs</div>
               )}
             </>
           )}
+        </div>
+        
+        <div className="flex md:hidden items-center justify-center w-full py-1">
+          <div className={`${style.bgColor} rounded-full p-1`}>
+            <FaArrowRight className={style.textColor} size={12} />
+          </div>
         </div>
         
         <div className="hidden md:flex items-center justify-center">
@@ -189,14 +198,17 @@ const TransactionCard = ({ transaction }) => {
         
         <div className="bg-gray-50 p-2 rounded w-full md:w-2/5">
           <div className="text-gray-500 mb-1 font-medium">{vout?.length || 0} Output{vout?.length !== 1 ? 's' : ''}</div>
-          {vout && vout.length > 0 && vout.map((output, index) => (
+          {vout && vout.length > 0 && vout.slice(0, 2).map((output, index) => (
             <div key={index} className="flex justify-between text-xs">
-              <span className="font-mono overflow-hidden text-overflow-ellipsis">
+              <span className="font-mono truncate max-w-[60%]">
                 {output.scriptPubKey && output.scriptPubKey.addresses ? output.scriptPubKey.addresses[0] : 'Unknown Address'}
               </span>
               <span className="whitespace-nowrap ml-2">{output.value} BTCZ</span>
             </div>
           ))}
+          {vout && vout.length > 2 && (
+            <div className="text-xs text-gray-500">{vout.length - 2} more output(s)...</div>
+          )}
           {(!vout || vout.length === 0) && (
             <div className="text-gray-400">No outputs</div>
           )}

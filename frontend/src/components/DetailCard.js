@@ -55,25 +55,25 @@ const DetailCard = ({ title, items, copyable = [] }) => {
   
   return (
     <motion.div 
-      className="card p-6 border border-gray-200 hover:shadow-lg transition-shadow duration-300"
+      className="card p-3 sm:p-6 border border-gray-200 hover:shadow-lg transition-shadow duration-300"
       initial={{ opacity: 0, y: 20 }}
       animate={{ opacity: 1, y: 0 }}
       transition={{ duration: 0.4 }}
     >
       {title && (
-        <div className="mb-6">
+        <div className="mb-3 sm:mb-6">
           {typeof title === 'string' ? (
-            <h3 className="text-xl font-bold">{title}</h3>
+            <h3 className="text-lg sm:text-xl font-bold">{title}</h3>
           ) : (
             title
           )}
         </div>
       )}
       
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 sm:gap-6">
         {/* Basic Info Column */}
         <motion.div 
-          className="space-y-4"
+          className="space-y-3 sm:space-y-4"
           variants={listVariants}
           initial="hidden"
           animate="visible"
@@ -83,19 +83,19 @@ const DetailCard = ({ title, items, copyable = [] }) => {
             <motion.div 
               key={index} 
               variants={itemVariants}
-              className="flex flex-wrap md:flex-nowrap border-b border-gray-100 pb-3 last:pb-0 last:border-b-0"
+              className="flex flex-col sm:flex-row border-b border-gray-100 pb-3 last:pb-0 last:border-b-0"
             >
-              <div className="w-full md:w-2/5 text-gray-500 font-medium mb-1 md:mb-0">
+              <div className="w-full sm:w-2/5 text-gray-500 font-medium mb-1 sm:mb-0">
                 {item.label}
               </div>
-              <div className="w-full md:w-3/5 break-words flex items-center">
-                <div className="flex-grow overflow-hidden font-mono text-sm bg-gray-50 p-2 rounded">
+              <div className="w-full sm:w-3/5 break-words flex items-center">
+                <div className="flex-grow overflow-hidden font-mono text-xs sm:text-sm bg-gray-50 p-2 rounded">
                   {item.value}
                 </div>
                 {copyable.includes(item.label) && !React.isValidElement(item.value) && (
                   <CopyToClipboard text={getTextValue(item.value)}>
                     <motion.button 
-                      className="ml-2 text-gray-400 hover:text-gray-600 focus:outline-none" 
+                      className="ml-2 text-gray-400 hover:text-gray-600 focus:outline-none p-2" 
                       title="Copy to clipboard"
                       whileHover={{ scale: 1.2 }}
                       whileTap={{ scale: 0.9 }}
@@ -111,7 +111,7 @@ const DetailCard = ({ title, items, copyable = [] }) => {
         
         {/* Technical Details Column */}
         <motion.div 
-          className="space-y-4"
+          className="space-y-3 sm:space-y-4"
           variants={listVariants}
           initial="hidden"
           animate="visible"
@@ -121,19 +121,22 @@ const DetailCard = ({ title, items, copyable = [] }) => {
             <motion.div 
               key={index} 
               variants={itemVariants}
-              className="flex flex-wrap md:flex-nowrap border-b border-gray-100 pb-3 last:pb-0 last:border-b-0"
+              className="flex flex-col sm:flex-row border-b border-gray-100 pb-3 last:pb-0 last:border-b-0"
             >
-              <div className="w-full md:w-1/4 text-gray-500 font-medium mb-1 md:mb-0">
+              <div className="w-full sm:w-1/4 text-gray-500 font-medium mb-1 sm:mb-0">
                 {item.label}
               </div>
-              <div className="w-full md:w-3/4 break-words flex items-center">
-                <div className="flex-grow overflow-hidden font-mono text-sm bg-gray-50 p-2 rounded">
-                  {item.value}
+              <div className="w-full sm:w-3/4 break-words flex items-center">
+                <div className="flex-grow overflow-hidden font-mono text-xs sm:text-sm bg-gray-50 p-2 rounded">
+                  {typeof item.value === 'string' && item.value.length > 50
+                    ? <div className="overflow-x-auto whitespace-nowrap">{item.value}</div>
+                    : item.value
+                  }
                 </div>
                 {copyable.includes(item.label) && !React.isValidElement(item.value) && (
                   <CopyToClipboard text={getTextValue(item.value)}>
                     <motion.button 
-                      className="ml-2 text-gray-400 hover:text-gray-600 focus:outline-none" 
+                      className="ml-2 text-gray-400 hover:text-gray-600 focus:outline-none p-2" 
                       title="Copy to clipboard"
                       whileHover={{ scale: 1.2 }}
                       whileTap={{ scale: 0.9 }}

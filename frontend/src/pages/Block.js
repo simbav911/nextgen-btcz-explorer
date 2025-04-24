@@ -296,27 +296,31 @@ const Block = () => {
   }
   
   return (
-    <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pb-12">
-      <div className="flex items-center justify-between mb-6">
-        <h1 className="text-3xl font-bold flex items-center">
-          <FaCube className="text-bitcoinz-600 mr-3" />
-          Block #{formatNumber(block.height)}
+    <div className="max-w-7xl mx-auto px-2 sm:px-6 lg:px-8 pb-8 sm:pb-12">
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between mb-4 sm:mb-6 space-y-3 sm:space-y-0">
+        <h1 className="text-xl sm:text-3xl font-bold flex items-center">
+          <FaCube className="text-bitcoinz-600 mr-2 sm:mr-3" size={20} />
+          <span className="flex-grow truncate">Block #{formatNumber(block.height)}</span>
         </h1>
         
         <div className="flex space-x-2">
           <button
             onClick={() => navigateToBlock(block.height - 1)}
             disabled={block.height === 0}
-            className={`btn btn-sm ${block.height === 0 ? 'bg-gray-100 text-gray-400 cursor-not-allowed' : 'btn-secondary'}`}
+            className={`btn btn-sm px-2 py-1 sm:px-3 sm:py-2 ${block.height === 0 ? 'bg-gray-100 text-gray-400 cursor-not-allowed' : 'btn-secondary'}`}
+            aria-label="Previous Block"
           >
-            <FaArrowLeft className="mr-2" /> Previous Block
+            <span className="hidden sm:inline"><FaArrowLeft className="mr-2" /> Previous</span>
+            <span className="sm:hidden"><FaArrowLeft /></span>
           </button>
           <button
             onClick={() => navigateToBlock(block.height + 1)}
             disabled={!block.nextblockhash}
-            className={`btn btn-sm ${!block.nextblockhash ? 'bg-gray-100 text-gray-400 cursor-not-allowed' : 'btn-secondary'}`}
+            className={`btn btn-sm px-2 py-1 sm:px-3 sm:py-2 ${!block.nextblockhash ? 'bg-gray-100 text-gray-400 cursor-not-allowed' : 'btn-secondary'}`}
+            aria-label="Next Block"
           >
-            Next Block <FaArrowRight className="ml-2" />
+            <span className="hidden sm:inline">Next <FaArrowRight className="ml-2" /></span>
+            <span className="sm:hidden"><FaArrowRight /></span>
           </button>
         </div>
       </div>
@@ -327,25 +331,27 @@ const Block = () => {
         copyable={['Hash', 'Merkle Root']}
       />
       
-      <div id="transactions-list" className="mt-8">
-        <h2 className="text-2xl font-bold mb-4">Transactions ({formatNumber(block.tx.length)})</h2>
+      <div id="transactions-list" className="mt-6 sm:mt-8">
+        <h2 className="text-lg sm:text-2xl font-bold mb-3 sm:mb-4">Transactions ({formatNumber(block.tx.length)})</h2>
         
         {transactions.length > 0 ? (
           <>
-            <div className="space-y-4 mb-4">
+            <div className="space-y-3 sm:space-y-4 mb-4">
               {transactions.map(tx => (
                 <TransactionCard key={tx.txid} transaction={tx} />
               ))}
             </div>
             
-            <Pagination
-              currentPage={currentPage}
-              totalPages={totalPages}
-              onPageChange={handlePageChange}
-            />
+            <div className="pb-4 sm:pb-0">
+              <Pagination
+                currentPage={currentPage}
+                totalPages={totalPages}
+                onPageChange={handlePageChange}
+              />
+            </div>
           </>
         ) : (
-          <div className="card text-center py-8 max-w-5xl mx-auto">
+          <div className="card text-center py-4 sm:py-8 max-w-5xl mx-auto">
             <p className="text-gray-500">No transactions available</p>
           </div>
         )}

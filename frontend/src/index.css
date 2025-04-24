@@ -42,6 +42,130 @@ header {
     text-overflow: ellipsis;
     white-space: nowrap;
   }
+  
+  /* Better spacing for tables on mobile */
+  td, th {
+    @apply py-2 px-2;
+  }
+  
+  /* Improve mobile block list view */
+  .mobile-block-row {
+    @apply py-3 px-3 border-b border-gray-100;
+  }
+  
+  .mobile-block-row:active {
+    @apply bg-blue-50;
+  }
+  
+  /* Remove excessive padding on mobile */
+  .page-container {
+    @apply px-2 py-3 sm:px-4 sm:py-6;
+  }
+  
+  /* Adjust font sizes for headings on mobile */
+  h1.page-title {
+    @apply text-xl sm:text-2xl;
+  }
+  
+  /* Improved block list for mobile */
+  .blocks-list-item {
+    @apply flex items-center p-3 border-b border-gray-100;
+  }
+  
+  .blocks-list-item-height {
+    @apply font-bold text-bitcoinz-600 w-1/3 flex items-center;
+  }
+  
+  .blocks-list-item-time {
+    @apply text-xs text-gray-500 w-1/3;
+  }
+  
+  .blocks-list-item-count {
+    @apply text-xs w-1/3 text-right;
+  }
+}
+
+/* Specific styles for the blocks table mobile view */
+.mobile-blocks-table {
+  @apply rounded-lg overflow-hidden bg-white;
+}
+
+.mobile-blocks-header {
+  @apply bg-blue-50 py-2 px-3 grid grid-cols-3 text-xs font-semibold text-gray-700;
+}
+
+.mobile-blocks-row {
+  @apply grid grid-cols-3 py-3 px-3 border-b border-gray-50 hover:bg-blue-50 active:bg-blue-100;
+}
+
+.mobile-blocks-row:last-child {
+  @apply border-b-0;
+}
+
+/* Fix for unwanted portal-root text */
+#portal-root {
+  position: fixed;
+  top: 0;
+  left: 0;
+  z-index: 9999;
+  pointer-events: none;
+  visibility: visible !important;
+  display: block !important;
+  height: 0 !important;
+  width: 0 !important;
+  overflow: hidden !important;
+}
+
+/* Hide debug information */
+div#portal-root {
+  display: none !important;
+}
+
+/* Transaction tile optimizations */
+.transaction-tile {
+  @apply rounded-lg overflow-hidden shadow-sm transition-all duration-200 border border-gray-100 hover:shadow-md;
+  max-height: 160px;
+}
+
+.transaction-tile-compact {
+  @apply p-2;
+}
+
+.transaction-header {
+  @apply flex justify-between items-center mb-1;
+}
+
+.transaction-type-indicator {
+  @apply rounded-full p-1 mr-2 flex-shrink-0 shadow-sm;
+  width: 24px;
+  height: 24px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.transaction-details-grid {
+  @apply grid grid-cols-4 gap-1 my-1 py-1 border-t border-b border-gray-100;
+}
+
+.transaction-address {
+  @apply font-mono text-xs truncate;
+  max-width: 180px;
+}
+
+/* Mobile-specific transaction optimizations */
+@media (max-width: 640px) {
+  .transaction-tile {
+    max-height: 140px;
+  }
+  
+  .transaction-address {
+    max-width: 140px;
+  }
+  
+  .transaction-tile-compact {
+    @apply p-1.5;
+  }
 }
 
 /* Custom Components */

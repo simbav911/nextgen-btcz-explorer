@@ -238,107 +238,81 @@ const TransactionList = () => {
               return (
                 <div
                   key={tx.txid}
-                  className={`relative rounded-lg overflow-hidden shadow-md transition-all duration-200 border border-gray-100 hover:shadow-xl ${style.bg}`}
+                  className={`transaction-tile ${style.bg}`}
                   style={{
                     borderLeft: style.border,
                     boxShadow: style.shadow
                   }}
                 >
                   <Link to={`/tx/${tx.txid}`} className="block">
-                    <div className="p-3">
-                      <div className="flex flex-col md:flex-row justify-between">
-                        {/* Left side - Transaction info */}
-                        <div className="flex items-start space-x-2 mb-2 md:mb-0 md:w-2/5">
-                          <div className={`${style.iconBg} p-1.5 rounded-full flex-shrink-0 mt-1 shadow-sm`}>
+                    <div className="transaction-tile-compact">
+                      {/* Mobile layout - Top section with icon and type */}
+                      <div className="transaction-header">
+                        <div className="flex items-center">
+                          <div className={`transaction-type-indicator ${style.iconBg}`}>
                             {style.icon}
                           </div>
-                          <div>
-                            <h3 className="text-sm font-semibold flex items-center flex-wrap">
-                              {isCoinbase ? 'Coinbase Transaction' : 'Transaction'}
-                              <span className={`ml-2 text-xs py-0.5 px-1.5 rounded-full font-medium ${style.labelClass}`}>{style.label}</span>
-                              <span className="ml-2 text-xs py-0.5 px-1.5 rounded font-medium bg-gray-50 text-gray-500 border border-gray-100">{tx.confirmations > 0 ? `${tx.confirmations} Confirms` : 'Unconfirmed'}</span>
-                            </h3>
-                            <div className="text-xs text-gray-500 mt-0.5">
-                              <div className="flex items-center">
-                                <FaClock className="mr-1" size={10} />
-                                {formatRelativeTime(tx.time)}
-                              </div>
-                              <div className="font-mono mt-0.5 overflow-hidden text-overflow-ellipsis">
-                                <span className="text-gray-600">ID:</span> {formatHash(tx.txid, 12)}
-                              </div>
-                            </div>
-                          </div>
+                          <span className="text-sm font-medium">{isCoinbase ? 'Coinbase' : 'Transaction'}</span>
+                          <span className={`ml-2 text-xs py-0.5 px-1.5 rounded-full font-medium ${style.labelClass}`}>{style.label}</span>
                         </div>
-                        {/* Middle - Transaction details */}
-                        <div className="md:w-2/5 mb-2 md:mb-0">
-                          <div className="grid grid-cols-2 gap-1 text-sm">
-                            <div>
-                              <p className="text-xs text-gray-500 font-medium">Block</p>
-                              <p className="text-xs">
-                                {tx.blockhash ? (
-                                  <Link 
-                                    to={`/blocks/${tx.blockhash}`} 
-                                    className="text-blue-600 hover:underline" 
-                                    onClick={(e) => e.stopPropagation()}
-                                  >
-                                    {tx.height || formatHash(tx.blockhash, 8)}
-                                  </Link>
-                                ) : (
-                                  <span className="text-orange-500">Pending</span>
-                                )}
-                              </p>
-                            </div>
-                            <div>
-                              <p className="text-xs text-gray-500 font-medium">Size</p>
-                              <p className="text-xs">{tx.size ? `${formatNumber(tx.size)} bytes` : 'Unknown'}</p>
-                            </div>
-                            <div>
-                              <p className="text-xs text-gray-500 font-medium">Inputs</p>
-                              <p className="text-xs">{tx.vin ? tx.vin.length : 0}</p>
-                            </div>
-                            <div>
-                              <p className="text-xs text-gray-500 font-medium">Outputs</p>
-                              <p className="text-xs">{tx.vout ? tx.vout.length : 0}</p>
-                            </div>
-                          </div>
+                        <span className="text-xs py-0.5 px-1.5 rounded font-medium bg-gray-50 text-gray-500 border border-gray-100">
+                          {tx.confirmations > 0 ? `${tx.confirmations} Confirms` : 'Unconfirmed'}
+                        </span>
+                      </div>
+                      
+                      {/* Transaction ID and time */}
+                      <div className="flex justify-between items-center text-xs text-gray-500 mb-1">
+                        <div className="font-mono overflow-hidden text-overflow-ellipsis">
+                          <span className="text-gray-600">ID:</span> {formatHash(tx.txid, 10)}
                         </div>
-                        {/* Right side - Value and fee */}
-                        <div className="md:w-1/5 text-right">
-                          <div>
-                            <p className="text-xs text-gray-500 font-medium">Total Value</p>
-                            <p className="text-sm font-semibold text-green-600">
-                              {tx.vout ? formatBTCZ(tx.vout.reduce((sum, output) => sum + (output.value || 0), 0)) : '0.00 BTCZ'}
-                            </p>
-                          </div>
-                          {!isCoinbase && (
-                            <div className="mt-1">
-                              <p className="text-xs text-gray-500 font-medium">Fee</p>
-                              <p className="text-xs text-gray-700">
-                                {tx.fee !== undefined ? formatBTCZ(tx.fee) : '0.00 BTCZ'}
-                              </p>
-                            </div>
-                          )}
-                          {isCoinbase && (
-                            <div className="mt-1">
-                              <p className="text-xs text-gray-500 font-medium">Reward</p>
-                              <p className="text-xs text-yellow-600 font-medium">
-                                {tx.vout ? formatBTCZ(tx.vout.reduce((sum, output) => sum + (output.value || 0), 0)) : '0.00 BTCZ'}
-                              </p>
-                            </div>
-                          )}
+                        <div className="flex items-center">
+                          <FaClock className="mr-1" size={10} />
+                          {formatRelativeTime(tx.time)}
                         </div>
                       </div>
-                      <div className="mt-2 grid grid-cols-1 md:grid-cols-2 gap-2 text-xs">
-                        <div className="bg-gray-50 rounded p-2">
-                          <p className="text-gray-500 mb-1 font-medium">From</p>
-                          {isCoinbase ? (
-                            <div className="flex items-center">
-                              <FaCoins className="text-yellow-500 mr-1" size={10} />
-                              <span className="text-yellow-600">Newly Generated Coins</span>
-                            </div>
-                          ) : tx.vin && tx.vin.length > 0 ? (
-                            tx.vin[0].addresses ? (
-                              <div className="font-mono truncate">
+                      
+                      {/* Transaction details - grid layout */}
+                      <div className="transaction-details-grid">
+                        <div className="col-span-1">
+                          <p className="text-xs text-gray-500">Block</p>
+                          <p className="text-xs">
+                            {tx.blockhash ? (
+                              <Link 
+                                to={`/blocks/${tx.blockhash}`} 
+                                className="text-blue-600 hover:underline" 
+                                onClick={(e) => e.stopPropagation()}
+                              >
+                                {tx.height || formatHash(tx.blockhash, 6)}
+                              </Link>
+                            ) : (
+                              <span className="text-orange-500">Pending</span>
+                            )}
+                          </p>
+                        </div>
+                        <div className="col-span-1 text-center">
+                          <p className="text-xs text-gray-500">In/Out</p>
+                          <p className="text-xs">{tx.vin ? tx.vin.length : 0}/{tx.vout ? tx.vout.length : 0}</p>
+                        </div>
+                        <div className="col-span-2 text-right">
+                          <p className="text-xs text-gray-500">{isCoinbase ? 'Reward' : 'Value'}</p>
+                          <p className="text-xs font-medium text-green-600">
+                            {tx.vout ? formatBTCZ(tx.vout.reduce((sum, output) => sum + (output.value || 0), 0)) : '0.00 BTCZ'}
+                          </p>
+                        </div>
+                      </div>
+                      
+                      {/* From/To section */}
+                      <div className="mt-1 grid grid-cols-1 gap-1 text-xs">
+                        <div className="flex">
+                          <div className="w-1/5 text-gray-500 font-medium">From:</div>
+                          <div className="w-4/5">
+                            {isCoinbase ? (
+                              <div className="flex items-center">
+                                <FaCoins className="text-yellow-500 mr-1" size={10} />
+                                <span className="text-yellow-600">Newly Generated Coins</span>
+                              </div>
+                            ) : tx.vin && tx.vin.length > 0 && tx.vin[0].addresses ? (
+                              <div className="transaction-address">
                                 <Link
                                   to={`/address/${tx.vin[0].addresses[0]}`}
                                   className="text-blue-600 hover:underline"
@@ -346,27 +320,23 @@ const TransactionList = () => {
                                 >
                                   {tx.vin[0].addresses[0]}
                                 </Link>
-                                {tx.vin.length > 1 && <span className="text-gray-500"> +{tx.vin.length - 1} more</span>}
+                                {tx.vin.length > 1 && <span className="text-gray-500"> +{tx.vin.length - 1}</span>}
                               </div>
                             ) : (
-                              <div>
-                                {tx.vin[0].coinbase ? (
-                                  <span className="text-yellow-600">Coinbase (Newly Generated Coins)</span>
-                                ) : (
-                                  <span className="text-gray-500">No input address</span>
-                                )}
-                              </div>
-                            )
-                          ) : (
-                            <span className="text-gray-500">No inputs</span>
-                          )}
+                              tx.vin && tx.vin[0] && tx.vin[0].coinbase ? (
+                                <span className="text-yellow-600">Coinbase</span>
+                              ) : (
+                                <span className="text-gray-500">No inputs</span>
+                              )
+                            )}
+                          </div>
                         </div>
                         
-                        <div className="bg-gray-50 rounded p-2">
-                          <p className="text-gray-500 mb-1 font-medium">To</p>
-                          {tx.vout && tx.vout.length > 0 ? (
-                            tx.vout[0].scriptPubKey && tx.vout[0].scriptPubKey.addresses ? (
-                              <div className="font-mono truncate">
+                        <div className="flex">
+                          <div className="w-1/5 text-gray-500 font-medium">To:</div>
+                          <div className="w-4/5">
+                            {tx.vout && tx.vout.length > 0 && tx.vout[0].scriptPubKey && tx.vout[0].scriptPubKey.addresses ? (
+                              <div className="transaction-address">
                                 <Link
                                   to={`/address/${tx.vout[0].scriptPubKey.addresses[0]}`}
                                   className="text-blue-600 hover:underline"
@@ -374,14 +344,12 @@ const TransactionList = () => {
                                 >
                                   {tx.vout[0].scriptPubKey.addresses[0]}
                                 </Link>
-                                {tx.vout.length > 1 && <span className="text-gray-500"> +{tx.vout.length - 1} more</span>}
+                                {tx.vout.length > 1 && <span className="text-gray-500"> +{tx.vout.length - 1}</span>}
                               </div>
                             ) : (
                               <span className="text-gray-500">No output address</span>
-                            )
-                          ) : (
-                            <span className="text-gray-500">No outputs</span>
-                          )}
+                            )}
+                          </div>
                         </div>
                       </div>
                     </div>

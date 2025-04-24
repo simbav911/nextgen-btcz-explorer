@@ -9,14 +9,14 @@ const Footer = () => {
   const currentYear = new Date().getFullYear();
 
   return (
-    <footer className="relative text-white py-8 z-10 mt-32">
+    <footer className="relative text-black py-8 z-10 mt-32">
       {/* Content container */}
       <div className="container-custom relative z-10 pt-12">
         <div className="grid grid-cols-1 md:grid-cols-4 gap-8">
           {/* About */}
           <div>
             <h3 className="text-lg font-bold mb-4 header-text">BitcoinZ Explorer</h3>
-            <p className="text-white text-sm header-text">
+            <p className="text-black text-sm header-text">
               A modern, open-source block explorer for the BitcoinZ community.
               Explore blocks, transactions, and addresses on the BitcoinZ blockchain.
             </p>
@@ -27,16 +27,16 @@ const Footer = () => {
             <h3 className="text-lg font-bold mb-4 header-text">Quick Links</h3>
             <ul className="space-y-2">
               <li>
-                <Link to="/" className="text-white hover:text-blue-200 text-sm nav-item-hover px-2 py-1 rounded-md">Home</Link>
+                <Link to="/" className="text-black hover:text-blue-600 text-sm nav-item-hover px-2 py-1 rounded-md">Home</Link>
               </li>
               <li>
-                <Link to="/blocks" className="text-white hover:text-blue-200 text-sm nav-item-hover px-2 py-1 rounded-md">Latest Blocks</Link>
+                <Link to="/blocks" className="text-black hover:text-blue-600 text-sm nav-item-hover px-2 py-1 rounded-md">Latest Blocks</Link>
               </li>
               <li>
-                <Link to="/transactions" className="text-white hover:text-blue-200 text-sm nav-item-hover px-2 py-1 rounded-md">Latest Transactions</Link>
+                <Link to="/transactions" className="text-black hover:text-blue-600 text-sm nav-item-hover px-2 py-1 rounded-md">Latest Transactions</Link>
               </li>
               <li>
-                <Link to="/stats" className="text-white hover:text-blue-200 text-sm nav-item-hover px-2 py-1 rounded-md">Network Statistics</Link>
+                <Link to="/stats" className="text-black hover:text-blue-600 text-sm nav-item-hover px-2 py-1 rounded-md">Network Statistics</Link>
               </li>
             </ul>
           </div>
@@ -50,7 +50,7 @@ const Footer = () => {
                   href="https://getbtcz.com/" 
                   target="_blank" 
                   rel="noopener noreferrer"
-                  className="text-white hover:text-blue-200 text-sm nav-item-hover px-2 py-1 rounded-md"
+                  className="text-black hover:text-blue-600 text-sm nav-item-hover px-2 py-1 rounded-md"
                 >
                   BitcoinZ Website
                 </a>
@@ -60,7 +60,7 @@ const Footer = () => {
                   href="https://github.com/btcz/bitcoinz" 
                   target="_blank" 
                   rel="noopener noreferrer"
-                  className="text-white hover:text-blue-200 text-sm nav-item-hover px-2 py-1 rounded-md"
+                  className="text-black hover:text-blue-600 text-sm nav-item-hover px-2 py-1 rounded-md"
                 >
                   BitcoinZ GitHub
                 </a>
@@ -70,7 +70,7 @@ const Footer = () => {
                   href="https://getbtcz.com/learn/" 
                   target="_blank" 
                   rel="noopener noreferrer"
-                  className="text-white hover:text-blue-200 text-sm nav-item-hover px-2 py-1 rounded-md"
+                  className="text-black hover:text-blue-600 text-sm nav-item-hover px-2 py-1 rounded-md"
                 >
                   BitcoinZ Wiki
                 </a>
@@ -86,7 +86,7 @@ const Footer = () => {
                 href="https://github.com/btcz" 
                 target="_blank" 
                 rel="noopener noreferrer"
-                className="text-white hover:text-blue-200 nav-item-hover p-2 rounded-full"
+                className="text-black hover:text-blue-600 nav-item-hover p-2 rounded-full"
               >
                 <FaGithub size={20} />
               </a>
@@ -94,7 +94,7 @@ const Footer = () => {
                 href="https://twitter.com/BTCZOfficial" 
                 target="_blank" 
                 rel="noopener noreferrer"
-                className="text-white hover:text-blue-200 nav-item-hover p-2 rounded-full"
+                className="text-black hover:text-blue-600 nav-item-hover p-2 rounded-full"
               >
                 <FaTwitter size={20} />
               </a>
@@ -102,7 +102,7 @@ const Footer = () => {
                 href="https://discordapp.com/invite/u3dkbFs" 
                 target="_blank" 
                 rel="noopener noreferrer"
-                className="text-white hover:text-blue-200 nav-item-hover p-2 rounded-full"
+                className="text-black hover:text-blue-600 nav-item-hover p-2 rounded-full"
               >
                 <FaDiscord size={20} />
               </a>
@@ -110,7 +110,7 @@ const Footer = () => {
                 href="https://t.me/btczofficialgroup" 
                 target="_blank" 
                 rel="noopener noreferrer" 
-                className="text-white hover:text-blue-200 nav-item-hover p-2 rounded-full"
+                className="text-black hover:text-blue-600 nav-item-hover p-2 rounded-full"
               >
                 <FaTelegramPlane size={20} />
               </a>
@@ -118,20 +118,20 @@ const Footer = () => {
                 href="https://www.reddit.com/r/BTCZCommunity/hot/"
                 target="_blank"
                 rel="noopener noreferrer"
-                className="text-white hover:text-blue-200 nav-item-hover p-2 rounded-full"
+                className="text-black hover:text-blue-600 nav-item-hover p-2 rounded-full"
               >
                 <FaReddit size={20} />
               </a>
             </div>
-            <p className="mt-4 text-white text-sm header-text">
+            <p className="mt-4 text-black text-sm header-text">
               Join the community to stay updated with the latest news and developments.
             </p>
           </div>
         </div>
 
-        <div className="mt-8 pt-6 border-t border-white border-opacity-20 text-center">
-          <p className="text-white text-sm header-text">&copy; {currentYear} BitcoinZ Explorer. All rights reserved.</p>
-          <p className="mt-2 text-white text-sm header-text">
+        <div className="mt-8 pt-6 border-t border-gray-300 border-opacity-20 text-center">
+          <p className="text-black text-sm header-text">&copy; {currentYear} BitcoinZ Explorer. All rights reserved.</p>
+          <p className="mt-2 text-black text-sm header-text">
             BitcoinZ - Community driven development, Decentralized Cryptocurrency
           </p>
         </div>

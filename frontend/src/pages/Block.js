@@ -133,7 +133,7 @@ const Block = () => {
   // Navigate to previous/next block
   const navigateToBlock = (height) => {
     if (height < 0) return;
-    navigate(`/blocks/height/${height}`);
+    navigate(`/blocks/${height}`);
   };
   
   // Extract miner information if available

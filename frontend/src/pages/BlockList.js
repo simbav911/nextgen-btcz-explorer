@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useContext, useRef } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import { FaCube, FaClock, FaLayerGroup } from 'react-icons/fa';
 
 // Components
@@ -18,7 +18,7 @@ import apiInstance from '../services/api';
 // Utils
 import { formatNumber, formatTimestamp, formatRelativeTime } from '../utils/formatting';
 
-const BLOCKS_PER_PAGE = 40;
+const BLOCKS_PER_PAGE = 50;
 
 // Helper function to decode hex to ASCII
 const hexToAscii = (hex) => {
@@ -108,6 +108,7 @@ const BlockList = () => {
   
   const socket = useContext(SocketContext);
   const { showToast } = useContext(ToastContext);
+  const navigate = useNavigate();
   
   // Calculate total pages
   const totalPages = Math.ceil(totalBlocks / BLOCKS_PER_PAGE);
@@ -245,12 +246,12 @@ const BlockList = () => {
                   <table className="min-w-full text-base">
                     <thead className="bg-slate-100">
                       <tr>
-                        <th className="py-4 px-6 text-left font-bold text-slate-700 w-1/6">Height</th>
-                        <th className="py-4 px-6 text-left font-bold text-slate-700 w-1/6">Timestamp</th>
-                        <th className="py-4 px-6 text-left font-bold text-slate-700 w-1/12">Transactions</th>
-                        <th className="py-4 px-6 text-left font-bold text-slate-700 w-1/6">Size</th>
-                        <th className="py-4 px-6 text-center font-bold text-slate-700 w-1/5">Mining Pool</th>
-                        <th className="py-4 px-6 text-left font-bold text-slate-700 w-1/4">Hash</th>
+                        <th className="py-2 px-4 text-left font-bold text-slate-700 w-1/6">Height</th>
+                        <th className="py-2 px-4 text-left font-bold text-slate-700 w-1/6">Timestamp</th>
+                        <th className="py-2 px-4 text-left font-bold text-slate-700 w-1/12">Transactions</th>
+                        <th className="py-2 px-4 text-left font-bold text-slate-700 w-1/6">Size</th>
+                        <th className="py-2 px-4 text-center font-bold text-slate-700 w-1/5">Mining Pool</th>
+                        <th className="py-2 px-4 text-left font-bold text-slate-700 w-1/4">Hash</th>
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-slate-100 bg-white">
@@ -261,28 +262,28 @@ const BlockList = () => {
                             (i % 2 === 1 ? 'bg-slate-50' : '') +
                             ' hover:bg-blue-200 hover:bg-opacity-50 hover:shadow-inner cursor-pointer transition-all duration-200'
                           }
-                          onClick={() => window.location.assign(`/blocks/${block.hash}`)}
+                          onClick={() => navigate(`/blocks/${block.hash}`)}
                         >
-                          <td className="py-3 px-6 font-semibold">
+                          <td className="py-1.5 px-4 font-semibold">
                             <Link to={`/blocks/${block.hash}`} className="flex items-center text-bitcoinz-600 hover:underline" onClick={e => e.stopPropagation()}>
-                              <FaCube className="mr-2" />
+                              <FaCube className="mr-1" size={14} />
                               {formatNumber(block.height)}
                             </Link>
                           </td>
-                          <td className="py-3 px-6">
+                          <td className="py-1.5 px-4">
                             <div className="flex items-center text-sm text-gray-700">
-                              <FaClock className="mr-1" />
+                              <FaClock className="mr-1" size={12} />
                               <span title={formatTimestamp(block.time)}>
                                 {formatRelativeTime(block.time)}
                               </span>
                             </div>
                           </td>
-                          <td className="py-3 px-6">{formatNumber(block.tx.length)}</td>
-                          <td className="py-3 px-6">{formatNumber(block.size)} bytes</td>
-                          <td className="py-3 px-6 text-center">
+                          <td className="py-1.5 px-4">{formatNumber(block.tx.length)}</td>
+                          <td className="py-1.5 px-4">{formatNumber(block.size)} bytes</td>
+                          <td className="py-1.5 px-4 text-center">
                             {block.miningPoolName || block.poolName || block.pool || 'Unknown Pool'}
                           </td>
-                          <td className="py-3 px-6 font-mono text-xs">
+                          <td className="py-1.5 px-4 font-mono text-xs">
                             <Link to={`/blocks/${block.hash}`} className="text-bitcoinz-600 hover:underline" onClick={e => e.stopPropagation()}>
                               {block.hash.substring(0, 10)}...{block.hash.substring(block.hash.length - 10)}
                             </Link>
@@ -307,13 +308,13 @@ const BlockList = () => {
                         key={block.hash}
                         className={`block ${i % 2 === 1 ? 'bg-slate-50' : ''} hover:bg-blue-200 hover:bg-opacity-50 hover:shadow-inner transition-all duration-200`}
                       >
-                        <div className="mobile-blocks-row items-center">
+                        <div className="mobile-blocks-row items-center py-1.5 px-2">
                           <div className="font-semibold text-bitcoinz-600 flex items-center">
-                            <FaCube className="mr-1 flex-shrink-0" size={12} />
+                            <FaCube className="mr-1 flex-shrink-0" size={10} />
                             <span className="truncate">{formatNumber(block.height)}</span>
                           </div>
                           <div className="text-xs text-gray-700 flex items-center">
-                            <FaClock className="mr-1 flex-shrink-0" size={10} />
+                            <FaClock className="mr-1 flex-shrink-0" size={8} />
                             <span className="truncate">
                               {formatRelativeTime(block.time)}
                             </span>

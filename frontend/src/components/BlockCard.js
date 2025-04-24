@@ -152,50 +152,50 @@ const BlockCard = ({ block }) => {
     >
       <div className="flex flex-col md:flex-row md:items-center justify-between">
         <div className="flex items-center">
-          <div className="bg-bitcoinz-100 p-3 rounded-full mr-4 flex-shrink-0">
-            <FaCube className="text-bitcoinz-600" size={20} />
+          <div className="bg-bitcoinz-100 p-2 sm:p-3 rounded-full mr-3 sm:mr-4 flex-shrink-0">
+            <FaCube className="text-bitcoinz-600" size={16} />
           </div>
           <div className="min-w-0">
-            <h3 className="text-lg font-semibold">
+            <h3 className="text-base sm:text-lg font-semibold truncate-mobile">
               Block {formatNumber(height)}
             </h3>
-            <p className="text-sm text-gray-500 flex items-center">
-              <FaClock className="mr-1 flex-shrink-0" />
+            <p className="text-xs sm:text-sm text-gray-500 flex items-center">
+              <FaClock className="mr-1 flex-shrink-0" size={12} />
               {formatRelativeTime(time)}
             </p>
             {/* Show mining pool info when available */}
             {(miner || !isLoading) && (
-              <p className="text-xs text-blue-600 flex items-center mt-1">
+              <p className="text-xs text-blue-600 flex items-center mt-1 truncate-mobile max-w-full">
                 <FaHammer className="mr-1 flex-shrink-0" size={10} />
-                Mined by {miner || 'Unknown Pool'}
+                <span className="truncate">Mined by {miner || 'Unknown Pool'}</span>
               </p>
             )}
           </div>
         </div>
         
         <div className="mt-2 md:mt-0 text-right">
-          <div className="text-sm">
+          <div className="text-xs sm:text-sm">
             <span className="text-gray-500">Hash:</span> 
-            <span className="font-mono text-xs ml-1 text-gray-700">{hash.substring(0, 10)}...</span>
+            <span className="font-mono text-xs ml-1 text-gray-700">{hash.substring(0, 8)}...</span>
           </div>
-          <div className="text-sm text-gray-500">
-            {tx_count} {tx_count === 1 ? 'transaction' : 'transactions'}
+          <div className="text-xs sm:text-sm text-gray-500">
+            {tx_count} {tx_count === 1 ? 'tx' : 'txs'}
           </div>
         </div>
       </div>
       
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mt-4 text-sm">
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-2 sm:gap-4 mt-3 sm:mt-4 text-xs sm:text-sm">
         <div>
           <div className="text-gray-500">Size</div>
           <div>{formatNumber(size)} bytes</div>
         </div>
         <div>
           <div className="text-gray-500">Difficulty</div>
-          <div>{typeof difficulty === 'number' ? difficulty.toFixed(2) : difficulty}</div>
+          <div className="truncate">{typeof difficulty === 'number' ? difficulty.toFixed(2) : difficulty}</div>
         </div>
         <div>
           <div className="text-gray-500">Bits</div>
-          <div className="font-mono">{bits}</div>
+          <div className="font-mono truncate">{bits}</div>
         </div>
         <div>
           <div className="text-gray-500">Nonce</div>

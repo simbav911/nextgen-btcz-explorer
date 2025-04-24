@@ -48,22 +48,22 @@ const StatCard = ({ title, value, icon, color = 'blue', change }) => {
     <motion.div 
       whileHover={{ y: -5 }}
       transition={{ type: "spring", stiffness: 300 }}
-      className={`card border ${colors.border} ${colors.shadow} hover:shadow-lg transition-all duration-300 h-32 flex flex-col justify-center`}
+      className={`card border ${colors.border} ${colors.shadow} hover:shadow-lg transition-all duration-300 h-auto min-h-24 sm:h-32 flex flex-col justify-center`}
     >
       <div className="flex items-center justify-between">
-        <div>
-          <p className="text-gray-500 text-sm font-medium">{title}</p>
-          <h3 className={`text-2xl font-bold mt-1 ${colors.text}`}>{value}</h3>
+        <div className="mr-2">
+          <p className="text-gray-500 text-xs sm:text-sm font-medium">{title}</p>
+          <h3 className={`text-base sm:text-lg md:text-2xl font-bold mt-1 ${colors.text} break-words`}>{value}</h3>
           
           {change && (
-            <div className={`text-sm mt-1 flex items-center ${change.positive ? 'text-green-600' : 'text-red-600'}`}>
+            <div className={`text-xs sm:text-sm mt-1 flex items-center ${change.positive ? 'text-green-600' : 'text-red-600'}`}>
               <span className="font-medium">{change.positive ? '↑' : '↓'} {change.value}</span>
               {change.period && <span className="text-gray-500 ml-1 text-xs">{change.period}</span>}
             </div>
           )}
         </div>
         
-        <div className={`${colors.bg} p-3 rounded-full`}>
+        <div className={`${colors.bg} p-2 sm:p-3 rounded-full flex-shrink-0`}>
           {icon}
         </div>
       </div>

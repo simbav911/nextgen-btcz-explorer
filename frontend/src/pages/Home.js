@@ -210,7 +210,7 @@ const Home = () => {
       </div>
 
       {/* Stats Overview */}
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-2 sm:gap-4 mb-6">
         <Link to="/blocks" className="block">
           <StatCard
             title="Latest Block"

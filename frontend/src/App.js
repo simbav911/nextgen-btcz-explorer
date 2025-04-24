@@ -94,7 +94,7 @@ function App({ skipHeader = false }) {
       {/* Main content with WebSocket context */}
       <SocketContext.Provider value={socketRef.current}>
         <ToastContext.Provider value={toastContextValue}>
-          <main className="flex-grow py-8">
+          <main className="flex-grow py-4 sm:py-6 md:py-8">
             <Routes>
               <Route path="/" element={<Home />} />
               <Route path="/blocks" element={<BlockList />} />

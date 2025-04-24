@@ -12,7 +12,11 @@ const HorizontalBarChart = ({ chartData }) => {
   const [tooltipPosition, setTooltipPosition] = useState({ x: 0, y: 0 });
   const [showAddressList, setShowAddressList] = useState(true); // Default to showing addresses
   const { poolColors } = getChartColors();
-
+  
+  // Pagination state
+  const [currentPage, setCurrentPage] = useState(1);
+  const poolsPerPage = 15; // Show 15 pools per page
+  
   if (!chartData || !chartData.data || chartData.data.length === 0) {
     return (
       <div className="chart-placeholder">
@@ -150,6 +154,19 @@ const HorizontalBarChart = ({ chartData }) => {
   const { poolData, unknownAddresses, totalUnknownCount } = processData();
   const totalBlocks = chartData.data.length;
   
+  // Calculate total pages
+  const totalPages = Math.ceil(poolData.length / poolsPerPage);
+  
+  // Get current page of pools
+  const indexOfLastPool = currentPage * poolsPerPage;
+  const indexOfFirstPool = indexOfLastPool - poolsPerPage;
+  const currentPools = poolData.slice(indexOfFirstPool, indexOfLastPool);
+  
+  // Change page
+  const paginate = (pageNumber) => setCurrentPage(pageNumber);
+  const nextPage = () => setCurrentPage(prev => Math.min(prev + 1, totalPages));
+  const prevPage = () => setCurrentPage(prev => Math.max(prev - 1, 1));
+  
   // Calculate bar widths as percentages
   const calculateBarWidth = (count) => {
     return (count / totalBlocks) * 100;
@@ -177,7 +194,7 @@ const HorizontalBarChart = ({ chartData }) => {
   // DIRECT DATE IMPLEMENTATION WITH TODAY BUTTON FIX
   // Direct access to the raw date string from chart data
   const rawDateString = chartData.date; 
-  console.log(`🔥 RAW DATE STRING FROM PROPS: ${rawDateString}`);
+  console.log(` RAW DATE STRING FROM PROPS: ${rawDateString}`);
   
   // Get today's date string for comparison
   const today = new Date();
@@ -187,7 +204,7 @@ const HorizontalBarChart = ({ chartData }) => {
   let storedDate;
   try {
     storedDate = localStorage.getItem('minedBlocks_selectedDate');
-    console.log(`🔥 STORED DATE FROM LOCALSTORAGE: ${storedDate}`);
+    console.log(` STORED DATE FROM LOCALSTORAGE: ${storedDate}`);
   } catch (e) {
     console.error("Error accessing localStorage:", e);
   }
@@ -199,13 +216,13 @@ const HorizontalBarChart = ({ chartData }) => {
   if (rawDateString === todayString) {
     // User clicked Today button - always show today's date
     exactRequestedDate = todayString;
-    console.log("🔥 TODAY BUTTON USED - showing today's date:", todayString);
+    console.log(" TODAY BUTTON USED - showing today's date:", todayString);
   } else {
     // For custom dates, use localStorage or fall back to props date
     exactRequestedDate = storedDate || rawDateString || todayString;
   }
   
-  console.log(`🔥 FINAL DATE USED FOR DISPLAY: ${exactRequestedDate}`);
+  console.log(` FINAL DATE USED FOR DISPLAY: ${exactRequestedDate}`);
   
   // Basic direct string formatting without any Date objects
   let dateDisplay;
@@ -223,7 +240,7 @@ const HorizontalBarChart = ({ chartData }) => {
     // Format as "Apr 10, 2025" without timezone conversion
     dateDisplay = `${monthNames[month]} ${day}, ${year}`;
     
-    console.log(`🔥 FORMATTED FOR DISPLAY: ${dateDisplay}`);
+    console.log(` FORMATTED FOR DISPLAY: ${dateDisplay}`);
   } catch (e) {
     console.error("Error formatting date:", e);
     dateDisplay = exactRequestedDate; // Fallback to raw date if parsing fails
@@ -241,9 +258,32 @@ const HorizontalBarChart = ({ chartData }) => {
         </span>
       </div>
       
+      {/* Pagination controls - only show if we have multiple pages */}
+      {totalPages > 1 && (
+        <div className="pagination-controls">
+          <button 
+            className="pagination-button" 
+            onClick={prevPage} 
+            disabled={currentPage === 1}
+          >
+            &laquo; Previous
+          </button>
+          <div className="pagination-info">
+            Page {currentPage} of {totalPages} ({poolData.length} pools)
+          </div>
+          <button 
+            className="pagination-button" 
+            onClick={nextPage} 
+            disabled={currentPage === totalPages}
+          >
+            Next &raquo;
+          </button>
+        </div>
+      )}
+      
       <div className="horizontal-bar-chart">
         <div className="horizontal-bars">
-          {poolData.map((pool, index) => (
+          {currentPools.map((pool, index) => (
             <div 
               key={pool.name} 
               className="bar-container"
@@ -256,7 +296,7 @@ const HorizontalBarChart = ({ chartData }) => {
                 className="bar" 
                 style={{ 
                   width: `${calculateBarWidth(pool.count)}%`,
-                  backgroundColor: poolColors[index % poolColors.length]
+                  backgroundColor: poolColors[(indexOfFirstPool + index) % poolColors.length]
                 }}
               />
             </div>
@@ -264,7 +304,7 @@ const HorizontalBarChart = ({ chartData }) => {
         </div>
         
         <div className="bar-labels">
-          {poolData.map((pool, index) => (
+          {currentPools.map((pool, index) => (
             <div 
               key={`label-${pool.name}`} 
               className={`bar-label ${pool.isUnknown ? 'unknown-pool' : ''}`}
@@ -272,7 +312,7 @@ const HorizontalBarChart = ({ chartData }) => {
             >
               <span 
                 className="color-indicator" 
-                style={{ backgroundColor: poolColors[index % poolColors.length] }}
+                style={{ backgroundColor: poolColors[(indexOfFirstPool + index) % poolColors.length] }}
               />
               <span className="pool-name" title={pool.fullName}>
                 {pool.displayName}
@@ -287,6 +327,29 @@ const HorizontalBarChart = ({ chartData }) => {
           ))}
         </div>
       </div>
+      
+      {/* Pagination controls at bottom - only show if we have multiple pages */}
+      {totalPages > 1 && (
+        <div className="pagination-controls">
+          <button 
+            className="pagination-button" 
+            onClick={prevPage} 
+            disabled={currentPage === 1}
+          >
+            &laquo; Previous
+          </button>
+          <div className="pagination-info">
+            Page {currentPage} of {totalPages}
+          </div>
+          <button 
+            className="pagination-button" 
+            onClick={nextPage} 
+            disabled={currentPage === totalPages}
+          >
+            Next &raquo;
+          </button>
+        </div>
+      )}
       
       {/* Unknown addresses list */}
       {showAddressList && unknownAddresses.length > 0 && (

@@ -23,8 +23,8 @@
 }
 
 .bar-container {
-  height: 40px;
-  margin-bottom: 10px;
+  height: 28px;
+  margin-bottom: 6px;
   background-color: rgba(240, 240, 240, 0.5);
   border-radius: 4px;
   overflow: hidden;
@@ -49,19 +49,20 @@
 }
 
 .bar-label {
-  height: 40px;
-  margin-bottom: 10px;
+  height: 28px;
+  margin-bottom: 6px;
   display: flex;
   align-items: center;
-  font-size: 14px;
+  font-size: 13px;
   font-weight: 500;
 }
 
 .color-indicator {
-  width: 12px;
-  height: 12px;
+  width: 10px;
+  height: 10px;
   border-radius: 2px;
-  margin-right: 8px;
+  margin-right: 6px;
+  flex-shrink: 0;
 }
 
 .pool-name {
@@ -70,19 +71,16 @@
   overflow: hidden;
   text-overflow: ellipsis;
   font-family: 'Inter', 'Segoe UI', Roboto, sans-serif;
-  cursor: help; /* Show help cursor to indicate tooltip is available */
-}
-
-.pool-name[title^="Unknown (t1"], 
-.pool-name[title^="Unknown (t3"] {
-  font-family: 'Roboto Mono', monospace;
+  cursor: help;
   font-size: 13px;
-  color: #444;
 }
 
 .block-count {
   font-weight: bold;
   margin-left: 8px;
+  flex-shrink: 0;
+  min-width: 30px;
+  text-align: right;
 }
 
 .x-axis {
@@ -116,7 +114,7 @@
 .ruler-container {
   position: relative;
   height: 20px;
-  width: calc(100% - 220px); /* Account for the label width on the right */
+  width: calc(100% - 220px);
 }
 
 .ruler-line {
@@ -353,6 +351,42 @@
   color: #333;
   min-width: 30px;
   text-align: right;
+}
+
+/* Pagination controls */
+.pagination-controls {
+  display: flex;
+  justify-content: center;
+  margin-top: 10px;
+  margin-bottom: 10px;
+}
+
+.pagination-button {
+  background-color: #f0f0f0;
+  border: 1px solid #ddd;
+  border-radius: 4px;
+  padding: 5px 10px;
+  margin: 0 5px;
+  cursor: pointer;
+  font-size: 12px;
+  transition: all 0.2s ease;
+}
+
+.pagination-button:hover {
+  background-color: #e0e0e0;
+}
+
+.pagination-button:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.pagination-info {
+  display: flex;
+  align-items: center;
+  font-size: 12px;
+  color: #666;
+  margin: 0 10px;
 }
 
 /* Tooltip action */

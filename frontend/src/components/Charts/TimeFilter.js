@@ -218,8 +218,29 @@ const TimeFilter = ({ date, setDate, applyFilter, showTodayDefault = false, acti
         } else if (activeChart === chartTypes.MINED_BLOCK) {
           localStorage.removeItem('minedBlocks_selectedDate');
         }
+        
+        // CRITICAL FIX: Force immediate update with today's date
+        const today = formatDate(new Date());
+        console.log(" FORCE IMMEDIATE UPDATE with today's date:", today);
+        
+        // Update local state
+        setDate(today);
+        
+        // Create a date range object for today only
+        const todayDateRange = {
+          startDate: today,
+          endDate: today,
+          isStandardRange: true,
+          forceRefresh: true // Special flag to force immediate data refresh
+        };
+        
+        // Apply the filter immediately with the today date
+        applyFilter(today, '1d', todayDateRange);
+        
+        // Return early to prevent the normal flow
+        return;
       } catch (e) {
-        console.warn("Error clearing localStorage:", e);
+        console.warn("Error handling Today button click:", e);
       }
     }
     

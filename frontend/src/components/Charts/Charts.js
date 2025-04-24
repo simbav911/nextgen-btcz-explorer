@@ -408,108 +408,46 @@ const Charts = () => {
     // Save current chart type before changing
     const previousChart = activeChart;
     
-    // CRITICAL FIX: For Mining Revenue, we need to completely reset the component state
-    if (chartType === chartTypes.MINING_REVENUE) {
-      console.log(`⚠️ Navigating to Mining Revenue from ${previousChart}`);
+    // CRITICAL FIX: Always reset state completely when changing chart types
+    console.log(`🔄 Chart navigation: ${previousChart} -> ${chartType}`);
+    
+    // First, set the new active chart
+    setActiveChart(chartType);
+    
+    // Force clean state for ALL chart type changes
+    setLoading(true);
+    setChartData(null);
+    setError(null);
+    
+    // CRITICAL FIX: Reset date and time range based on chart type
+    if (chartType === chartTypes.POOL_STAT || chartType === chartTypes.MINED_BLOCK) {
+      // For single-day charts, always use today's date
+      const today = formatDate(new Date());
+      setDate(today);
+      setTimeRange('1d');
       
-      // First, set the active chart
-      setActiveChart(chartType);
-      
-      // Completely reset the state
-      setLoading(true);
-      setChartData(null);
-      setError(null);
-      
-      // Reset to default 30-day view for Mining Revenue
-      setTimeRange('30d');
-      
-      // Calculate date 30 days ago for the start date
-      const thirtyDaysAgo = new Date();
-      thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
-      const newDate = formatDate(thirtyDaysAgo);
-      setDate(newDate);
-      
-      // Clear any localStorage values that might interfere
+      // Clear any stored dates to prevent issues
       try {
         localStorage.removeItem('poolStats_selectedDate');
         localStorage.removeItem('minedBlocks_selectedDate');
       } catch (e) {
         console.warn("Could not clear localStorage dates:", e);
       }
+    } else {
+      // For multi-day charts, always use 30-day view
+      setTimeRange('30d');
       
-      // Force data fetch with a longer delay to ensure all state updates are complete
-      setTimeout(() => {
-        console.log(`🔄 Forcing Mining Revenue data fetch with date: ${newDate}`);
-        
-        // Use a direct API call instead of the fetchChartData function
-        // This bypasses any potential state issues
-        const days = getDaysFromRange('30d');
-        chartService.getChartData(chartTypes.MINING_REVENUE, { days, date: newDate })
-          .then(response => {
-            console.log(`✅ Direct API call successful for Mining Revenue:`, response.data);
-            setChartData(response.data);
-            setLoading(false);
-          })
-          .catch(err => {
-            console.error('Error in direct API call for Mining Revenue:', err);
-            // Try to generate mock data as fallback
-            const mockData = generateMockData(chartTypes.MINING_REVENUE);
-            if (mockData) {
-              setChartData(mockData);
-              setError(`Failed to load chart data from server. Showing sample data.`);
-            } else {
-              setError(`Failed to load Mining Revenue data. Please try again.`);
-            }
-            setLoading(false);
-          });
-      }, 150);
-      
-      // Skip the rest of the function
-      return;
+      // Calculate date 30 days ago for the start date
+      const thirtyDaysAgo = new Date();
+      thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
+      setDate(formatDate(thirtyDaysAgo));
     }
     
-    // For all other chart types, use the original logic
-    setActiveChart(chartType);
-    
-    // Save current date for both chart types when switching away
-    if ((activeChart === chartTypes.POOL_STAT || activeChart === chartTypes.MINED_BLOCK) && timeRange === 'custom') {
-      try {
-        if (activeChart === chartTypes.POOL_STAT) {
-          localStorage.setItem('poolStats_selectedDate', date);
-          console.log("Saved Pool Stats date before chart change:", date);
-        } else {
-          localStorage.setItem('minedBlocks_selectedDate', date);
-          console.log("Saved Mined Blocks date before chart change:", date);
-        }
-      } catch (e) {
-        console.warn("Could not save date to localStorage", e);
-      }
-    }
-    
-    // Handle switching TO either single-day chart type - use identical logic for both
-    if (chartType === chartTypes.POOL_STAT || chartType === chartTypes.MINED_BLOCK) {
-      try {
-        // Check for previously selected date
-        const storageKey = chartType === chartTypes.POOL_STAT 
-          ? 'poolStats_selectedDate' 
-          : 'minedBlocks_selectedDate';
-          
-        const savedDate = localStorage.getItem(storageKey);
-        
-        if (savedDate) {
-          console.log(`Restoring saved date for ${chartType}:`, savedDate);
-          setDate(savedDate);
-          setTimeRange('custom');
-          return; // Don't reset to today if we have a saved date
-        }
-      } catch (e) {
-        console.warn("Error reading from localStorage:", e);
-      }
-      
-      // Only reset to today if we don't have a saved date
-      setDate(formatDate(new Date()));
-      setTimeRange('1d');
-    }
+    // Force immediate data fetch with a delay to ensure state updates are complete
+    setTimeout(() => {
+      console.log(`⚡ Forcing immediate data fetch for ${chartType}`);
+      fetchChartData();
+    }, 100);
   };
 
   // Handle time filter change
@@ -570,6 +508,14 @@ const Charts = () => {
         // For these charts, we always use the startDate only
         console.log(`Setting single-day chart to date: ${dateRange.startDate}`);
       }
+    }
+    
+    // CRITICAL FIX: Check for forceRefresh flag from Today button
+    // This ensures immediate data refresh when Today button is clicked
+    if (dateRange && dateRange.forceRefresh) {
+      console.log(`⚡ Detected forceRefresh flag - fetching data immediately`);
+      fetchChartData();
+      return;
     }
     
     // Force a refresh of the chart data with a sufficient delay

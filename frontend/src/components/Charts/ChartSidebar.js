@@ -59,37 +59,35 @@ const ChartSidebar = ({ activeChart, setActiveChart }) => {
 
   return (
     <div className="charts-sidebar">
-      <div className="charts-header">
-        <div className="chart-icon">
-          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" width="42" height="42">
-            {/* Semi-circle gauge at the top */}
-            <path d="M5 7.5a5.5 5.5 0 0 1 5.5-5.5 5.5 5.5 0 0 1 5.5 5.5" />
-            
-            {/* Gauge tick marks on the right */}
-            <path d="M17 4.5h2.5" />
-            <path d="M17 7h3" />
-            
-            {/* Monitor/dashboard in bottom left */}
-            <path d="M3 11v6h6v-6z" />
-            <path d="M3 14.5h6" />
-            
-            {/* Bar chart elements on the right */}
-            <rect x="11" y="15" width="2" height="5" stroke="none" fill="currentColor" />
-            <rect x="14" y="11" width="2" height="9" stroke="none" fill="currentColor" />
-            <rect x="17" y="13" width="2" height="7" stroke="none" fill="currentColor" />
-            
-            {/* Bottom line */}
-            <path d="M10 20h10" />
+      <div className="page-title">
+        <div className="flex items-center justify-center">
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" className="w-8 h-8 mr-2 text-blue-500">
+            <path d="M18.375 2.25c-1.035 0-1.875.84-1.875 1.875v15.75c0 1.035.84 1.875 1.875 1.875h.75c1.035 0 1.875-.84 1.875-1.875V4.125c0-1.036-.84-1.875-1.875-1.875h-.75zM9.75 8.625c0-1.036.84-1.875 1.875-1.875h.75c1.036 0 1.875.84 1.875 1.875v11.25c0 1.035-.84 1.875-1.875 1.875h-.75a1.875 1.875 0 01-1.875-1.875V8.625zM3 13.125c0-1.036.84-1.875 1.875-1.875h.75c1.036 0 1.875.84 1.875 1.875v6.75c0 1.035-.84 1.875-1.875 1.875h-.75A1.875 1.875 0 013 19.875v-6.75z" />
           </svg>
+          <span className="text-blue-500 font-bold text-2xl">Charts</span>
         </div>
-        <h2>Charts</h2>
       </div>
       <div className="chart-buttons">
         {Object.entries(chartTypes).map(([key, value]) => (
           <button 
             key={key}
             className={activeChart === value ? 'active' : ''}
-            onClick={() => setActiveChart(value)}
+            onClick={() => {
+              // Only trigger change if it's a different chart
+              if (activeChart !== value) {
+                console.log(`📊 Chart button clicked: ${value}`);
+                setActiveChart(value);
+              } else {
+                // If clicking the same chart that's already active, force a refresh
+                console.log(`📊 Same chart clicked again (${value}), forcing refresh`);
+                // Create a temporary event to simulate a click on the time filter
+                const currentTimeRange = document.querySelector('.time-filter-buttons button.active');
+                if (currentTimeRange) {
+                  console.log(`📊 Simulating click on time filter: ${currentTimeRange.textContent}`);
+                  currentTimeRange.click();
+                }
+              }
+            }}
           >
             <div className="button-icon">{getChartIcon(value)}</div>
             <span>{value.replace(/-/g, ' ').replace(/\b\w/g, (l) => l.toUpperCase())}</span>

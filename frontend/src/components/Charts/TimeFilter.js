@@ -12,21 +12,27 @@ const DatePickerPortal = ({ children }) => {
   // Only create the element once on first render
   if (!elRef.current) {
     const newEl = document.createElement('div');
-    newEl.style.position = 'relative';
+    newEl.style.position = 'fixed';
+    newEl.style.top = '0';
+    newEl.style.left = '0';
+    newEl.style.width = '100%';
+    newEl.style.height = '100%';
     newEl.style.zIndex = '9999';
+    newEl.style.pointerEvents = 'none';
     newEl.className = 'date-picker-portal'; // Add a class to help with debugging
     elRef.current = newEl;
   }
   
   useEffect(() => {
-    // Try to use portal-root if available, otherwise use body
-    const portalRoot = document.getElementById('portal-root') || document.body;
-    portalRoot.appendChild(elRef.current);
+    // Add to body directly for maximum z-index effectiveness
+    document.body.appendChild(elRef.current);
+    console.log(" Portal element added to DOM");
     
     // Only remove on unmount
     return () => {
-      if (portalRoot.contains(elRef.current)) {
-        portalRoot.removeChild(elRef.current);
+      if (document.body.contains(elRef.current)) {
+        document.body.removeChild(elRef.current);
+        console.log(" Portal element removed from DOM");
       }
     };
   }, []); // Empty dependency array - only run on mount and unmount
@@ -188,8 +194,14 @@ const TimeFilter = ({ date, setDate, applyFilter, showTodayDefault = false, acti
     return () => clearTimeout(timeoutId);
   }, [showDatePicker]); // Re-add the listener whenever showDatePicker changes
 
+  // Store the selected date range
+  const [dateRange, setDateRange] = useState({ 
+    startDate: date, 
+    endDate: isSingleDayChart ? date : null 
+  });
+
   const handleTimeRangeChange = (range) => {
-    console.log(`⏰ Time range changed to: ${range}`);
+    console.log(` Time range changed to: ${range}`);
     
     // Set the new time range first
     setTimeRange(range);
@@ -197,7 +209,7 @@ const TimeFilter = ({ date, setDate, applyFilter, showTodayDefault = false, acti
     // CRITICAL FIX: Today button handling
     // If user clicked on "Today" button, we need to clear any saved custom date
     if (range === '1d') {
-      console.log("⏰ Today button clicked - CLEARING saved dates");
+      console.log(" Today button clicked - CLEARING saved dates");
       
       try {
         // Clear any saved custom dates to ensure Today button works
@@ -213,12 +225,13 @@ const TimeFilter = ({ date, setDate, applyFilter, showTodayDefault = false, acti
     
     // Special handling for custom date range
     if (range === 'custom') {
-      console.log("⏰ Custom date range selected");
+      console.log(" Custom date range selected");
       
       // Force showing the date picker with a slight delay 
       // to ensure any click events are processed first
       setTimeout(() => {
         setShowDatePicker(true);
+        console.log(" Date picker should be visible now");
       }, 50);
       return;
     }
@@ -299,21 +312,33 @@ const TimeFilter = ({ date, setDate, applyFilter, showTodayDefault = false, acti
         position: 'fixed',
         top: '100px',
         left: '20px',
+        zIndex: 9999
       };
     }
+    
     const rect = buttonEl.getBoundingClientRect();
+    const viewportHeight = window.innerHeight;
+    const spaceBelow = viewportHeight - rect.bottom;
+    
+    // Check if there's enough space below the button
+    // If not, position above the button
+    if (spaceBelow < 450) { // Calendar height approx
+      return {
+        position: 'fixed',
+        top: `${Math.max(10, rect.top - 450 - 10)}px`, // 10px padding, ensure not off-screen
+        left: `${rect.left}px`,
+        zIndex: 9999
+      };
+    }
+    
+    // Default position below the button
     return {
       position: 'fixed',
-      top: `${rect.bottom + 5}px`,
+      top: `${rect.bottom + 10}px`,
       left: `${rect.left}px`,
+      zIndex: 9999
     };
   };
-
-  // Store the selected date range
-  const [dateRange, setDateRange] = useState({ 
-    startDate: date, 
-    endDate: isSingleDayChart ? date : null 
-  });
 
   // Format date in a human-readable way
   const formatDisplayDate = (date) => {
@@ -403,12 +428,40 @@ const TimeFilter = ({ date, setDate, applyFilter, showTodayDefault = false, acti
           <div 
             className="date-picker-container" 
             ref={datePickerRef}
-            style={getDatePickerPosition()}
+            style={{
+              position: 'fixed',
+              top: '50%',
+              left: '50%',
+              transform: 'translate(-50%, -50%)',
+              zIndex: 9999,
+              width: '350px',
+              background: 'white',
+              borderRadius: '16px',
+              boxShadow: '0 15px 35px rgba(59, 130, 246, 0.4), 0 5px 15px rgba(59, 130, 246, 0.3), 0 0 0 2px rgba(59, 130, 246, 0.2), 0 0 30px rgba(59, 130, 246, 0.25)',
+              padding: '20px',
+              pointerEvents: 'auto'
+            }}
           >
             <button 
               className="date-picker-close"
               onClick={() => setShowDatePicker(false)}
               aria-label="Close date picker"
+              style={{
+                position: 'absolute',
+                top: '10px',
+                right: '10px',
+                background: 'rgba(59, 130, 246, 0.1)',
+                border: 'none',
+                width: '30px',
+                height: '30px',
+                borderRadius: '50%',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                cursor: 'pointer',
+                color: '#3b82f6',
+                transition: 'all 0.2s'
+              }}
             >
               <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                 <line x1="18" y1="6" x2="6" y2="18"></line>
@@ -470,13 +523,13 @@ const TimeFilter = ({ date, setDate, applyFilter, showTodayDefault = false, acti
                 }
               }}
               onApply={(dateRange) => {
-                console.log("🔵 Applying date range:", dateRange); // Debug log
+                console.log(" Applying date range:", dateRange); // Debug log
                 
                 if (dateRange.startDate) {
                   // CRITICAL FIX: Preserve the exact date string without any manipulation
                   // This prevents the date shifting problem
                   const exactSelectedDate = dateRange.startDate;
-                  console.log("🔵 TimeFilter - EXACT date to apply:", exactSelectedDate);
+                  console.log(" TimeFilter - EXACT date to apply:", exactSelectedDate);
                   
                   // For single-day charts, ensure we use the same date for start and end
                   // but preserve the exact date string
@@ -493,7 +546,7 @@ const TimeFilter = ({ date, setDate, applyFilter, showTodayDefault = false, acti
                         endDate: dateRange.endDate || exactSelectedDate
                       };
                   
-                  console.log("🔵 TimeFilter - Processed date range to apply:", newDateRange);
+                  console.log(" TimeFilter - Processed date range to apply:", newDateRange);
                   
                   // CRITICAL: Set the exact date in parent component without any transformation
                   setDate(exactSelectedDate);
@@ -511,7 +564,7 @@ const TimeFilter = ({ date, setDate, applyFilter, showTodayDefault = false, acti
                   setShowDatePicker(false);
                   
                   // For debugging
-                  console.log("🔵 TimeFilter - Final applied date:", exactSelectedDate);
+                  console.log(" TimeFilter - Final applied date:", exactSelectedDate);
                 }
               }}
               minDate="2017-09-09"

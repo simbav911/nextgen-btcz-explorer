@@ -14,75 +14,60 @@
 /* Sidebar styling */
 .charts-sidebar {
   width: 280px;
-  background: linear-gradient(to right, #0c2e5c, #1e72c3);
+  background: transparent;
   border-radius: 12px;
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
   overflow: hidden;
   display: flex;
   flex-direction: column;
   position: relative;
   z-index: 1;
-}
-
-/* Removed the decorative pattern and glow effects */
-
-.charts-header {
-  background: rgba(255, 255, 255, 0.1);
-  color: white;
   padding: 20px;
-  text-align: center;
-  border-bottom: 1px solid rgba(255, 255, 255, 0.1);
-  position: relative;
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
+  border: none;
+  box-shadow: none;
 }
 
-.chart-icon {
-  margin: 0 auto;
-  width: 64px;
-  height: 64px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-}
-
-.charts-header h2 {
-  margin-top: 8px;
-  font-size: 22px;
-  font-weight: 600;
-  letter-spacing: 0.5px;
+/* Remove animated gradient background */
+.charts-sidebar::before {
+  display: none;
 }
 
 .chart-buttons {
   display: flex;
   flex-direction: column;
-  padding: 12px;
   gap: 8px;
+  padding: 12px;
 }
 
 .chart-buttons button {
-  background: rgba(255, 255, 255, 0.1);
-  color: rgba(219, 234, 254, 1);
+  background: #3b82f6;
+  color: white;
   border: none;
-  border-radius: 6px;
-  padding: 10px 16px;
+  border-radius: 8px;
+  padding: 12px 16px;
   font-size: 14px;
   font-weight: 500;
   cursor: pointer;
   text-align: left;
-  transition: all 0.2s;
+  transition: all 0.3s;
   display: flex;
   align-items: center;
   justify-content: flex-start;
+  box-shadow: 0 4px 10px rgba(59, 130, 246, 0.4), 0 0 0 1px rgba(59, 130, 246, 0.1), 0 1px 3px rgba(0, 0, 0, 0.1);
 }
 
 .chart-buttons button:hover {
-  background: rgba(30, 64, 175, 0.5);
-  color: white;
+  background: #2563eb;
+  transform: translateY(-2px);
+  box-shadow: 0 8px 15px rgba(59, 130, 246, 0.5), 0 0 0 1px rgba(59, 130, 246, 0.2), 0 0 20px rgba(59, 130, 246, 0.3);
 }
 
 .chart-buttons button.active {
-  background: rgba(255, 255, 255, 0.15);
+  background: #3b82f6;
   color: white;
   font-weight: 600;
+  box-shadow: 0 6px 15px rgba(59, 130, 246, 0.6), 0 0 0 2px rgba(59, 130, 246, 0.3), 0 0 25px rgba(59, 130, 246, 0.4);
 }
 
 .button-icon {
@@ -94,10 +79,12 @@
 /* Main content area */
 .chart-content {
   flex: 1;
-  background: linear-gradient(135deg, #ffffff, #f8fafc);
+  background: rgba(255, 255, 255, 0.7);
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
   border-radius: 24px;
-  box-shadow: 0 15px 40px rgba(0, 0, 0, 0.08),
-              0 0 0 1px rgba(0, 0, 0, 0.01);
+  box-shadow: 0 8px 32px rgba(31, 38, 135, 0.15);
+  border: 1px solid rgba(255, 255, 255, 0.3);
   padding: 36px;
   position: relative;
   overflow: visible; /* Changed from hidden to allow dropdowns to show */
@@ -111,7 +98,7 @@
   right: -100px;
   width: 400px;
   height: 400px;
-  background: radial-gradient(circle, rgba(219, 234, 254, 0.7) 0%, rgba(219, 234, 254, 0) 70%);
+  background: radial-gradient(circle, rgba(59, 130, 246, 0.2) 0%, rgba(59, 130, 246, 0) 70%);
   z-index: 0;
   opacity: 0.7;
 }
@@ -123,21 +110,52 @@
   left: -100px;
   width: 400px;
   height: 400px;
-  background: radial-gradient(circle, rgba(239, 246, 255, 0.7) 0%, rgba(239, 246, 255, 0) 70%);
+  background: radial-gradient(circle, rgba(59, 130, 246, 0.2) 0%, rgba(59, 130, 246, 0) 70%);
   z-index: 0;
   opacity: 0.7;
 }
 
-/* Chart Date Range Banner */
+.chart-header {
+  padding: 20px;
+  text-align: center;
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+}
+
+.chart-icon {
+  margin: 0 auto;
+  width: 64px;
+  height: 64px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  filter: drop-shadow(0 0 8px rgba(255, 255, 255, 0.5));
+  color: #3b82f6;
+}
+
+.charts-header h2 {
+  margin-top: 8px;
+  font-size: 22px;
+  font-weight: 600;
+  letter-spacing: 0.5px;
+  text-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
+  color: white;
+}
+
 .chart-date-range-banner {
   display: flex;
   align-items: center;
-  background: linear-gradient(90deg, rgba(59, 130, 246, 0.1), rgba(59, 130, 246, 0));
+  background: rgba(59, 130, 246, 0.1);
   border-left: 3px solid #3b82f6;
   padding: 10px 16px;
   margin-bottom: 20px;
   border-radius: 8px;
-  box-shadow: 0 2px 6px rgba(59, 130, 246, 0.05);
+  box-shadow: 0 4px 12px rgba(59, 130, 246, 0.1);
+  backdrop-filter: blur(5px);
+  -webkit-backdrop-filter: blur(5px);
 }
 
 .date-range-icon {
@@ -153,7 +171,6 @@
   color: #3b82f6;
 }
 
-/* Chart header */
 .chart-header {
   display: flex;
   justify-content: space-between;
@@ -185,560 +202,315 @@
   box-shadow: 0 2px 6px rgba(59, 130, 246, 0.3);
 }
 
-/* Time filter styling */
-.chart-time-filter {
-  display: flex;
-  flex-direction: column;
-  gap: 15px;
-}
-
-.date-range-description {
-  font-size: 16px;
-  font-weight: 600;
-  color: #1f2937;
-  padding: 6px 10px;
-  background: rgba(59, 130, 246, 0.1);
-  border-radius: 8px;
-  display: inline-block;
-  margin-bottom: 5px;
-  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05);
-  border-left: 3px solid #3b82f6;
-}
-
 .time-filter-buttons {
   display: flex;
   gap: 8px;
   flex-wrap: wrap;
-  justify-content: flex-end;
-  margin-bottom: 15px;
 }
 
 .time-filter-buttons button {
-  background: white;
-  color: #3b82f6;
-  font-weight: 600;
+  background: rgba(255, 255, 255, 0.7);
+  color: #1f2937;
+  border: 1px solid rgba(59, 130, 246, 0.2);
+  border-radius: 8px;
+  padding: 8px 16px;
   font-size: 14px;
-  padding: 10px 16px;
-  border-radius: 12px;
-  border: 1px solid #e5e7eb;
+  font-weight: 500;
   cursor: pointer;
-  transition: all 0.25s ease;
+  transition: all 0.3s;
   box-shadow: 0 2px 6px rgba(0, 0, 0, 0.05);
-  position: relative;
-  overflow: hidden;
-}
-
-.time-filter-buttons button::before {
-  content: '';
-  position: absolute;
-  top: 0;
-  left: 0;
-  right: 0;
-  height: 50%;
-  background: linear-gradient(rgba(255, 255, 255, 0.5), rgba(255, 255, 255, 0));
-  opacity: 0.6;
+  backdrop-filter: blur(5px);
+  -webkit-backdrop-filter: blur(5px);
 }
 
 .time-filter-buttons button:hover {
-  background: #f1f5fd;
+  background: rgba(59, 130, 246, 0.1);
   transform: translateY(-2px);
   box-shadow: 0 4px 10px rgba(59, 130, 246, 0.15);
-  border-color: #bfdbfe;
+  border-color: rgba(59, 130, 246, 0.4);
 }
 
 .time-filter-buttons button.active {
-  background: linear-gradient(135deg, #3b82f6, #2563eb);
+  background: rgba(59, 130, 246, 0.6);
   color: white;
-  border-color: #2563eb;
-  box-shadow: 0 4px 12px rgba(37, 99, 235, 0.3);
-  font-weight: 700;
+  border-color: rgba(59, 130, 246, 0.8);
+  box-shadow: 0 4px 12px rgba(59, 130, 246, 0.3);
 }
 
-.time-filter-buttons button.active::before {
-  background: linear-gradient(rgba(255, 255, 255, 0.3), rgba(255, 255, 255, 0));
-}
-
-.chart-date-selector {
-  display: flex;
-  align-items: center;
-  color: #3b82f6;
-  font-weight: 600;
-  background: white;
-  padding: 12px 18px;
-  border-radius: 14px;
-  box-shadow: 0 6px 16px rgba(59, 130, 246, 0.15),
-              0 0 0 1px rgba(59, 130, 246, 0.15);
-  position: relative;
-  z-index: 2;
-  transition: all 0.2s;
-}
-
-.chart-date-selector:hover {
-  box-shadow: 0 8px 20px rgba(59, 130, 246, 0.2),
-              0 0 0 1px rgba(59, 130, 246, 0.2);
-}
-
-.chart-date-selector span {
-  font-size: 15px;
-  letter-spacing: 0.3px;
-  padding-left: 6px;
-}
-
-.date-button {
-  background: linear-gradient(135deg, #3b82f6, #2563eb);
-  color: white;
-  border: none;
-  border-radius: 10px;
-  width: 38px;
-  height: 38px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  margin-left: 15px;
-  cursor: pointer;
-  box-shadow: 0 4px 8px rgba(37, 99, 235, 0.2);
-  transition: all 0.25s ease;
+.chart-display {
+  height: 550px; /* Taller for better visualization */
+  border-radius: 20px;
+  background: rgba(255, 255, 255, 0.8);
+  backdrop-filter: blur(5px);
+  -webkit-backdrop-filter: blur(5px);
+  box-shadow: 0 8px 20px rgba(31, 38, 135, 0.1);
+  border: 1px solid rgba(255, 255, 255, 0.3);
+  padding: 20px;
   position: relative;
   overflow: hidden;
 }
 
-.date-button::before {
+.chart-display::after {
   content: '';
   position: absolute;
-  top: 0;
-  left: 0;
-  right: 0;
-  height: 50%;
-  background: linear-gradient(rgba(255, 255, 255, 0.3), rgba(255, 255, 255, 0));
-  opacity: 0.8;
-}
-
-.date-button:hover {
-  transform: translateY(-3px) scale(1.05);
-  box-shadow: 0 8px 16px rgba(37, 99, 235, 0.35);
-}
-
-.date-button:active {
-  transform: translateY(-1px) scale(0.98);
-  box-shadow: 0 2px 8px rgba(37, 99, 235, 0.2);
-}
-
-.date-picker-container {
-  position: fixed; /* Use fixed positioning */
-  background: white;
-  border-radius: 16px;
-  box-shadow: 0 15px 35px rgba(0, 0, 0, 0.3),
-              0 0 0 1px rgba(0, 0, 0, 0.1);
-  padding: 12px;
-  width: 320px;
-  overflow: hidden;
-  z-index: 9999; /* Extremely high z-index to ensure it's always on top */
-  transform: translateZ(0); /* Create a new stacking context */
-  will-change: transform; /* Optimization hint for browsers */
-  animation: datepicker-popup 0.2s ease-out;
-}
-
-@keyframes datepicker-popup {
-  from {
-    opacity: 0;
-    transform: translateY(-10px) translateZ(0);
-  }
-  to {
-    opacity: 1;
-    transform: translateY(0) translateZ(0);
-  }
-}
-
-/* Active range display */
-.active-range-display {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  padding: 12px 15px;
-  background: #f3f4f6;
-  border-bottom: 1px solid #e5e7eb;
-}
-
-.range-label {
-  font-size: 13px;
-  color: #6b7280;
-}
-
-.range-value {
-  font-size: 14px;
-  font-weight: 600;
-  color: #3b82f6;
+  bottom: -20px;
+  right: -20px;
+  width: 200px;
+  height: 200px;
+  background: radial-gradient(circle, rgba(59, 130, 246, 0.1) 0%, rgba(59, 130, 246, 0) 70%);
+  z-index: 0;
 }
 
 .calendar-container {
-  padding: 12px;
-  box-shadow: 0 10px 25px rgba(0, 0, 0, 0.15);
-  border-radius: 0;
-  overflow: hidden;
   background: white;
+  border-radius: 12px;
+  width: 100%;
+  padding: 20px;
+  box-shadow: 0 8px 20px rgba(59, 130, 246, 0.15);
 }
 
 .calendar-header {
-  background: linear-gradient(to right, #3b82f6, #2563eb);
-  color: white;
-  font-weight: 600;
-  padding: 12px;
-  font-size: 16px;
-  letter-spacing: 0.3px;
-  position: relative;
   text-align: center;
-  border-bottom: 1px solid #e5e7eb;
-  margin-bottom: 8px;
+  margin-bottom: 20px;
+  padding-bottom: 15px;
+  border-bottom: 1px solid rgba(59, 130, 246, 0.1);
 }
 
-.date-picker-close {
-  position: absolute;
-  top: 8px;
-  right: 8px;
-  background: rgba(255, 255, 255, 0.2);
-  border: none;
-  width: 30px;
-  height: 30px;
-  border-radius: 50%;
+.calendar-header span {
+  font-size: 18px;
+  font-weight: 600;
+  color: #3b82f6;
+}
+
+.selected-date, .selected-range {
+  margin-bottom: 20px;
+  padding: 10px;
+  background: rgba(59, 130, 246, 0.05);
+  border-radius: 8px;
+  border-left: 3px solid #3b82f6;
+}
+
+.range-display-row {
   display: flex;
-  align-items: center;
-  justify-content: center;
-  cursor: pointer;
-  transition: all 0.2s;
-  color: white;
-  z-index: 10;
-}
-
-.date-picker-close:hover {
-  background: rgba(255, 255, 255, 0.3);
-  transform: scale(1.1);
-}
-
-.selected-range {
-  background: #f3f4f6;
-  padding: 15px;
-  display: flex;
-  flex-wrap: wrap;
+  justify-content: space-between;
   gap: 10px;
-  border-bottom: 1px solid #e5e7eb;
 }
 
 .range-display {
-  display: flex;
-  align-items: center;
-  gap: 5px;
-  margin-right: 15px;
+  flex: 1;
 }
 
 .range-label {
   font-size: 13px;
   color: #6b7280;
-  font-weight: 500;
+  margin-bottom: 5px;
 }
 
 .range-value {
   font-size: 14px;
-  color: #1f2937;
   font-weight: 600;
-  transition: all 0.3s ease;
+  color: #1f2937;
+  padding: 8px;
+  background: white;
+  border-radius: 6px;
+  border: 1px solid #e5e7eb;
 }
 
 .range-value.selecting {
-  color: #3b82f6;
-  font-weight: 700;
-  background: rgba(59, 130, 246, 0.1);
-  padding: 3px 8px;
-  border-radius: 4px;
+  border-color: #3b82f6;
   box-shadow: 0 0 0 2px rgba(59, 130, 246, 0.2);
 }
 
+.range-instruction {
+  margin-top: 10px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
 .instruction-highlight {
+  font-size: 13px;
   color: #3b82f6;
-  font-weight: 600;
-  background: rgba(59, 130, 246, 0.1);
-  padding: 4px 8px;
-  border-radius: 4px;
-  display: inline-block;
+  font-style: italic;
 }
 
 .reset-button {
-  background: #f3f4f6;
-  border: 1px solid #d1d5db;
-  border-radius: 4px;
-  padding: 2px 8px;
-  font-size: 12px;
-  color: #6b7280;
+  background: none;
+  border: none;
+  color: #ef4444;
+  font-size: 13px;
   cursor: pointer;
-  margin-left: auto;
+  padding: 5px 10px;
+  border-radius: 4px;
 }
 
 .reset-button:hover {
-  background: #e5e7eb;
-  color: #4b5563;
+  background: rgba(239, 68, 68, 0.1);
 }
 
 .month-navigation {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  margin: 15px;
+  margin: 15px 0;
 }
 
 .month-nav-button {
-  background: #f1f5fd;
+  background: rgba(59, 130, 246, 0.1);
   border: none;
-  width: 30px;
-  height: 30px;
-  border-radius: 8px;
+  color: #3b82f6;
+  cursor: pointer;
+  padding: 8px;
   display: flex;
   align-items: center;
   justify-content: center;
-  cursor: pointer;
-  color: #3b82f6;
+  border-radius: 50%;
+  width: 35px;
+  height: 35px;
   transition: all 0.2s;
 }
 
 .month-nav-button:hover {
-  background: #e1eafd;
-  transform: scale(1.05);
+  background: rgba(59, 130, 246, 0.2);
+  transform: scale(1.1);
 }
 
 .month-nav-button:disabled {
-  color: #cbd5e1;
-  background: #f8fafc;
+  color: #d1d5db;
+  background: rgba(209, 213, 219, 0.1);
   cursor: not-allowed;
+  transform: none;
 }
 
 .month-year {
   display: flex;
-  gap: 8px;
+  gap: 10px;
 }
 
 .month-select, .year-select {
-  background: #f8fafc;
+  padding: 8px 12px;
   border: 1px solid #e5e7eb;
   border-radius: 6px;
-  padding: 8px 12px;
   font-size: 14px;
   color: #1f2937;
+  background: white;
   cursor: pointer;
-  font-weight: 500;
+  transition: all 0.2s;
+}
+
+.month-select:hover, .year-select:hover {
+  border-color: #93c5fd;
 }
 
 .month-select:focus, .year-select:focus {
   outline: none;
   border-color: #3b82f6;
+  box-shadow: 0 0 0 2px rgba(59, 130, 246, 0.2);
 }
 
 .weekday-header {
   display: grid;
   grid-template-columns: repeat(7, 1fr);
-  margin: 0 15px 8px;
-}
-
-.weekday {
   text-align: center;
-  font-size: 12px;
   font-weight: 600;
   color: #6b7280;
-  padding: 8px 0;
+  font-size: 12px;
+  margin-bottom: 10px;
 }
 
-.calendar-days {
+.calendar-grid {
   display: grid;
   grid-template-columns: repeat(7, 1fr);
   gap: 4px;
-  padding: 0 15px 15px;
 }
 
 .calendar-day {
+  height: 36px;
   display: flex;
   align-items: center;
   justify-content: center;
-  height: 36px;
   font-size: 14px;
-  border-radius: 0;
+  border-radius: 50%;
   cursor: pointer;
-  transition: all 0.2s;
-  position: relative;
-}
-
-.calendar-day.current-month {
   color: #1f2937;
-}
-
-.calendar-day.other-month {
-  color: transparent;
-  pointer-events: none;
-}
-
-.calendar-day:hover:not(.disabled):not(.other-month) {
-  background: #f1f5fd;
-  transform: scale(1.05);
-}
-
-.calendar-day.selecting-start:hover {
-  background: rgba(59, 130, 246, 0.2);
-  box-shadow: 0 0 0 2px rgba(59, 130, 246, 0.4);
-}
-
-.calendar-day.selecting-end:hover {
-  background: rgba(236, 72, 153, 0.15);
-  box-shadow: 0 0 0 2px rgba(236, 72, 153, 0.3);
-}
-
-.calendar-day.start-date, .calendar-day.end-date {
-  background: #3b82f6;
-  color: white;
-  font-weight: 600;
-  z-index: 2;
-}
-
-.calendar-day.in-range {
-  background: #bfdbfe;
-  color: #1e40af;
   position: relative;
+  transition: all 0.2s;
 }
 
-.calendar-day.in-range::before {
-  content: '';
-  position: absolute;
-  top: 0;
-  bottom: 0;
-  left: -2px;
-  right: -2px;
-  background: #bfdbfe;
-  z-index: -1;
+.calendar-day:hover:not(.empty):not(.disabled) {
+  background-color: rgba(59, 130, 246, 0.1);
+  transform: scale(1.1);
+}
+
+.calendar-day.empty {
+  cursor: default;
 }
 
 .calendar-day.disabled {
-  color: #cbd5e1;
+  color: #d1d5db;
   cursor: not-allowed;
 }
 
-.quick-dates {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 8px;
-  margin: 0 15px 15px;
-  padding: 15px 0;
-  border-top: 1px solid #e5e7eb;
-}
-
-.quick-date-button {
-  background: white;
-  border: 1px solid #d1d5db;
-  border-radius: 8px;
-  padding: 8px 16px;
-  font-size: 13px;
-  color: #3b82f6;
-  cursor: pointer;
-  transition: all 0.2s;
-  flex: 1;
-  text-align: center;
-  min-width: 100px;
-}
-
-.quick-date-button:hover {
-  background: #f1f5fd;
-  border-color: #93c5fd;
-  transform: translateY(-2px);
-  box-shadow: 0 2px 5px rgba(59, 130, 246, 0.1);
-}
-
-.calendar-footer {
-  display: flex;
-  justify-content: flex-end;
-  padding: 15px;
-  border-top: 1px solid #e5e7eb;
-  background: #f9fafb;
-}
-
-.calendar-footer .apply-button {
-  background: linear-gradient(to right, #3b82f6, #2563eb);
+.calendar-day.start-date, .calendar-day.end-date {
+  background-color: #3b82f6;
   color: white;
-  border: none;
-  border-radius: 8px;
-  padding: 12px 30px;
   font-weight: 600;
-  font-size: 15px;
-  cursor: pointer;
-  transition: all 0.3s;
-  box-shadow: 0 4px 12px rgba(37, 99, 235, 0.25);
-  width: 100%;
-  text-align: center;
-}
-
-.calendar-footer .apply-button:hover {
-  transform: translateY(-2px);
-  box-shadow: 0 6px 15px rgba(37, 99, 235, 0.3);
-}
-
-.calendar-footer .apply-button:active {
-  transform: translateY(0);
-  box-shadow: 0 2px 5px rgba(37, 99, 235, 0.2);
-}
-
-.calendar-footer .apply-button:disabled {
-  background: linear-gradient(to right, #93c5fd, #60a5fa);
-  cursor: not-allowed;
-  transform: none;
-  box-shadow: none;
-}
-
-/* Date picker container styling */
-.date-picker-container {
-  position: fixed;
-  background: white;
-  border-radius: 16px;
-  box-shadow: 0 15px 35px rgba(0, 0, 0, 0.3),
-              0 0 0 1px rgba(0, 0, 0, 0.1);
-  padding: 0;
-  width: 350px;
-  overflow: visible; /* Changed from hidden to prevent clipping issues */
-  z-index: 9999;
-  transform: translateZ(0);
-  will-change: transform;
-  animation: datepicker-popup 0.3s ease-out;
-  /* Ensure minimum distance from edges of viewport */
-  max-height: 90vh;
-  max-width: 90vw;
-}
-
-/* Position the date picker portal absolutely */
-.date-picker-portal {
-  position: absolute;
-  top: 0;
-  left: 0;
-  width: 100%;
-  height: 100%;
-  z-index: 9999;
-  pointer-events: none; /* Allow clicks to pass through to underlying elements */
-}
-
-/* But allow interactions with the date picker itself */
-.date-picker-container {
-  pointer-events: auto;
-}
-
-/* Chart display */
-.chart-display {
-  height: 550px; /* Taller for better visualization */
-  border-radius: 20px;
-  box-shadow: 0 8px 20px rgba(0, 0, 0, 0.06),
-              0 0 0 1px rgba(0, 0, 0, 0.02);
-  background: white;
-  padding: 30px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  position: relative;
+  box-shadow: 0 4px 8px rgba(59, 130, 246, 0.3);
   z-index: 1;
-  overflow: visible; /* Changed from hidden to prevent clipping of 3D chart */
-  transform-style: preserve-3d;
 }
 
-/* 3D effects */
+.calendar-day.in-range {
+  background-color: rgba(59, 130, 246, 0.1);
+  color: #3b82f6;
+}
+
+.calendar-actions {
+  display: flex;
+  justify-content: space-between;
+  margin-top: 20px;
+  gap: 10px;
+}
+
+.calendar-button {
+  padding: 10px 20px;
+  border-radius: 8px;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  border: none;
+  transition: all 0.3s;
+  flex: 1;
+  box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+}
+
+.calendar-button.clear {
+  background-color: white;
+  color: #6b7280;
+  border: 1px solid #e5e7eb;
+}
+
+.calendar-button.clear:hover {
+  background-color: #f9fafb;
+  border-color: #d1d5db;
+}
+
+.calendar-button.apply {
+  background-color: #3b82f6;
+  color: white;
+  box-shadow: 0 4px 10px rgba(59, 130, 246, 0.4), 0 0 0 1px rgba(59, 130, 246, 0.1), 0 1px 3px rgba(0, 0, 0, 0.1);
+}
+
+.calendar-button.apply:hover {
+  background-color: #2563eb;
+  transform: translateY(-2px);
+  box-shadow: 0 8px 15px rgba(59, 130, 246, 0.5), 0 0 0 1px rgba(59, 130, 246, 0.2), 0 0 20px rgba(59, 130, 246, 0.3);
+}
+
+.calendar-button.apply:disabled {
+  background-color: #93c5fd;
+  cursor: not-allowed;
+}
+
 .chart-3d-container {
   position: relative;
   transform-style: preserve-3d;
@@ -757,7 +529,6 @@
   height: 100%;
 }
 
-/* Date indicator styles for line charts */
 .chart-3d-container .chart-date-indicator {
   position: absolute;
   top: 10px;
@@ -810,7 +581,6 @@
   overflow: visible;
 }
 
-/* Subtle hover effect */
 .chart-3d-inner:hover {
   transform: scale(0.99);
   box-shadow: 0 20px 40px rgba(0, 0, 0, 0.15), 
@@ -818,7 +588,6 @@
               inset 0 1px 3px rgba(255, 255, 255, 0.7);
 }
 
-/* Add realistic lighting effect to chart */
 .chart-3d-inner::before {
   content: '';
   position: absolute;
@@ -849,7 +618,6 @@
   transition: all 0.5s ease;
 }
 
-/* Enhance shadow on hover for 3D effect */
 .chart-3d-container:hover .chart-3d-shadow {
   bottom: -20px;
   height: 45px;
@@ -857,7 +625,6 @@
   filter: blur(12px);
 }
 
-/* Make the pie chart container simple and clean */
 .pie-chart-container {
   height: 450px;
   margin: 20px 0;
@@ -868,7 +635,6 @@
   justify-content: center;
 }
 
-/* Style legend area for better readability with more mining pools */
 canvas + .chartjs-legend {
   padding: 15px !important;
   margin-left: 20px !important;
@@ -879,13 +645,11 @@ canvas + .chartjs-legend {
   overflow-y: auto !important; /* Add scrolling if needed */
 }
 
-/* Make sure legend items have enough spacing for new pools */
 .chartjs-legend li {
   margin-bottom: 10px !important;
   padding: 5px !important;
 }
 
-/* Loading state */
 .chart-loading {
   display: flex;
   flex-direction: column;
@@ -942,7 +706,6 @@ canvas + .chartjs-legend {
   margin-top: 10px;
 }
 
-/* Error state */
 .chart-error {
   display: flex;
   flex-direction: column;
@@ -981,15 +744,14 @@ canvas + .chartjs-legend {
   cursor: pointer;
   transition: all 0.2s;
   font-weight: 600;
-  box-shadow: 0 4px 6px rgba(37, 99, 235, 0.2);
+  box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
 }
 
 .retry-button:hover {
   transform: translateY(-2px);
-  box-shadow: 0 6px 12px rgba(37, 99, 235, 0.25);
+  box-shadow: 0 6px 12px rgba(0, 0, 0, 0.15);
 }
 
-/* Placeholder */
 .chart-placeholder {
   max-width: 80%;
   padding: 50px;
@@ -1006,7 +768,6 @@ canvas + .chartjs-legend {
   line-height: 1.6;
 }
 
-/* No data state */
 .chart-no-data {
   max-width: 80%;
   padding: 40px;
@@ -1057,14 +818,15 @@ canvas + .chartjs-legend {
   font-weight: 500;
   cursor: pointer;
   transition: all 0.2s;
+  box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
 }
 
 .chart-no-data .suggestion button:hover {
   background: #2563eb;
   transform: translateY(-1px);
+  box-shadow: 0 6px 12px rgba(0, 0, 0, 0.15);
 }
 
-/* Pool stat summary */
 .pool-stat-summary {
   margin-top: 40px;
   border-radius: 16px;
@@ -1072,6 +834,8 @@ canvas + .chartjs-legend {
   background: #f9fafb;
   box-shadow: 0 4px 12px rgba(0, 0, 0, 0.03);
   border: 1px solid #f3f4f6;
+  max-height: 600px;
+  overflow-y: auto;
 }
 
 .pool-stat-summary h3 {
@@ -1195,13 +959,11 @@ canvas + .chartjs-legend {
   color: #4b5563;
 }
 
-/* Pie chart specific styles */
 .pie-chart-container {
   display: flex;
   flex-direction: column;
 }
 
-/* Responsive adjustments */
 @media (max-width: 1200px) {
   .charts-container {
     padding: 24px;
@@ -1263,7 +1025,6 @@ canvas + .chartjs-legend {
   }
 }
 
-/* Make pool stat grid more robust for additional entries */
 .pool-stat-summary {
   margin-top: 40px;
   border-radius: 16px;
@@ -1275,7 +1036,6 @@ canvas + .chartjs-legend {
   overflow-y: auto;
 }
 
-/* Media queries for responsive design */
 @media (max-width: 576px) {
   .charts-container {
     padding: 16px;
@@ -1315,7 +1075,6 @@ canvas + .chartjs-legend {
     grid-template-columns: 1fr;
   }
   
-  /* Smaller pool stat items on mobile */
   .pool-stat-item {
     padding: 12px;
     margin-bottom: 10px;
@@ -1330,7 +1089,6 @@ canvas + .chartjs-legend {
   }
 }
 
-/* Calendar styles for single date mode */
 .calendar {
   background: white;
   border-radius: 12px;
@@ -1490,6 +1248,7 @@ canvas + .chartjs-legend {
   font-weight: 600;
   cursor: pointer;
   border: none;
+  box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
 }
 
 .calendar-button.clear {
@@ -1508,6 +1267,8 @@ canvas + .chartjs-legend {
 
 .calendar-button.apply:hover {
   background-color: #2563eb;
+  transform: translateY(-2px);
+  box-shadow: 0 6px 12px rgba(0, 0, 0, 0.15);
 }
 
 .calendar-button.apply:disabled {

@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
-import { FaCoins, FaCube, FaExchangeAlt, FaChartLine, FaInfoCircle, FaHome, FaBars, FaTimes } from 'react-icons/fa';
+import { FaCoins, FaCube, FaExchangeAlt, FaChartLine, FaInfoCircle, FaHome, FaBars, FaTimes, FaSearch } from 'react-icons/fa';
 
 // Import the animation styles
 import '../styles/animatedHeader.css';
@@ -55,7 +55,9 @@ const ModernHeader = () => {
                 <span className="text-white">Bitcoin</span>
                 <span className="text-yellow-300" style={{ textShadow: '0 0 5px rgba(251, 191, 36, 0.9), 0 0 10px rgba(251, 191, 36, 0.5)' }}>Z</span>
               </h1>
-              <span className="text-xs text-white opacity-95 tracking-wider sharp-text" style={{ textShadow: '0 0 2px rgba(255, 255, 255, 0.8), 0 1px 2px rgba(0, 0, 0, 0.6)', letterSpacing: '0.05em', fontWeight: '600' }}>Explorer</span>
+              <span className="text-xs text-white opacity-95 tracking-wider sharp-text flex items-center" style={{ textShadow: '0 0 2px rgba(255, 255, 255, 0.8), 0 1px 2px rgba(0, 0, 0, 0.6)', letterSpacing: '0.05em', fontWeight: '600' }}>
+                Explorer <FaSearch className="ml-1" size={10} style={{ filter: 'drop-shadow(0 0 1px rgba(255, 255, 255, 0.8))' }} />
+              </span>
             </div>
           </Link>
 

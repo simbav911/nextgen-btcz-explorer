@@ -20,17 +20,28 @@ const SearchBox = ({ placeholder = 'Enter a block height, transaction hash, or a
         <input
           type="text"
           placeholder={placeholder}
-          className="w-full py-2 px-10 border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-1 focus:ring-bitcoinz-500 focus:border-bitcoinz-500"
+          className="w-full py-3 px-12 border-2 border-white border-opacity-30 bg-white bg-opacity-20 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-white focus:ring-opacity-50 text-white placeholder-white placeholder-opacity-70 shadow-lg"
           value={query}
           onChange={(e) => setQuery(e.target.value)}
-          style={{ minHeight: '42px' }} /* Ensure minimum tap target size for mobile */
+          style={{ 
+            minHeight: '50px',
+            backdropFilter: 'blur(5px)',
+            boxShadow: '0 4px 20px rgba(0, 0, 0, 0.15), inset 0 1px 0 rgba(255, 255, 255, 0.2)'
+          }}
         />
         <button
           type="submit"
-          className="absolute left-0 top-0 h-full px-3 text-gray-400 flex items-center"
-          style={{ minWidth: '44px', justifyContent: 'center' }} /* Ensure minimum tap target size for mobile */
+          className="absolute left-0 top-0 h-full px-4 text-white flex items-center"
+          style={{ 
+            minWidth: '50px', 
+            justifyContent: 'center',
+            background: 'rgba(255, 255, 255, 0.1)',
+            borderTopLeftRadius: '0.75rem',
+            borderBottomLeftRadius: '0.75rem',
+            boxShadow: 'inset 0 1px 0 rgba(255, 255, 255, 0.2)'
+          }}
         >
-          <FaSearch />
+          <FaSearch size={18} />
         </button>
       </form>
     </div>

@@ -238,76 +238,89 @@ const Home = () => {
   
   return (
     <div className="container-custom py-4">
-      {/* Hero Section with Search - More compact */}
-      <div className="bg-gradient-to-r from-blue-600 to-bitcoinz-600 rounded-lg shadow-sm mb-4 p-3 sm:p-4">
-        <div className="text-center mb-2">
-          <h1 className="text-lg sm:text-xl font-bold text-white mb-1">BitcoinZ Blockchain Explorer</h1>
-          <p className="text-white text-xs opacity-90 mb-2">Search for blocks, transactions, and addresses on the BitcoinZ blockchain</p>
+      {/* Hero Section with Search - Enhanced with shadow effects */}
+      <div className="bg-gradient-to-r from-blue-600 to-bitcoinz-600 rounded-xl shadow-lg mb-5 p-4 sm:p-5"
+           style={{ boxShadow: '0 10px 25px rgba(59, 130, 246, 0.3)' }}>
+        <div className="text-center mb-3">
+          <h1 className="text-xl sm:text-2xl font-bold text-white mb-1" style={{ textShadow: '0 2px 4px rgba(0,0,0,0.2)' }}>
+            BitcoinZ Blockchain Explorer
+          </h1>
+          <p className="text-white text-sm opacity-90 mb-3">Search for blocks, transactions, and addresses on the BitcoinZ blockchain</p>
         </div>
         <SearchBox />
       </div>
 
-      {/* Stats Overview - Equal sized cards */}
+      {/* Stats Overview - Equal sized cards with colored shadow effects */}
       <div className="stats-grid">
-        <Link to="/blocks" className="block">
-          <StatCard
-            title="Latest Block"
-            value={stats && stats.blockchainInfo ? formatNumber(stats.blockchainInfo.blocks) : 'Loading...'}
-            icon={latestBlockIcon}
-            color="blue"
-          />
-        </Link>
+        <div className="stats-card-blue rounded-xl">
+          <Link to="/blocks" className="block">
+            <StatCard
+              title="Latest Block"
+              value={stats && stats.blockchainInfo ? formatNumber(stats.blockchainInfo.blocks) : 'Loading...'}
+              icon={latestBlockIcon}
+              color="blue"
+            />
+          </Link>
+        </div>
         
-        <Link to="/stats" className="block">
-          <StatCard
-            title="Difficulty"
-            value={stats && stats.blockchainInfo ? formatDifficulty(stats.blockchainInfo.difficulty) : 'Loading...'}
-            icon={difficultyIcon}
-            color="purple"
-          />
-        </Link>
+        <div className="stats-card-purple rounded-xl">
+          <Link to="/stats" className="block">
+            <StatCard
+              title="Difficulty"
+              value={stats && stats.blockchainInfo ? formatDifficulty(stats.blockchainInfo.difficulty) : 'Loading...'}
+              icon={difficultyIcon}
+              color="purple"
+            />
+          </Link>
+        </div>
         
-        <Link to="/stats" className="block">
-          <StatCard
-            title="Network Hashrate"
-            value={stats && stats.miningInfo ? `${formatNumber(stats.miningInfo.networkhashps)} H/s` : 'Loading...'}
-            icon={hashrateIcon}
-            color="orange"
-          />
-        </Link>
+        <div className="stats-card-orange rounded-xl">
+          <Link to="/stats" className="block">
+            <StatCard
+              title="Network Hashrate"
+              value={stats && stats.miningInfo ? `${formatNumber(stats.miningInfo.networkhashps)} H/s` : 'Loading...'}
+              icon={hashrateIcon}
+              color="orange"
+            />
+          </Link>
+        </div>
         
-        <Link to="/charts" className="block">
-          <StatCard
-            title="BTCZ Price"
-            value={btczPrice ? `$${btczPrice.usd.toFixed(8)}` : 'Loading...'}
-            icon={priceIcon}
-            color="green"
-            change={btczPrice ? {
-              value: `${Math.abs(btczPrice.usd_24h_change).toFixed(2)}%`,
-              positive: btczPrice.usd_24h_change >= 0,
-              period: '24h'
-            } : null}
-          />
-        </Link>
+        <div className="stats-card-green rounded-xl">
+          <Link to="/charts" className="block">
+            <StatCard
+              title="BTCZ Price"
+              value={btczPrice ? `$${btczPrice.usd.toFixed(8)}` : 'Loading...'}
+              icon={priceIcon}
+              color="green"
+              change={btczPrice ? {
+                value: `${Math.abs(btczPrice.usd_24h_change).toFixed(2)}%`,
+                positive: btczPrice.usd_24h_change >= 0,
+                period: '24h'
+              } : null}
+            />
+          </Link>
+        </div>
       </div>
 
       {/* Latest Blocks and Transactions - Styling consistent with transactions page */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-        {/* Latest Blocks */}
+        {/* Latest Blocks with shadow and glow effects */}
         <div>
-          <div className="flex justify-between items-center mb-2">
+          <div className="flex justify-between items-center mb-3">
             <h2 className="text-lg font-bold flex items-center">
-              <FaCube className="text-bitcoinz-600 mr-2" size={18} />
+              <div className="bg-blue-100 p-1.5 rounded-full mr-2 flex-shrink-0 shadow-sm">
+                <FaCube className="text-blue-600" size={18} />
+              </div>
               Latest Blocks
             </h2>
             <Link 
               to="/blocks" 
-              className="text-blue-600 hover:text-blue-800 text-sm font-medium"
+              className="text-blue-600 hover:text-blue-800 text-sm font-medium bg-blue-50 px-3 py-1 rounded-full hover:bg-blue-100 transition-colors duration-200"
             >
               View All
             </Link>
           </div>
-          <div className="space-y-2">
+          <div className="space-y-3 blue-glow p-3 rounded-xl bg-white shadow-lg">
             {blockCards.length > 0 ? (
               blockCards
             ) : (
@@ -316,21 +329,23 @@ const Home = () => {
           </div>
         </div>
         
-        {/* Latest Transactions - Match the style from transactions page */}
+        {/* Latest Transactions with shadow and glow effects */}
         <div>
-          <div className="flex justify-between items-center mb-2">
+          <div className="flex justify-between items-center mb-3">
             <h2 className="text-lg font-bold flex items-center">
-              <FaExchangeAlt className="text-blue-600 mr-2" size={18} />
+              <div className="bg-green-100 p-1.5 rounded-full mr-2 flex-shrink-0 shadow-sm">
+                <FaExchangeAlt className="text-green-600" size={18} />
+              </div>
               Latest Transactions
             </h2>
             <Link 
               to="/transactions" 
-              className="text-blue-600 hover:text-blue-800 text-sm font-medium"
+              className="text-green-600 hover:text-green-800 text-sm font-medium bg-green-50 px-3 py-1 rounded-full hover:bg-green-100 transition-colors duration-200"
             >
               View All
             </Link>
           </div>
-          <div className="space-y-2">
+          <div className="space-y-3 green-glow p-3 rounded-xl bg-white shadow-lg">
             {latestTransactions.map(tx => {
               // Use the same styling logic as in the TransactionList component
               const txType = classifyTxType(tx);

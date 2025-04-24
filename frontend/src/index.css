@@ -199,13 +199,94 @@ div#portal-root {
 
 /* Stats cards on homepage */
 .stats-grid {
-  @apply grid grid-cols-2 lg:grid-cols-4 gap-2;
+  @apply grid grid-cols-2 lg:grid-cols-4 gap-3;
   margin-bottom: 16px;
 }
 
 .stat-card-equal {
-  @apply bg-white rounded-lg shadow-sm border border-gray-100 p-3;
-  height: 90px; /* Force all stat cards to be the same height */
+  @apply bg-white rounded-xl shadow-md border border-gray-100 p-3;
+  height: 100px; /* Force all stat cards to be the same height */
+  box-shadow: 0 4px 15px rgba(0, 0, 0, 0.08);
+  transition: all 0.3s ease;
+}
+
+.stat-card-equal:hover {
+  transform: translateY(-3px);
+  box-shadow: 0 8px 25px rgba(0, 0, 0, 0.1);
+}
+
+/* Block card glowing effects */
+.block-card-glowing {
+  transition: all 0.3s ease;
+}
+
+.block-card-glowing:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 8px 20px rgba(59, 130, 246, 0.15);
+}
+
+/* Custom color glow effects for different cards */
+.blue-glow {
+  box-shadow: 0 4px 20px rgba(59, 130, 246, 0.25);
+}
+
+.purple-glow {
+  box-shadow: 0 4px 20px rgba(168, 85, 247, 0.25);
+}
+
+.orange-glow {
+  box-shadow: 0 4px 20px rgba(249, 115, 22, 0.25);
+}
+
+.green-glow {
+  box-shadow: 0 4px 20px rgba(16, 185, 129, 0.25);
+}
+
+/* Stronger shadow effects for stats cards - matching reference image */
+.stats-card-blue {
+  box-shadow: 0 4px 15px rgba(59, 130, 246, 0.35), 0 0 0 1px rgba(59, 130, 246, 0.05);
+  border: 1px solid rgba(59, 130, 246, 0.1);
+}
+
+.stats-card-purple {
+  box-shadow: 0 4px 15px rgba(168, 85, 247, 0.35), 0 0 0 1px rgba(168, 85, 247, 0.05);
+  border: 1px solid rgba(168, 85, 247, 0.1);
+}
+
+.stats-card-orange {
+  box-shadow: 0 4px 15px rgba(249, 115, 22, 0.35), 0 0 0 1px rgba(249, 115, 22, 0.05);
+  border: 1px solid rgba(249, 115, 22, 0.1);
+}
+
+.stats-card-green {
+  box-shadow: 0 4px 15px rgba(16, 185, 129, 0.35), 0 0 0 1px rgba(16, 185, 129, 0.05);
+  border: 1px solid rgba(16, 185, 129, 0.1);
+}
+
+/* Hover effects for stats cards */
+.stats-card-blue:hover {
+  box-shadow: 0 8px 30px rgba(59, 130, 246, 0.5), 0 0 0 1px rgba(59, 130, 246, 0.1);
+  transform: translateY(-3px);
+}
+
+.stats-card-purple:hover {
+  box-shadow: 0 8px 30px rgba(168, 85, 247, 0.5), 0 0 0 1px rgba(168, 85, 247, 0.1);
+  transform: translateY(-3px);
+}
+
+.stats-card-orange:hover {
+  box-shadow: 0 8px 30px rgba(249, 115, 22, 0.5), 0 0 0 1px rgba(249, 115, 22, 0.1);
+  transform: translateY(-3px);
+}
+
+.stats-card-green:hover {
+  box-shadow: 0 8px 30px rgba(16, 185, 129, 0.5), 0 0 0 1px rgba(16, 185, 129, 0.1);
+  transform: translateY(-3px);
+}
+
+/* Transition for smooth hover effects */
+.stats-card-blue, .stats-card-purple, .stats-card-orange, .stats-card-green {
+  transition: all 0.3s ease;
 }
 
 /* Mobile-specific transaction optimizations */

@@ -148,46 +148,62 @@ const BlockCard = ({ block }) => {
   return (
     <Link 
       to={`/blocks/${hash}`} 
-      className="block card p-2 hover:shadow-md transition-shadow duration-200 hover:border-bitcoinz-200 border border-gray-100 rounded-lg"
+      className="block-card-glowing block card p-3 hover:shadow-lg transition-all duration-300 border border-gray-200 rounded-xl"
+      style={{
+        position: 'relative',
+        overflow: 'hidden',
+        background: 'white',
+        boxShadow: '0 4px 15px rgba(0, 0, 0, 0.05)',
+      }}
     >
-      <div className="flex items-center justify-between mb-2">
+      {/* Glowing background effect */}
+      <div 
+        className="absolute inset-0 opacity-5" 
+        style={{ 
+          background: 'radial-gradient(circle at 30% 30%, #3B82F6, transparent 70%)',
+          zIndex: 1 
+        }}
+      />
+      
+      <div className="flex items-center justify-between mb-2 relative z-10">
         <div className="flex items-center">
-          <div className="bg-bitcoinz-100 p-1.5 rounded-full mr-2 flex-shrink-0">
-            <FaCube className="text-bitcoinz-600" size={14} />
+          <div className="bg-blue-100 p-2 rounded-full mr-2 flex-shrink-0 shadow-md" 
+               style={{ boxShadow: '0 2px 8px rgba(59, 130, 246, 0.3)' }}>
+            <FaCube className="text-blue-600" size={14} />
           </div>
           <div>
-            <h3 className="text-sm font-semibold">Block {formatNumber(height)}</h3>
+            <h3 className="text-sm font-bold text-gray-800">Block {formatNumber(height)}</h3>
           </div>
         </div>
-        <div className="text-xs text-gray-500">
+        <div className="text-xs font-medium bg-gray-100 px-2 py-1 rounded-full text-gray-600">
           {tx_count} {tx_count === 1 ? 'tx' : 'txs'}
         </div>
       </div>
       
-      <div className="grid grid-cols-3 gap-1 mb-1.5">
+      <div className="grid grid-cols-3 gap-1 mb-2 relative z-10">
         <div className="flex items-center text-xs">
-          <FaClock className="mr-1 flex-shrink-0 text-gray-400" size={10} />
-          <span className="text-gray-500 truncate">{formatRelativeTime(time)}</span>
+          <FaClock className="mr-1 flex-shrink-0 text-blue-500" size={10} />
+          <span className="text-gray-600 truncate">{formatRelativeTime(time)}</span>
         </div>
         
         <div className="text-xs text-center">
-          <span className="text-gray-500">{formatNumber(size)} bytes</span>
+          <span className="text-gray-600">{formatNumber(size)} bytes</span>
         </div>
         
         <div className="text-xs text-right">
-          <span className="text-gray-500 truncate">{typeof difficulty === 'number' ? difficulty.toFixed(2) : difficulty}</span>
+          <span className="text-gray-600 truncate">{typeof difficulty === 'number' ? difficulty.toFixed(2) : difficulty}</span>
         </div>
       </div>
       
-      <div className="flex justify-between items-center text-xs">
+      <div className="flex justify-between items-center text-xs relative z-10 pt-1 border-t border-gray-100">
         {(miner || !isLoading) && (
           <div className="flex items-center text-blue-600 truncate max-w-[60%]">
             <FaHammer className="mr-1 flex-shrink-0" size={10} />
-            <span className="truncate">{miner || 'Unknown Pool'}</span>
+            <span className="truncate font-medium">{miner || 'Unknown Pool'}</span>
           </div>
         )}
         
-        <div className="font-mono text-xs text-gray-500 truncate text-right">
+        <div className="font-mono text-xs bg-gray-100 px-2 py-0.5 rounded text-gray-600 truncate text-right">
           {hash.substring(0, 6)}...
         </div>
       </div>

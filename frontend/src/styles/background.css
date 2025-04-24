@@ -1,0 +1,69 @@
+/* Animated Background Styles */
+.bg-animation-container {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  z-index: -1;
+  overflow: hidden;
+  background: linear-gradient(to bottom, #f0f4ff, #e6f0ff);
+}
+
+#bg-canvas {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+}
+
+/* Add a subtle overlay to ensure content remains readable */
+.content-container {
+  position: relative;
+  z-index: 1;
+}
+
+/* Ensure the header is above the background */
+header {
+  position: relative;
+  z-index: 2;
+}
+
+/* Apply a slight transparency to cards to let background shine through */
+.card {
+  background-color: rgba(255, 255, 255, 0.85);
+  backdrop-filter: blur(5px);
+  transition: background-color 0.3s ease;
+}
+
+.card:hover {
+  background-color: rgba(255, 255, 255, 0.95);
+}
+
+/* Stats cards with colored shadows but semi-transparent backgrounds */
+.stats-card-blue,
+.stats-card-purple,
+.stats-card-orange,
+.stats-card-green {
+  background-color: rgba(255, 255, 255, 0.8);
+  backdrop-filter: blur(8px);
+}
+
+.stats-card-blue:hover,
+.stats-card-purple:hover,
+.stats-card-orange:hover,
+.stats-card-green:hover {
+  background-color: rgba(255, 255, 255, 0.9);
+}
+
+/* Screen size optimizations */
+@media (max-width: 768px) {
+  .bg-animation-container {
+    background: linear-gradient(to bottom, #f0f4ff, #e6f0ff);
+  }
+  
+  #bg-canvas {
+    opacity: 0.5; /* Reduce the opacity on mobile for better performance */
+  }
+}

@@ -287,6 +287,80 @@ div#portal-root {
 /* Transition for smooth hover effects */
 .stats-card-blue, .stats-card-purple, .stats-card-orange, .stats-card-green {
   transition: all 0.3s ease;
+  background-color: rgba(255, 255, 255, 0.9);
+  backdrop-filter: blur(8px);
+}
+
+/* Background animation related styles */
+.bg-animation-container {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  z-index: -1;
+  overflow: hidden;
+  background: linear-gradient(to bottom, #f0f4ff, #e6f0ff);
+}
+
+#bg-canvas {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+}
+
+/* Add a subtle overlay to ensure content remains readable */
+.content-container {
+  position: relative;
+  z-index: 1;
+}
+
+/* Add a glass effect to containers */
+.blue-glow,
+.green-glow,
+.purple-glow,
+.orange-glow {
+  background-color: rgba(255, 255, 255, 0.85);
+  backdrop-filter: blur(4px);
+}
+
+/* Ensure the header is above the background */
+header {
+  position: relative;
+  z-index: 2;
+}
+
+/* Style adjustments for content with background */
+.container-custom {
+  background-color: rgba(255, 255, 255, 0.7);
+  backdrop-filter: blur(5px);
+  border-radius: 1rem;
+  margin-top: 0.5rem;
+}
+
+/* Apply a slight transparency to cards to let background shine through */
+.card {
+  background-color: rgba(255, 255, 255, 0.85);
+  backdrop-filter: blur(5px);
+  transition: background-color 0.3s ease;
+  box-shadow: 0 4px 6px rgba(0, 0, 0, 0.07), 0 1px 3px rgba(0, 0, 0, 0.1);
+}
+
+.card:hover {
+  background-color: rgba(255, 255, 255, 0.95);
+}
+
+/* Screen size optimizations */
+@media (max-width: 768px) {
+  .bg-animation-container {
+    background: linear-gradient(to bottom, #f0f4ff, #e6f0ff);
+  }
+  
+  #bg-canvas {
+    opacity: 0.5; /* Reduce the opacity on mobile for better performance */
+  }
 }
 
 /* Mobile-specific transaction optimizations */

@@ -2,6 +2,9 @@ import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react'
 import { Routes, Route } from 'react-router-dom';
 import { io } from 'socket.io-client';
 
+// Import background styles
+import './styles/background.css';
+
 // Components
 import ModernHeader from './components/ModernHeader';
 import Footer from './components/Footer';
@@ -24,12 +27,25 @@ import WealthDistribution from './pages/WealthDistribution';
 import { SocketContext } from './contexts/SocketContext';
 import { ToastContext } from './contexts/ToastContext';
 
+// Import background manager
+import backgroundManager from './utils/backgroundManager';
+
 // API Configuration
 const SOCKET_URL = process.env.REACT_APP_SOCKET_URL || 'http://localhost:3000';
 
 // Using the DarkHeader component instead of defining it here
 
 function App({ skipHeader = false }) {
+  // Initialize background animation
+  useEffect(() => {
+    // Initialize with the primary style
+    backgroundManager.init('primary');
+    
+    // Clean up animation on unmount
+    return () => {
+      backgroundManager.stop();
+    };
+  }, []);
   const socketRef = useRef(null);
   const [isConnected, setIsConnected] = useState(false);
   const [toast, setToast] = useState(null);
@@ -88,13 +104,16 @@ function App({ skipHeader = false }) {
 
   return (
     <div className="flex flex-col min-h-screen">
+      {/* Background animation container */}
+      <div id="bg-animation-container" className="bg-animation-container"></div>
+      
       {/* Only include the header if skipHeader is false */}
       {!skipHeader && <ModernHeader />}
       
       {/* Main content with WebSocket context */}
       <SocketContext.Provider value={socketRef.current}>
         <ToastContext.Provider value={toastContextValue}>
-          <main className="flex-grow py-4 sm:py-6 md:py-8">
+          <main className="flex-grow py-4 sm:py-6 md:py-8 content-container">
             <Routes>
               <Route path="/" element={<Home />} />
               <Route path="/blocks" element={<BlockList />} />

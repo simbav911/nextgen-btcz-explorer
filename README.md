@@ -143,15 +143,38 @@ npm start
 Configure your bitcoinz.conf:
 
 ```ini
-server=1
-txindex=1
+# RPC Configuration
+rpcuser=your_rpc_username     # Replace with your secure username
+rpcpassword=your_rpc_pass     # Replace with your secure password
+rpcport=1978
+
+# RPC Network Settings
+rpcbind=127.0.0.1      # Bind RPC to IPv4 localhost only
+rpcallowip=127.0.0.1   # Allow RPC connections from IPv4 localhost only
+rpcconnect=127.0.0.1   # Specify RPC connection target as IPv4 localhost
+
+# Core Features
+experimentalfeatures=1
+insightexplorer=1
 addressindex=1
 spentindex=1
-rpcuser=your_rpc_username
-rpcpassword=your_rpc_password
-rpcbind=127.0.0.1
-rpcport=1978
+txindex=1
+listen=1
+server=1
+port=1989
+
+# Network Bindings
+bind=0.0.0.0:1989      # Bind the main port to all IPv4 interfaces only
+# bind=[::]:1989       # IPv6 binding (commented out)
+
+# Network Nodes
+addnode=explorer.btcz.app:1989
+addnode=explorer.btcz.rocks:1989
+addnode=37.187.76.80:1989
+addnode=45.32.135.197:1989
 ```
+
+These settings enable all required features for the explorer including address indexing, transaction indexing, and RPC access. The configuration also includes recommended nodes for better network connectivity.
 
 ### Environment Variables
 

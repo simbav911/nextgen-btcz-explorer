@@ -3,6 +3,8 @@ const { DataTypes } = require('sequelize');
 module.exports = (sequelize) => {
   if (!sequelize) return null;
   
+  // Use Block as model name but don't force any specific table name
+  // This allows us to work with either 'blocks' or 'Blocks' tables
   const Block = sequelize.define('Block', {
     hash: {
       type: DataTypes.STRING,
@@ -72,6 +74,7 @@ module.exports = (sequelize) => {
       type: DataTypes.STRING
     }
   }, {
+    // Don't specify a fixed table name to work with existing tables
     indexes: [
       { fields: ['height'] },
       { fields: ['time'] },

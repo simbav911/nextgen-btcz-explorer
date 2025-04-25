@@ -190,7 +190,34 @@ const getBestBlockHash = async () => {
  * Get block by hash
  */
 const getBlock = async (hash, verbosity = 1) => {
-  return executeRpcCommand('getblock', [hash, verbosity]);
+  try {
+    logger.debug(`Getting block with hash ${hash} (verbosity ${verbosity})`);
+    
+    // Handle invalid or non-hex hash format
+    if (!hash || typeof hash !== 'string' || !/^[0-9a-fA-F]+$/.test(hash)) {
+      logger.error(`Invalid block hash format: ${hash}`);
+      throw new Error(`Invalid block hash format: ${hash}`);
+    }
+    
+    // Add timeout to get better error messages
+    const result = await executeRpcCommand('getblock', [hash, verbosity], 15000);
+    
+    if (verbosity >= 1) {
+      // Log some basic block information
+      logger.debug(`Block ${hash.substring(0, 8)}... retrieved: height=${result.height}, txs=${result.tx.length}, size=${result.size}`);
+    }
+    
+    return result;
+  } catch (error) {
+    // Improve error reporting
+    if (error.message && error.message.includes('Block not found')) {
+      logger.error(`Block not found: ${hash}. This may indicate a pruned node or an invalid hash.`);
+    } else {
+      logger.error(`Error getting block ${hash}: ${error.message}`);
+    }
+    
+    throw error;
+  }
 };
 
 /**
@@ -198,10 +225,39 @@ const getBlock = async (hash, verbosity = 1) => {
  */
 const getBlockByHeight = async (height, verbosity = 1) => {
   try {
+    // Validate height parameter
+    if (!Number.isInteger(height) || height < 0) {
+      logger.error(`Invalid block height: ${height}`);
+      throw new Error(`Invalid block height: ${height}`);
+    }
+    
+    logger.debug(`Getting block at height ${height} (verbosity ${verbosity})`);
     const hash = await executeRpcCommand('getblockhash', [height]);
-    return getBlock(hash, verbosity);
+    
+    if (!hash) {
+      logger.error(`No hash returned for block height ${height}`);
+      throw new Error(`No hash returned for block height ${height}`);
+    }
+    
+    logger.debug(`Block hash for height ${height}: ${hash}`);
+    
+    if (verbosity === 0) {
+      // If verbosity is 0, we're only requesting the hash, so return it directly
+      return hash;
+    } else {
+      // Otherwise get the full block
+      return getBlock(hash, verbosity);
+    }
   } catch (error) {
-    logger.error(`Failed to get block at height ${height}:`, error.message);
+    // Improve error reporting
+    if (error.message && error.message.includes('Block height out of range')) {
+      logger.error(`Block height ${height} is out of range. The blockchain may not have reached this height yet.`);
+    } else if (error.message && error.message.includes('Block not found')) {
+      logger.error(`Block at height ${height} not found. This may indicate a pruned node.`);
+    } else {
+      logger.error(`Failed to get block at height ${height}: ${error.message}`);
+    }
+    
     throw error;
   }
 };

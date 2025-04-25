@@ -6,6 +6,7 @@ let Block = null;
 let Transaction = null;
 let Address = null;
 let Statistics = null;
+let SyncStatus = null;
 
 // Flag to track if models are initialized
 let initialized = false;
@@ -14,7 +15,7 @@ let initialized = false;
 const initializeModels = () => {
   try {
     if (initialized) {
-      return { Block, Transaction, Address, Statistics };
+      return { Block, Transaction, Address, Statistics, SyncStatus };
     }
 
     const sequelize = getSequelize();
@@ -22,7 +23,7 @@ const initializeModels = () => {
     // If no sequelize connection, return null models
     if (!sequelize) {
       logger.warn('No database connection. Models not initialized.');
-      return { Block: null, Transaction: null, Address: null, Statistics: null };
+      return { Block: null, Transaction: null, Address: null, Statistics: null, SyncStatus: null };
     }
     
     logger.info('Initializing database models...');
@@ -32,6 +33,7 @@ const initializeModels = () => {
     Transaction = require('./postgres/Transaction')(sequelize);
     Address = require('./postgres/Address')(sequelize);
     Statistics = require('./postgres/Statistics')(sequelize);
+    SyncStatus = require('./postgres/SyncStatus')(sequelize);
     
     // Set up associations if needed
     // Block.hasMany(Transaction, { foreignKey: 'blockhash', sourceKey: 'hash' });
@@ -40,10 +42,10 @@ const initializeModels = () => {
     initialized = true;
     logger.info('Database models initialized successfully');
     
-    return { Block, Transaction, Address, Statistics };
+    return { Block, Transaction, Address, Statistics, SyncStatus };
   } catch (error) {
     logger.error('Error initializing models:', error);
-    return { Block: null, Transaction: null, Address: null, Statistics: null };
+    return { Block: null, Transaction: null, Address: null, Statistics: null, SyncStatus: null };
   }
 };
 
@@ -96,6 +98,18 @@ const getStatistics = async (sequelizeInstance = null) => {
   return require('./postgres/Statistics')(sequelize);
 };
 
+const getSyncStatus = async (sequelizeInstance = null) => {
+  if (SyncStatus) return SyncStatus;
+  
+  const sequelize = sequelizeInstance || getSequelize();
+  if (!sequelize) {
+    logger.warn('No database connection available for SyncStatus model');
+    return null;
+  }
+  
+  return require('./postgres/SyncStatus')(sequelize);
+};
+
 // Export models accessor functions
 module.exports = {
   initializeModels,
@@ -103,5 +117,6 @@ module.exports = {
   getTransaction,
   getAddress,
   getStatistics,
+  getSyncStatus,
   isInitialized: () => initialized
 };

@@ -75,6 +75,7 @@ module.exports = (sequelize) => {
       type: DataTypes.STRING
     }
   }, {
+    // Don't specify a fixed table name to work with existing tables
     indexes: [
       { fields: ['blockhash'] },
       { fields: ['time'] }

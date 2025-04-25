@@ -14,6 +14,24 @@ let lastIndexedBlock = 0;
 const initializeIndexer = async () => {
   logger.info('Initializing blockchain indexer service');
   
+  // Load the last indexed block from the database first
+  try {
+    const db = getSequelize();
+    if (db) {
+      const BlockModel = await getBlock(db);
+      const lastBlock = await BlockModel.findOne({
+        order: [['height', 'DESC']]
+      });
+      
+      if (lastBlock) {
+        lastIndexedBlock = lastBlock.height;
+        logger.info(`Initializing indexer from last synced block: ${lastIndexedBlock}`);
+      }
+    }
+  } catch (error) {
+    logger.warn(`Failed to load last indexed block: ${error.message}`);
+  }
+  
   // Start the indexing process
   scheduleIndexing();
   

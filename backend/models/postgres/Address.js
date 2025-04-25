@@ -38,6 +38,7 @@ module.exports = (sequelize) => {
       defaultValue: DataTypes.NOW
     }
   }, {
+    // Don't specify a fixed table name to work with existing tables
     indexes: [
       { fields: ['balance'] },
       { fields: ['txCount'] }

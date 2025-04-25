@@ -429,6 +429,34 @@ const saveTransaction = async (tx, block) => {
         if (fee < 0) fee = 0; // Handle rounding errors
       }
       
+      // Process vin and vout to store only essential fields
+      const processVin = (vinArray) => {
+        if (!vinArray) return [];
+        return vinArray.map(input => ({
+          txid: input.txid,
+          vout: input.vout,
+          sequence: input.sequence,
+          coinbase: input.coinbase,
+          // Include address and value if available from prevout
+          address: input.prevout?.scriptPubKey?.addresses?.[0],
+          value: input.prevout?.value,
+        }));
+      };
+
+      const processVout = (voutArray) => {
+        if (!voutArray) return [];
+        return voutArray.map(output => ({
+          value: output.value,
+          n: output.n,
+          scriptPubKey: {
+            addresses: output.scriptPubKey?.addresses || [],
+          },
+        }));
+      };
+
+      const processedVin = processVin(tx.vin);
+      const processedVout = processVout(tx.vout);
+
       try {
         // Insert transaction - use explicit type casting for PostgreSQL
         await client.query(`
@@ -438,7 +466,7 @@ const saveTransaction = async (tx, block) => {
             vin, vout, is_coinbase, fee, value_in, value_out,
             created_at, updated_at
           ) VALUES (
-            $1, $2, $3, $4, $5, $6, $7, 
+            $1, $2, $3, $4, $5, $6, $7,
             $8, $9, $10, $11,
             $12::jsonb, $13::jsonb, $14::boolean, $15::float8, $16::float8, $17::float8,
             NOW(), NOW()
@@ -455,18 +483,28 @@ const saveTransaction = async (tx, block) => {
           tx.confirmations || 1,
           tx.time || block.time,
           block.time,
-          JSON.stringify(tx.vin || []),
-          JSON.stringify(tx.vout || []),
+          JSON.stringify(processedVin), // Use processed vin
+          JSON.stringify(processedVout), // Use processed vout
           isCoinbase,
           fee,
           valueIn,
           valueOut
         ]);
       } catch (insertError) {
-        log.error(`Error inserting transaction ${tx.txid}: ${insertError.message}`);
-        // Try a simplified insert if the full insert fails
+        // Log more details about the error
+        log.error(`-----------------------------------------------------`);
+        log.error(`Error inserting transaction ${tx.txid}`);
+        log.error(`Error Code: ${insertError.code}`);
+        log.error(`Error Message: ${insertError.message}`);
+        // Log the data that was attempted to be inserted (careful with large data)
+        // log.error(`Attempted Data (Vin): ${JSON.stringify(processedVin)}`);
+        // log.error(`Attempted Data (Vout): ${JSON.stringify(processedVout)}`);
+        log.error(`Full Error Stack: ${insertError.stack}`);
+        log.error(`-----------------------------------------------------`);
+
+        // Keep the simplified insert attempt as a fallback
         try {
-          log.warn(`Attempting simplified insert for transaction ${tx.txid}`);
+          log.warn(`Attempting simplified insert for transaction ${tx.txid} after full insert failed.`);
           await client.query(`
             INSERT INTO transactions (
               txid, blockhash, is_coinbase, created_at, updated_at
@@ -498,144 +536,150 @@ const saveTransaction = async (tx, block) => {
   }
 };
 
-// ADDED: Update addresses from transaction
+// ADDED: Update address balances based on transaction
 const updateAddressesFromTransaction = async (tx, isCoinbase, valueIn, valueOut) => {
+  const client = await pool.connect();
   try {
-    const addressChanges = new Map(); // Map to store changes per address { received: X, sent: Y, txids: Set }
+    const addressesToUpdate = {};
 
-    // Process outputs (funds received)
+    // Process outputs (receiving addresses)
     if (tx.vout) {
       for (const output of tx.vout) {
-        if (output.scriptPubKey?.addresses?.length > 0 && output.value > 0) {
-          const address = output.scriptPubKey.addresses[0];
-          if (!addressChanges.has(address)) {
-            addressChanges.set(address, { received: 0, sent: 0, txids: new Set() });
+        if (output.scriptPubKey && output.scriptPubKey.addresses) {
+          for (const address of output.scriptPubKey.addresses) {
+            if (!addressesToUpdate[address]) {
+              addressesToUpdate[address] = { received: 0, sent: 0 };
+            }
+            addressesToUpdate[address].received += output.value || 0;
           }
-          const change = addressChanges.get(address);
-          change.received += output.value;
-          change.txids.add(tx.txid);
         }
       }
     }
 
-    // Process inputs (funds sent)
+    // Process inputs (sending addresses) - only if not coinbase
     if (!isCoinbase && tx.vin) {
       for (const input of tx.vin) {
-        // Try to get address from prevout if available
-        if (input.prevout && input.prevout.scriptPubKey && input.prevout.scriptPubKey.addresses) {
-          const address = input.prevout.scriptPubKey.addresses[0];
-          const value = input.prevout.value;
-          
-          if (address && value > 0) {
-            if (!addressChanges.has(address)) {
-              addressChanges.set(address, { received: 0, sent: 0, txids: new Set() });
+        // Need to fetch the previous transaction to find the input address and value
+        if (input.txid) {
+          try {
+            // Check if we already have the input transaction in our DB
+            const prevTxResult = await client.query(
+              'SELECT vout FROM transactions WHERE txid = $1',
+              [input.txid]
+            );
+            
+            let prevTxVout = null;
+            if (prevTxResult.rows.length > 0 && prevTxResult.rows[0].vout) {
+              // Parse the stored (potentially reduced) vout JSON
+              try {
+                 prevTxVout = typeof prevTxResult.rows[0].vout === 'string'
+                               ? JSON.parse(prevTxResult.rows[0].vout)
+                               : prevTxResult.rows[0].vout;
+              } catch (parseError) {
+                 log.warn(`Could not parse vout from DB for prev tx ${input.txid}: ${parseError.message}`);
+                 prevTxVout = null; // Ensure it's null if parsing fails
+              }
+              // log.debug(`Found previous tx ${input.txid} in DB for input processing`); // Too noisy
+            } else {
+              // If not in DB, fetch from RPC (less efficient)
+              // log.debug(`Fetching previous tx ${input.txid} from RPC for input processing`); // Too noisy
+              const prevTxData = await rpcCall('getrawtransaction', [input.txid, 1]); // Verbosity 1 for decoded tx
+              if (prevTxData && prevTxData.vout) {
+                prevTxVout = prevTxData.vout;
+              }
             }
-            const change = addressChanges.get(address);
-            change.sent += value;
-            change.txids.add(tx.txid);
+
+            if (prevTxVout && input.vout !== undefined && prevTxVout[input.vout]) {
+              const prevOutput = prevTxVout[input.vout];
+              // Check if the necessary fields exist (addresses might be nested differently now)
+              const addresses = prevOutput.scriptPubKey?.addresses;
+              const value = prevOutput.value;
+
+              if (addresses && addresses.length > 0 && value !== undefined) {
+                for (const address of addresses) {
+                  if (!addressesToUpdate[address]) {
+                    addressesToUpdate[address] = { received: 0, sent: 0 };
+                  }
+                  addressesToUpdate[address].sent += value || 0;
+                }
+              } else {
+                 log.warn(`Could not find address/value in previous output for input ${input.txid}:${input.vout}`);
+              }
+            } else {
+              log.warn(`Could not find previous output for input ${input.txid}:${input.vout}`);
+            }
+          } catch (rpcError) {
+            log.error(`Error fetching previous transaction ${input.txid} for input processing: ${rpcError.message}`);
           }
         }
       }
     }
 
-    if (addressChanges.size === 0) {
-      return; // No addresses affected by this transaction
-    }
-
-    const client = await pool.connect();
-    try {
-      // Get all affected addresses
-      const affectedAddresses = Array.from(addressChanges.keys());
+    // Update addresses in the database
+    for (const address in addressesToUpdate) {
+      const { received, sent } = addressesToUpdate[address];
       
-      // Find existing addresses
-      const existingResult = await client.query(`
-        SELECT address, balance, total_received, total_sent, tx_count, transactions
-        FROM addresses
-        WHERE address = ANY($1)
-      `, [affectedAddresses]);
-      
-      const existingAddresses = new Map(existingResult.rows.map(row => [row.address, row]));
-      
-      // Process each address
-      for (const [address, change] of addressChanges.entries()) {
-        const existing = existingAddresses.get(address);
-        const txidsArray = Array.from(change.txids);
-        
-        try {
-          if (existing) {
-            // Update existing address
-            const totalReceived = parseFloat(existing.total_received || 0) + change.received;
-            const totalSent = parseFloat(existing.total_sent || 0) + change.sent;
-            const balance = totalReceived - totalSent;
-            
-            // Combine transaction arrays
-            const currentTxids = new Set(existing.transactions || []);
-            txidsArray.forEach(txid => currentTxids.add(txid));
-            const newTxids = Array.from(currentTxids);
-            
-            await client.query(`
-              UPDATE addresses SET
-                balance = $1,
-                total_received = $2,
-                total_sent = $3,
-                tx_count = $4,
-                transactions = $5,
-                last_updated = NOW(),
-                updated_at = NOW()
-              WHERE address = $6
-            `, [
-              balance,
-              totalReceived,
-              totalSent,
-              newTxids.length,
-              newTxids,
-              address
-            ]);
-          } else {
-            // Create new address with ON CONFLICT DO UPDATE to handle race conditions
-            const balance = change.received - change.sent;
-            
-            await client.query(`
-              INSERT INTO addresses (
-                address, balance, total_received, total_sent,
-                unconfirmed_balance, tx_count, transactions,
-                last_updated, created_at, updated_at
-              ) 
-              VALUES (
-                $1, $2, $3, $4, 0, $5, $6, NOW(), NOW(), NOW()
-              )
-              ON CONFLICT (address) DO UPDATE SET
-                balance = addresses.balance + $2,
-                total_received = addresses.total_received + $3,
-                total_sent = addresses.total_sent + $4,
-                tx_count = 
-                  CASE 
-                    WHEN addresses.transactions @> $6::text[] THEN addresses.tx_count
-                    ELSE addresses.tx_count + array_length($6::text[], 1)
-                  END,
-                transactions = array_cat(addresses.transactions, $6::text[]),
-                last_updated = NOW(),
-                updated_at = NOW()
-            `, [
-              address,
-              balance,
-              change.received,
-              change.sent,
-              txidsArray.length,
-              txidsArray
-            ]);
-          }
-        } catch (addressError) {
-          log.warn(`Error processing address ${address}: ${addressError.message}`);
-          // Continue with other addresses
-        }
+      try {
+        // Use INSERT ... ON CONFLICT to handle new and existing addresses
+        // FIXED: Ensure we handle potential floating point inaccuracies
+        // FIXED: Add tx_count update
+        // FIXED: Use explicit casting
+        // NOTE: This assumes an 'addresses' table exists with columns:
+        // address, balance, total_received, total_sent, tx_count, created_at, updated_at
+        // It does NOT update a 'transactions' array column like syncService does.
+        await client.query(`
+          INSERT INTO addresses (address, balance, total_received, total_sent, tx_count, created_at, updated_at)
+          VALUES ($1::varchar, $2::float8, $3::float8, $4::float8, 1, NOW(), NOW())
+          ON CONFLICT (address) DO UPDATE SET
+            balance = addresses.balance + $2::float8,
+            total_received = addresses.total_received + $3::float8,
+            total_sent = addresses.total_sent + $4::float8,
+            tx_count = addresses.tx_count + 1,
+            updated_at = NOW()
+          WHERE addresses.address = $1::varchar
+        `, [
+          address,
+          (received - sent).toFixed(8), // Calculate balance change
+          received.toFixed(8),
+          sent.toFixed(8),
+          // Note: tx_count increment handled in the query
+          // Note: created_at only set on insert
+        ]);
+        // log.debug(`Updated address ${address}: received ${received}, sent ${sent}`); // Too noisy
+      } catch (updateError) {
+        log.error(`Error updating address ${address}: ${updateError.message}`);
+        // Try a simplified update if the full one fails
+        await client.query(`
+          INSERT INTO addresses (address, created_at, updated_at)
+          VALUES ($1::varchar, NOW(), NOW())
+          ON CONFLICT (address) DO UPDATE SET
+            updated_at = NOW()
+          WHERE addresses.address = $1::varchar
+        `, [address]);
       }
-    } finally {
-      client.release();
+      
+      // REMOVED: Logic attempting to store transaction history per address in 'address_transactions'
+      // This table does not exist in the models and this logic is redundant.
+      /*
+      try {
+        // Check if address_transactions table exists
+        const tableCheck = await client.query(`...`);
+        if (tableCheck.rows[0].exists) {
+          await client.query(`... INSERT INTO address_transactions ...`);
+          log.debug(`Added transaction ${tx.txid} to history for address ${address}`);
+        } else {
+          log.warn('address_transactions table not found, skipping history update.');
+        }
+      } catch (historyError) {
+        log.error(`Error updating transaction history for address ${address}, tx ${tx.txid}: ${historyError.message}`);
+      }
+      */
     }
-  } catch (error) {
-    log.error(`Error updating addresses for transaction ${tx.txid}: ${error.message}`);
+  } finally {
+    client.release(); // Ensure client is released even if errors occur within the loop
   }
+  // Removed outer try/catch as errors within the loop are handled,
+  // and releasing the client is the main goal of the finally block.
 };
 
 // Process a single block
@@ -664,7 +708,8 @@ const processBlock = async (height, chainHeight) => {
     // Save block to database
     await saveBlock(block);
     
-    log.debug(`Processed block ${height} (hash: ${hash.substring(0, 10)}...)`);
+    // Reduced log level for successful block processing
+    // log.debug(`Processed block ${height} (hash: ${hash.substring(0, 10)}...)`);
     return { height, status: 'success' };
   } catch (error) {
     log.error(`Error processing block ${height}: ${error.message}`);
@@ -742,73 +787,79 @@ const syncBlocks = async () => {
     updateSyncStatus(dbHeight, chainHeight);
     
     // Track statistics
-    const startTime = Date.now();
-    let successCount = 0;
-    let errorCount = 0;
-    let existingCount = 0;
-    
-    // Process blocks in batches
-    for (let height = startHeight; height <= chainHeight; height += BATCH_SIZE) {
-      const batchStart = height;
-      const batchEnd = Math.min(height + BATCH_SIZE - 1, chainHeight);
-      
-      log.info(`Processing batch: blocks ${batchStart} to ${batchEnd}`);
-      const batchStartTime = Date.now();
-      
-      // Create array of blocks to process
-      const heights = [];
-      for (let h = batchStart; h <= batchEnd; h++) {
-        heights.push(h);
+    const overallStartTime = Date.now();
+    let totalBlocksProcessedInRun = 0; // Track blocks processed in this run
+    let totalBatchesProcessed = 0;
+    let currentHeight = startHeight;
+    const PROGRESS_LOG_INTERVAL = 10; // Log progress every 10 batches
+
+    // Sync blocks in batches
+    while (currentHeight <= chainHeight) {
+      // Prepare batch heights
+      const heightsToProcess = [];
+      const endHeightForBatch = Math.min(currentHeight + BATCH_SIZE - 1, chainHeight);
+      for (let h = currentHeight; h <= endHeightForBatch; h++) {
+        heightsToProcess.push(h);
       }
-      
-      // Process the batch
-      const results = await processBatch(heights, chainHeight);
-      
-      // Count results
-      const batchSuccess = results.filter(r => r.status === 'success').length;
-      const batchError = results.filter(r => r.status === 'error').length;
-      const batchExisting = results.filter(r => r.status === 'exists').length;
-      
-      successCount += batchSuccess;
-      errorCount += batchError;
-      existingCount += batchExisting;
-      
-      // Calculate statistics
-      const batchTime = (Date.now() - batchStartTime) / 1000;
-      const blocksPerSecond = batchSuccess / Math.max(0.1, batchTime);
-      const progress = ((batchEnd - startHeight + 1) / blocksToSync) * 100;
-      
-      // Calculate estimated time remaining
-      const remainingBlocks = chainHeight - batchEnd;
-      const estimatedSecondsLeft = remainingBlocks / Math.max(0.1, blocksPerSecond);
-      
-      // Format time remaining
-      let timeRemaining;
-      if (estimatedSecondsLeft < 60) {
-        timeRemaining = `${Math.round(estimatedSecondsLeft)}s`;
-      } else if (estimatedSecondsLeft < 3600) {
-        timeRemaining = `${Math.floor(estimatedSecondsLeft / 60)}m ${Math.round(estimatedSecondsLeft % 60)}s`;
-      } else {
-        timeRemaining = `${Math.floor(estimatedSecondsLeft / 3600)}h ${Math.floor((estimatedSecondsLeft % 3600) / 60)}m`;
+
+      if (heightsToProcess.length === 0) {
+        log.info('No blocks left to process in this iteration.');
+        break;
       }
-      
-      // Log batch statistics
-      log.info(`Batch completed in ${batchTime.toFixed(1)}s: ${batchSuccess} new, ${batchExisting} existing, ${batchError} errors`);
-      log.info(`Progress: ${progress.toFixed(2)}% | Speed: ${blocksPerSecond.toFixed(1)} blocks/sec`);
-      log.info(`Blocks: ${batchEnd}/${chainHeight} | Estimated time remaining: ${timeRemaining}`);
-      
-      // Update Explorer UI with latest progress
-      updateSyncStatus(batchEnd, chainHeight);
+
+      // Process the batch concurrently
+      const batchResults = await processBatch(heightsToProcess, chainHeight);
+
+      // Count successes and update total processed in this run
+      const successfulBlocksInBatch = batchResults.filter(r => r.status === 'success' || r.status === 'exists').length; // Count existing as processed ok
+      totalBlocksProcessedInRun += successfulBlocksInBatch;
+      totalBatchesProcessed++;
+
+      // Update currentHeight for the next iteration
+      const actualLastProcessed = heightsToProcess[heightsToProcess.length - 1];
+      currentHeight = actualLastProcessed + 1;
+
+      // Log progress periodically
+      if (totalBatchesProcessed % PROGRESS_LOG_INTERVAL === 0 || successfulBlocksInBatch < heightsToProcess.length || currentHeight > chainHeight) { // Log every N batches, if errors occurred, or on the last batch
+          const batchEndTime = Date.now();
+          const overallElapsedTime = (batchEndTime - overallStartTime) / 1000; // seconds
+          // Calculate speed based on blocks processed *in this run*
+          const blocksPerSecond = overallElapsedTime > 0 ? totalBlocksProcessedInRun / overallElapsedTime : 0;
+          const remainingBlocksOnChain = chainHeight - actualLastProcessed;
+          const estimatedTimeLeftSeconds = blocksPerSecond > 0 ? remainingBlocksOnChain / blocksPerSecond : Infinity;
+
+          let eta = 'Calculating...';
+          if (estimatedTimeLeftSeconds === Infinity && blocksPerSecond > 0) {
+             eta = 'Almost done!'; // Handle case where remaining is 0 but speed is calculated
+          } else if (estimatedTimeLeftSeconds !== Infinity && estimatedTimeLeftSeconds > 0) {
+              const hours = Math.floor(estimatedTimeLeftSeconds / 3600);
+              const minutes = Math.floor((estimatedTimeLeftSeconds % 3600) / 60);
+              const seconds = Math.floor(estimatedTimeLeftSeconds % 60);
+              eta = `${hours}h ${minutes}m ${seconds}s`;
+          } else if (blocksPerSecond === 0 && overallElapsedTime > 10) { // Avoid 'Calculating...' if stuck early
+              eta = ' stalled';
+          }
+
+
+          const errorsInBatch = batchResults.filter(r => r.status === 'error').length;
+          const existsInBatch = batchResults.filter(r => r.status === 'exists').length;
+          const newInBatch = batchResults.filter(r => r.status === 'success').length;
+
+          log.info(`Progress: ${actualLastProcessed}/${chainHeight} (${((actualLastProcessed) / chainHeight * 100).toFixed(2)}%) | Batch: ${newInBatch} new, ${existsInBatch} exists, ${errorsInBatch} errors | Speed: ${blocksPerSecond.toFixed(2)} blocks/s | ETA: ${eta}`);
+      }
+
+      // Update UI status (use the last successfully processed height in the batch)
+      updateSyncStatus(actualLastProcessed, chainHeight);
+
+      // Optional delay
+      // await new Promise(resolve => setTimeout(resolve, 50));
     }
-    
-    // Log final statistics
-    const totalTime = (Date.now() - startTime) / 1000 / 60;
-    log.info(`Sync completed in ${totalTime.toFixed(2)} minutes`);
-    log.info(`Results: ${successCount} blocks added, ${existingCount} already existed, ${errorCount} errors`);
-    
-    // Final update to Explorer UI
+
+    log.info(`Sync finished! Processed approx ${totalBlocksProcessedInRun} blocks in this run.`);
+
+    // Final UI update
     updateSyncStatus(chainHeight, chainHeight);
-    
+
   } catch (error) {
     log.error(`Sync failed: ${error.message}`);
     log.error(error.stack);

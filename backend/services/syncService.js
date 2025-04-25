@@ -274,9 +274,45 @@ const syncTransaction = async (txData, blockhash, blockHeight, blockTime, transa
       }
     }
     
+    // Process vin and vout to store only essential fields
+    const processVin = (vinArray) => {
+      if (!vinArray) return [];
+      return vinArray.map(input => ({
+        // Keep essential fields needed by frontend/fee calculation
+        txid: input.txid,
+        vout: input.vout,
+        sequence: input.sequence, // Keep sequence
+        coinbase: input.coinbase, // Keep coinbase flag
+        // Include address and value if available (added during valueIn calculation)
+        address: input.address,
+        value: input.value,
+        // Explicitly exclude scriptSig and potentially large/unused fields
+        // scriptSig: undefined,
+      }));
+    };
+
+    const processVout = (voutArray) => {
+      if (!voutArray) return [];
+      return voutArray.map(output => ({
+        // Keep essential fields needed by frontend
+        value: output.value,
+        n: output.n,
+        scriptPubKey: { // Only keep addresses within scriptPubKey
+          addresses: output.scriptPubKey?.addresses || [],
+          // Explicitly exclude asm, hex, reqSigs, type etc.
+          // asm: undefined,
+          // hex: undefined,
+          // reqSigs: undefined,
+          // type: undefined,
+        },
+      }));
+    };
+
+    const processedVin = processVin(tx.vin);
+    const processedVout = processVout(tx.vout);
+
     // Store transaction in database within the transaction
-    // Note: Storing the full vin/vout objects can consume significant space.
-    // Consider storing only necessary fields if space becomes an issue.
+    // Note: Storing only essential vin/vout fields now.
     const txRecord = {
       txid: tx.txid,
       hash: tx.hash,
@@ -289,8 +325,8 @@ const syncTransaction = async (txData, blockhash, blockHeight, blockTime, transa
       confirmations: tx.confirmations || 1, // Confirmations might not be accurate from getblock, rely on block height
       time: tx.time || blockTime, // Prefer tx time if available
       blocktime: blockTime, // Always use the block's time
-      vin: tx.vin, // Store potentially large vin array
-      vout: tx.vout, // Store potentially large vout array
+      vin: processedVin, // Store processed vin array
+      vout: processedVout, // Store processed vout array
       isCoinbase: isCoinbase,
       fee: fee,
       valueIn: valueIn,
@@ -306,14 +342,31 @@ const syncTransaction = async (txData, blockhash, blockHeight, blockTime, transa
     await Transaction.upsert(txRecord, { transaction }); // Pass transaction object
     
     // Update address records for inputs and outputs within the transaction
-    // Pass the modified tx object which now includes address/value in vin inputs
+    // Pass the original tx object for address updates as it contains the necessary prevout info
     await updateAddressesFromTransaction(tx, isCoinbase, valueIn, valueOut, transaction); // Pass transaction object
-    
-    return txRecord; // Return the data that was upserted
+
+    // Return the record that was actually upserted (with processed vin/vout)
+    return txRecord;
   } catch (error) {
+    // Log more details about the error before re-throwing
+    logger.error(`-----------------------------------------------------`);
+    logger.error(`Error during Transaction.upsert for txid ${txid}`);
+    // Log Sequelize specific error details if available
+    if (error.name === 'SequelizeDatabaseError' || error.original) {
+      logger.error(`DB Error Code: ${error.original?.code}`);
+      logger.error(`DB Error Message: ${error.original?.message || error.message}`);
+      logger.error(`SQL: ${error.sql}`); // Log the SQL query if available
+    } else {
+      logger.error(`Error Message: ${error.message}`);
+    }
+    // Log the data that was attempted to be upserted (careful with large data)
+    // logger.error(`Attempted Data: ${JSON.stringify(txRecord)}`);
+    logger.error(`Full Error Stack: ${error.stack}`);
+    logger.error(`-----------------------------------------------------`);
+
     // Log the specific txid where the error occurred
     // The transaction will be rolled back in syncBlock's catch block
-    logger.error(`Error syncing transaction ${txid} (within block transaction):`, error);
+    logger.error(`Error syncing transaction ${txid} (within block transaction):`, error.message); // Log only message for brevity here
     throw error; // Re-throw to allow Promise.all and syncBlock to catch it
   }
 };

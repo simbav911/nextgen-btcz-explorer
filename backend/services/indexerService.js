@@ -190,7 +190,34 @@ const indexBlock = async (height) => {
       // Skip if we don't have full transaction details
       if (typeof tx !== 'object' || !tx.txid) continue;
       
-      // Prepare transaction data
+      // --- Process vin/vout to store only essential fields ---
+      const processVin = (vinArray) => {
+        if (!vinArray || !Array.isArray(vinArray)) return [];
+        return vinArray.map(input => ({
+          txid: input?.txid,
+          vout: input?.vout,
+          sequence: input?.sequence,
+          coinbase: input?.coinbase,
+          // Include address and value if they exist in the original data (prevout might be nested)
+          address: input?.address || input?.prevout?.scriptPubKey?.addresses?.[0],
+          value: input?.value || input?.prevout?.value,
+        }));
+      };
+      const processVout = (voutArray) => {
+        if (!voutArray || !Array.isArray(voutArray)) return [];
+        return voutArray.map(output => ({
+          value: output?.value,
+          n: output?.n,
+          scriptPubKey: {
+            addresses: output?.scriptPubKey?.addresses || [],
+          },
+        }));
+      };
+      const processedVin = processVin(tx.vin);
+      const processedVout = processVout(tx.vout);
+      // --- End vin/vout processing ---
+
+      // Prepare transaction data with optimized vin/vout
       const txData = {
         txid: tx.txid,
         hash: tx.hash,
@@ -203,17 +230,45 @@ const indexBlock = async (height) => {
         confirmations: tx.confirmations || blockDetails.confirmations,
         time: tx.time || blockDetails.time,
         blocktime: tx.blocktime || blockDetails.time,
-        vin: tx.vin,
-        vout: tx.vout,
-        is_coinbase: tx.vin && tx.vin.length > 0 && tx.vin[0].coinbase ? true : false
+        vin: processedVin, // Use processed vin
+        vout: processedVout, // Use processed vout
+        is_coinbase: tx.vin && tx.vin.length > 0 && tx.vin[0].coinbase ? true : false,
+        // Ensure other relevant fields are included if needed (fee, valueIn, valueOut might need calculation here if not present in tx object)
+        // fee: calculateFee(tx), // Example: You might need to calculate/extract these
+        // value_in: calculateValueIn(tx),
+        // value_out: calculateValueOut(tx),
+        valueBalance: tx.valueBalance, // Keep existing fields if present
+        fOverwintered: tx.fOverwintered,
+        vShieldedSpend: tx.vShieldedSpend,
+        vShieldedOutput: tx.vShieldedOutput,
+        bindingSig: tx.bindingSig
       };
 
-      // Save transaction
+      // Save transaction with detailed error logging
       // logger.debug(`[IndexBlock ${height}] Saving tx ${tx.txid}...`); // Can be too verbose
-      await TransactionModel.upsert(txData);
+      try {
+        await TransactionModel.upsert(txData);
+      } catch (error) {
+          // Log more details about the error
+          logger.error(`-----------------------------------------------------`);
+          logger.error(`[IndexBlock ${height}] Error during TransactionModel.upsert for txid ${tx.txid}`);
+          if (error.name === 'SequelizeDatabaseError' || error.original) {
+            logger.error(`DB Error Code: ${error.original?.code}`);
+            logger.error(`DB Error Message: ${error.original?.message || error.message}`);
+            logger.error(`SQL: ${error.sql}`);
+          } else {
+            logger.error(`Error Message: ${error.message}`);
+          }
+          // logger.error(`Attempted Data: ${JSON.stringify(txData)}`); // Be cautious logging potentially large data
+          logger.error(`Full Error Stack: ${error.stack}`);
+          logger.error(`-----------------------------------------------------`);
+          // Decide whether to continue indexing other transactions in the block or stop
+          // For now, we log and continue to the next transaction in the block
+          continue;
+      }
       // logger.debug(`[IndexBlock ${height}] Tx ${tx.txid} saved.`);
 
-      // Extract addresses from outputs
+      // Extract addresses from outputs (using original tx object for full scriptPubKey)
       // logger.debug(`[IndexBlock ${height}] Processing outputs for tx ${tx.txid}...`);
       if (tx.vout) {
         for (const vout of tx.vout) {

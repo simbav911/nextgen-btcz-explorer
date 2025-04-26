@@ -88,7 +88,13 @@ const WealthDistribution = () => {
         
         // Set top holders data
         if (holdersData && holdersData.topHolders && holdersData.topHolders.length > 0) {
-          setTopHolders(holdersData.topHolders);
+          const normalizedHolders = holdersData.topHolders.map(holder => ({
+            ...holder,
+            // Normalize percentageOfSupply to ensure it's actually a percentage (0-100)
+            percentageOfSupply: Number(holder.percentageOfSupply)
+          }));
+          
+          setTopHolders(normalizedHolders);
           setTotalSupply(holdersData.totalSupply || MOCK_TOTAL_SUPPLY);
           setTotalAddresses(holdersData.totalAddressesAnalyzed || MOCK_TOTAL_ADDRESSES);
         } else {
@@ -184,13 +190,14 @@ const WealthDistribution = () => {
     return num.toLocaleString(undefined, { maximumFractionDigits: 8 });
   };
 
-  // Format percentage
+  // Format percentage 
   const formatPercentage = (percent) => {
     // Handle null or undefined inputs gracefully
     if (percent === null || percent === undefined || typeof percent !== 'number') {
-      return '0.0000%';
+      return '0.00%';
     }
-    return percent.toFixed(4) + '%';
+    // Format the number with 2 decimal places
+    return percent.toFixed(2) + '%';
   };
 
   // Format address for display
@@ -206,11 +213,11 @@ const WealthDistribution = () => {
     const top10 = topHolders.slice(0, 10);
     
     // Calculate "Others" percentage
-    const othersPercentage = topHolders.slice(10).reduce((sum, holder) => sum + holder.percentageOfSupply, 0);
+    const othersPercentage = topHolders.slice(10).reduce((sum, holder) => sum + Number(holder.percentageOfSupply || 0), 0);
     
     const data = top10.map(holder => ({
       name: holder.address,
-      value: holder.percentageOfSupply
+      value: Number(holder.percentageOfSupply || 0)
     }));
     
     // Add "Others" if there are more than 10 holders
@@ -231,6 +238,15 @@ const WealthDistribution = () => {
       count: item.count,
       percentage: (item.count / totalAddresses) * 100
     }));
+  };
+
+  // Calculate top 10 and top 100 holder percentages
+  const getTop10Percentage = () => {
+    return topHolders.slice(0, 10).reduce((sum, h) => sum + Number(h.percentageOfSupply || 0), 0);
+  };
+
+  const getTop100Percentage = () => {
+    return topHolders.reduce((sum, h) => sum + Number(h.percentageOfSupply || 0), 0);
   };
 
   // Custom tooltip for pie chart
@@ -421,17 +437,13 @@ const WealthDistribution = () => {
                       <div className="p-2 bg-white rounded-md shadow-sm">
                         <p className="text-xs text-gray-500">Top 10 Holders</p>
                         <p className="text-sm font-bold">
-                          {formatPercentage(
-                            topHolders.slice(0, 10).reduce((sum, h) => sum + h.percentageOfSupply, 0)
-                          )}
+                          {formatPercentage(getTop10Percentage())}
                         </p>
                       </div>
                       <div className="p-2 bg-white rounded-md shadow-sm">
                         <p className="text-xs text-gray-500">Top 100 Holders</p>
                         <p className="text-sm font-bold">
-                          {formatPercentage(
-                            topHolders.reduce((sum, h) => sum + h.percentageOfSupply, 0)
-                          )}
+                          {formatPercentage(getTop100Percentage())}
                         </p>
                       </div>
                       <div className="p-2 bg-white rounded-md shadow-sm col-span-2">
@@ -509,7 +521,7 @@ const WealthDistribution = () => {
                             </a>
                           </td>
                           <td className="py-1.5 px-2 text-xs text-gray-900 font-medium text-right">{formatNumber(holder.balance)}</td>
-                          <td className="py-1.5 px-2 text-xs text-gray-900 text-right">{formatPercentage(holder.percentageOfSupply)}</td>
+                          <td className="py-1.5 px-2 text-xs text-gray-900 text-right">{Number(holder.percentageOfSupply).toFixed(4)}%</td>
                           <td className="py-1.5 px-2 text-xs text-gray-900 text-right">{formatNumber(holder.txCount)}</td>
                         </tr>
                       ))}

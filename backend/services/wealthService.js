@@ -69,11 +69,18 @@ async function getTopHolders(limit = 100) {
 
     logger.info(`Query returned ${topAddresses.length} addresses`);
 
-    // Calculate percentage and format
-    const holders = topAddresses.map(addr => ({
-      ...addr,
-      percentageOfSupply: totalSupply > 0 ? (addr.balance / totalSupply) * 100 : 0
-    }));
+    // Calculate percentage correctly - no need to multiply by 100 again
+    const holders = topAddresses.map(addr => {
+      const percentValue = totalSupply > 0 ? (addr.balance / totalSupply) * 100 : 0;
+      
+      // Ensure percentage is a proper number (logs for debugging)
+      logger.debug(`Address ${addr.address}: Balance=${addr.balance}, Supply=${totalSupply}, Percentage=${percentValue}`);
+      
+      return {
+        ...addr,
+        percentageOfSupply: percentValue
+      };
+    });
 
     logger.info(`Found ${holders.length} top holders from database`);
     

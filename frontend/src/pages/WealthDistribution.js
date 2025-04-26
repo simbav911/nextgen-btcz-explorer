@@ -88,13 +88,10 @@ const WealthDistribution = () => {
         
         // Set top holders data
         if (holdersData && holdersData.topHolders && holdersData.topHolders.length > 0) {
-          const normalizedHolders = holdersData.topHolders.map(holder => ({
-            ...holder,
-            // Normalize percentageOfSupply to ensure it's actually a percentage (0-100)
-            percentageOfSupply: Number(holder.percentageOfSupply)
-          }));
+          // Debug: Log the first few holders to check percentage values
+          console.log('First 5 holders percentages:', holdersData.topHolders.slice(0, 5).map(h => h.percentageOfSupply));
           
-          setTopHolders(normalizedHolders);
+          setTopHolders(holdersData.topHolders);
           setTotalSupply(holdersData.totalSupply || MOCK_TOTAL_SUPPLY);
           setTotalAddresses(holdersData.totalAddressesAnalyzed || MOCK_TOTAL_ADDRESSES);
         } else {
@@ -196,8 +193,8 @@ const WealthDistribution = () => {
     if (percent === null || percent === undefined || typeof percent !== 'number') {
       return '0.00%';
     }
-    // Format the number with 2 decimal places
-    return percent.toFixed(2) + '%';
+    // Format the number with 2 decimal places - scale down by 100 as backend provides percentages multiplied by 100
+    return (percent / 100).toFixed(2) + '%';
   };
 
   // Format address for display
@@ -212,19 +209,27 @@ const WealthDistribution = () => {
     // Take top 10 holders
     const top10 = topHolders.slice(0, 10);
     
-    // Calculate "Others" percentage
-    const othersPercentage = topHolders.slice(10).reduce((sum, holder) => sum + Number(holder.percentageOfSupply || 0), 0);
+    // Calculate total balance of all holders
+    const totalBalance = topHolders.reduce((sum, holder) => sum + Number(holder.balance || 0), 0);
     
+    // Calculate "Others" balance
+    const othersBalance = topHolders.slice(10).reduce((sum, holder) => sum + Number(holder.balance || 0), 0);
+    
+    // Map top 10 holders to data points with balance as value
     const data = top10.map(holder => ({
       name: holder.address,
-      value: Number(holder.percentageOfSupply || 0)
+      value: Number(holder.balance || 0),
+      fullAddress: holder.address,
+      percentage: holder.percentageOfSupply
     }));
     
     // Add "Others" if there are more than 10 holders
-    if (othersPercentage > 0) {
+    if (othersBalance > 0) {
       data.push({
         name: 'Others',
-        value: othersPercentage
+        value: othersBalance,
+        fullAddress: 'Combined smaller holders',
+        percentage: (othersBalance / totalSupply) * 100
       });
     }
     
@@ -242,11 +247,27 @@ const WealthDistribution = () => {
 
   // Calculate top 10 and top 100 holder percentages
   const getTop10Percentage = () => {
-    return topHolders.slice(0, 10).reduce((sum, h) => sum + Number(h.percentageOfSupply || 0), 0);
+    if (!topHolders.length) return 0;
+    
+    // Simply sum the first 10 holders' percentages
+    // The backend provides percentages that need to be scaled down by 100
+    return topHolders.slice(0, 10).reduce((sum, h) => {
+      // Ensure we're working with a valid number - do not scale down here
+      const percentage = Number(h.percentageOfSupply || 0);
+      return sum + percentage;
+    }, 0);
   };
 
   const getTop100Percentage = () => {
-    return topHolders.reduce((sum, h) => sum + Number(h.percentageOfSupply || 0), 0);
+    if (!topHolders.length) return 0;
+    
+    // Simply sum up to 100 holders' percentages
+    const holdersToSum = topHolders.slice(0, Math.min(100, topHolders.length));
+    return holdersToSum.reduce((sum, h) => {
+      // Ensure we're working with a valid number - do not scale down here
+      const percentage = Number(h.percentageOfSupply || 0);
+      return sum + percentage;
+    }, 0);
   };
 
   // Custom tooltip for pie chart
@@ -437,13 +458,13 @@ const WealthDistribution = () => {
                       <div className="p-2 bg-white rounded-md shadow-sm">
                         <p className="text-xs text-gray-500">Top 10 Holders</p>
                         <p className="text-sm font-bold">
-                          {formatPercentage(getTop10Percentage())}
+                          {(getTop10Percentage() / 1000).toFixed(2)}%
                         </p>
                       </div>
                       <div className="p-2 bg-white rounded-md shadow-sm">
                         <p className="text-xs text-gray-500">Top 100 Holders</p>
                         <p className="text-sm font-bold">
-                          {formatPercentage(getTop100Percentage())}
+                          {(getTop100Percentage() / 1000).toFixed(2)}%
                         </p>
                       </div>
                       <div className="p-2 bg-white rounded-md shadow-sm col-span-2">
@@ -521,7 +542,7 @@ const WealthDistribution = () => {
                             </a>
                           </td>
                           <td className="py-1.5 px-2 text-xs text-gray-900 font-medium text-right">{formatNumber(holder.balance)}</td>
-                          <td className="py-1.5 px-2 text-xs text-gray-900 text-right">{Number(holder.percentageOfSupply).toFixed(4)}%</td>
+                          <td className="py-1.5 px-2 text-xs text-gray-900 text-right">{formatPercentage(Number(holder.percentageOfSupply))}</td>
                           <td className="py-1.5 px-2 text-xs text-gray-900 text-right">{formatNumber(holder.txCount)}</td>
                         </tr>
                       ))}

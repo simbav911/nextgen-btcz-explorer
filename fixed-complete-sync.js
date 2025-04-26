@@ -631,7 +631,7 @@ const updateAddressesFromTransaction = async (tx, isCoinbase, valueIn, valueOut)
           INSERT INTO addresses (address, balance, total_received, total_sent, tx_count, created_at, updated_at)
           VALUES ($1::varchar, $2::float8, $3::float8, $4::float8, 1, NOW(), NOW())
           ON CONFLICT (address) DO UPDATE SET
-            balance = addresses.balance + $2::float8,
+            balance = (addresses.total_received + $3::float8) - (addresses.total_sent + $4::float8),
             total_received = addresses.total_received + $3::float8,
             total_sent = addresses.total_sent + $4::float8,
             tx_count = addresses.tx_count + 1,

@@ -37,16 +37,21 @@ async function getTotalSupply() {
   return 21000000; // Default max supply
 }
 
-// Get top holders (Refactored to use Database)
+// Get top holders (Refactored to use Database with proper balance filtering)
 async function getTopHolders(limit = 100) {
   try {
     logger.info(`Fetching top ${limit} holders from database`);
     const totalSupply = await getTotalSupply();
     const Address = await getAddress(); // Get the initialized model instance
 
-    // Query the Address table directly
+    // Query the Address table directly with balance > 0 filter
     const topAddresses = await Address.findAll({
       attributes: ['address', 'balance', 'totalReceived', 'totalSent', 'txCount'],
+      where: {
+        balance: {
+          [Op.gt]: 0 // Only include addresses with positive balances
+        }
+      },
       order: [['balance', 'DESC']],
       limit: limit,
       raw: true // Get plain objects
@@ -59,12 +64,24 @@ async function getTopHolders(limit = 100) {
     }));
 
     logger.info(`Found ${holders.length} top holders from database`);
+    
+    // If we found no records with balances, check if there's an issue with the DB
+    if (holders.length === 0) {
+      logger.warn('No addresses with positive balances found - checking total addresses in DB');
+      const totalAddressCount = await Address.count();
+      logger.warn(`Total addresses in database: ${totalAddressCount}`);
+      
+      // If we have addresses but none with balances, there might be a data issue
+      if (totalAddressCount > 0) {
+        logger.warn('There are addresses in the database but none with positive balances - this may indicate a data issue');
+      }
+    }
+    
     return holders;
 
   } catch (error) {
     logger.error('Error fetching top holders from database:', error);
     // Return empty array on error, frontend will handle mock data if necessary
-    // Or potentially re-throw the error depending on desired handling
     return [];
   }
 }

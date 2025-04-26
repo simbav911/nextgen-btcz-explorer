@@ -435,7 +435,8 @@ const updateAddressesFromTransaction = async (tx, isCoinbase, valueIn, valueOut,
         // Update existing record instance
         existingData.totalReceived = (Number(existingData.totalReceived) || 0) + change.received;
         existingData.totalSent = (Number(existingData.totalSent) || 0) + change.sent;
-        existingData.balance = existingData.totalReceived - existingData.totalSent;
+        // Recalculate balance correctly based on updated total received and sent
+        existingData.balance = (Number(existingData.totalReceived) || 0) - (Number(existingData.totalSent) || 0);
         
         const currentTxids = new Set(existingData.transactions || []);
         newTxidsArray.forEach(txid => currentTxids.add(txid));

@@ -97,6 +97,16 @@ if [ $? -ne 0 ]; then
 fi
 cd ..
 
+# Run address balance verification
+echo -e "${BLUE}[5.5/8]${NC} Verifying address balances in database..."
+node startup-balance-check.js
+if [ $? -ne 0 ]; then
+  echo -e "${YELLOW}Address balance verification had issues, but continuing...${NC}"
+else
+  echo -e "${GREEN}Address balances verified and fixed if needed.${NC}"
+fi
+=======
+
 # Install backend dependencies
 echo -e "${BLUE}[6/8]${NC} Installing backend dependencies..."
 cd backend

@@ -536,11 +536,53 @@ const saveTransaction = async (tx, block) => {
   }
 };
 
-// ADDED: Update address balances based on transaction
+// Helper function to verify address balance integrity
+const verifyAddressBalance = async (address, client) => {
+  try {
+    // Get the current address record
+    const addressResult = await client.query(
+      'SELECT address, balance, total_received, total_sent FROM addresses WHERE address = $1',
+      [address]
+    );
+    
+    if (addressResult.rows.length === 0) {
+      return; // Address not found, nothing to verify
+    }
+    
+    const record = addressResult.rows[0];
+    const calculatedBalance = parseFloat(record.total_received) - parseFloat(record.total_sent);
+    const currentBalance = parseFloat(record.balance);
+    
+    // If there's a significant discrepancy, fix it
+    if (Math.abs(calculatedBalance - currentBalance) > 0.00001) {
+      // Log the discrepancy for high-value addresses
+      if (calculatedBalance > 1000 || currentBalance > 1000) {
+        log.warn(`Balance discrepancy for high-value address ${address}: Current=${currentBalance}, Calculated=${calculatedBalance}`);
+      }
+      
+      // Fix the balance
+      await client.query(
+        'UPDATE addresses SET balance = GREATEST(0, $1), updated_at = NOW() WHERE address = $2',
+        [Math.max(0, calculatedBalance), address]
+      );
+    }
+  } catch (error) {
+    log.warn(`Error verifying address balance for ${address}: ${error.message}`);
+    // Continue processing - don't throw the error
+  }
+};
+
+// ADDED: Update address balances based on transaction with verification
 const updateAddressesFromTransaction = async (tx, isCoinbase, valueIn, valueOut) => {
   const client = await pool.connect();
   try {
     const addressesToUpdate = {};
+    
+    // Track high-value transaction for special attention
+    const isHighValueTx = (valueIn > 1000 || valueOut > 1000);
+    if (isHighValueTx) {
+      log.info(`Processing high-value transaction ${tx.txid}: In=${valueIn}, Out=${valueOut}`);
+    }
 
     // Process outputs (receiving addresses)
     if (tx.vout) {
@@ -551,6 +593,11 @@ const updateAddressesFromTransaction = async (tx, isCoinbase, valueIn, valueOut)
               addressesToUpdate[address] = { received: 0, sent: 0 };
             }
             addressesToUpdate[address].received += output.value || 0;
+            
+            // Log high-value outputs
+            if (output.value > 1000) {
+              log.info(`High-value output: ${address} receiving ${output.value} BTCZ`);
+            }
           }
         }
       }
@@ -621,12 +668,7 @@ const updateAddressesFromTransaction = async (tx, isCoinbase, valueIn, valueOut)
       
       try {
         // Use INSERT ... ON CONFLICT to handle new and existing addresses
-        // FIXED: Ensure we handle potential floating point inaccuracies
-        // FIXED: Add tx_count update
-        // FIXED: Use explicit casting
-        // NOTE: This assumes an 'addresses' table exists with columns:
-        // address, balance, total_received, total_sent, tx_count, created_at, updated_at
-        // It does NOT update a 'transactions' array column like syncService does.
+        // FIXED: Proper balance calculation and explicit numeric handling
         await client.query(`
           INSERT INTO addresses (address, balance, total_received, total_sent, tx_count, created_at, updated_at)
           VALUES ($1::varchar, $2::float8, $3::float8, $4::float8, 1, NOW(), NOW())
@@ -645,17 +687,30 @@ const updateAddressesFromTransaction = async (tx, isCoinbase, valueIn, valueOut)
           // Note: tx_count increment handled in the query
           // Note: created_at only set on insert
         ]);
-        // log.debug(`Updated address ${address}: received ${received}, sent ${sent}`); // Too noisy
+        
+        // Verify balance for high-value activity
+        if (received > 1000 || sent > 1000) {
+          await verifyAddressBalance(address, client);
+        }
+        
       } catch (updateError) {
         log.error(`Error updating address ${address}: ${updateError.message}`);
         // Try a simplified update if the full one fails
-        await client.query(`
-          INSERT INTO addresses (address, created_at, updated_at)
-          VALUES ($1::varchar, NOW(), NOW())
-          ON CONFLICT (address) DO UPDATE SET
-            updated_at = NOW()
-          WHERE addresses.address = $1::varchar
-        `, [address]);
+        try {
+          await client.query(`
+            INSERT INTO addresses (address, created_at, updated_at)
+            VALUES ($1::varchar, NOW(), NOW())
+            ON CONFLICT (address) DO UPDATE SET
+              updated_at = NOW()
+            WHERE addresses.address = $1::varchar
+          `, [address]);
+          
+          // Attempt to fix the address manually
+          await verifyAddressBalance(address, client);
+          
+        } catch (fallbackError) {
+          log.error(`Even fallback update failed for ${address}: ${fallbackError.message}`);
+        }
       }
       
       // REMOVED: Logic attempting to store transaction history per address in 'address_transactions'

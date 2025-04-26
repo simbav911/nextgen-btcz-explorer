@@ -55,6 +55,8 @@ const WealthDistribution = () => {
   const [searchTerm, setSearchTerm] = useState('');
   const [dataVersion, setDataVersion] = useState(0); // Add a version to prevent data changing on refresh
   const [syncStatus, setSyncStatus] = useState(null); // State for sync status
+  const [pageSize, setPageSize] = useState(100); // Default show all 100 holders
+  const [currentPage, setCurrentPage] = useState(1);
   const { showToast } = useContext(ToastContext);
 
   // Enhanced colors with better contrast
@@ -442,8 +444,8 @@ const WealthDistribution = () => {
                 
                 {/* Top Holders Table - With search and full addresses */}
                 <div className="mb-4">
-                  <div className="flex items-center bg-white rounded-lg shadow-sm p-3">
-                    <div className="relative w-full">
+                  <div className="flex items-center justify-between bg-white rounded-lg shadow-sm p-3">
+                    <div className="relative w-full mr-4">
                       <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
                         <svg className="h-5 w-5 text-gray-400" fill="currentColor" viewBox="0 0 20 20">
                           <path fillRule="evenodd" d="M8 4a4 4 0 100 8 4 4 0 000-8zM2 8a6 6 0 1110.89 3.476l4.817 4.817a1 1 0 01-1.414 1.414l-4.816-4.816A6 6 0 012 8z" clipRule="evenodd" />
@@ -457,12 +459,29 @@ const WealthDistribution = () => {
                         onChange={(e) => setSearchTerm(e.target.value)}
                       />
                     </div>
+                    <div className="flex items-center">
+                      <span className="text-sm text-gray-600 mr-2">Show:</span>
+                      <select 
+                        className="py-2 px-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                        value={pageSize}
+                        onChange={(e) => {
+                          setPageSize(parseInt(e.target.value));
+                          setCurrentPage(1); // Reset to first page when changing page size
+                        }}
+                      >
+                        <option value={15}>15 rows</option>
+                        <option value={25}>25 rows</option>
+                        <option value={50}>50 rows</option>
+                        <option value={100}>100 rows</option>
+                        <option value={200}>All</option>
+                      </select>
+                    </div>
                   </div>
                 </div>
                 
                 <div className="overflow-x-auto bg-white rounded-lg shadow-sm">
                   <table className="w-full table-fixed">
-                    <thead className="bg-gray-100">
+                    <thead className="bg-gray-100 sticky top-0">
                       <tr>
                         <th className="py-2 px-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider w-10">#</th>
                         <th className="py-2 px-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Address</th>
@@ -476,6 +495,7 @@ const WealthDistribution = () => {
                         .filter(holder => 
                           holder.address.toLowerCase().includes(searchTerm.toLowerCase())
                         )
+                        .slice(0, pageSize) // Only show the number of rows specified by pageSize
                         .map((holder, index) => (
                         <tr key={holder.address} className={index % 2 === 0 ? 'bg-white hover:bg-blue-50' : 'bg-gray-50 hover:bg-blue-50'}>
                           <td className="py-1.5 px-2 text-xs font-medium text-gray-900">{index + 1}</td>
@@ -495,6 +515,11 @@ const WealthDistribution = () => {
                       ))}
                     </tbody>
                   </table>
+                  
+                  {/* Display counter showing how many entries */}
+                  <div className="px-4 py-3 bg-gray-50 border-t text-xs text-gray-500">
+                    Showing {Math.min(pageSize, topHolders.length)} of {topHolders.length} addresses
+                  </div>
                 </div>
               </div>
             )}

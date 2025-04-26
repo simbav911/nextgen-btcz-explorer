@@ -8,6 +8,9 @@ const { getTransaction, getBlock, getAddress } = require('../models');
 let isIndexing = false;
 let lastIndexedBlock = 0;
 
+// Import the address monitor service
+const addressMonitorService = require('./addressMonitorService');
+
 /**
  * Initialize the indexer service
  */
@@ -34,6 +37,10 @@ const initializeIndexer = async () => {
   
   // Start the indexing process
   scheduleIndexing();
+  
+  // Start the address monitor service to maintain address balances
+  addressMonitorService.startMonitoring();
+  logger.info('Address balance monitor service started');
   
   return true;
 };
@@ -386,17 +393,27 @@ const indexBlock = async (height) => {
           // Combine existing and new transaction IDs
           const combinedTxids = [...new Set([...existingTxids, ...data.txids])];
           
-          // Update the record
+          // Calculate new values carefully
+          const newTotalReceived = Number(addressRecord.total_received || 0) + Number(data.received || 0);
+          const newTotalSent = Number(addressRecord.total_sent || 0) + Number(data.sent || 0);
+          const newBalance = newTotalReceived - newTotalSent;
+          
+          // Update the record with explicit calculation and type handling
           await AddressModel.update({
-            total_received: addressRecord.total_received + data.received,
-            total_sent: addressRecord.total_sent + data.sent,
-            balance: (addressRecord.total_received + data.received) - (addressRecord.total_sent + data.sent),
+            total_received: newTotalReceived,
+            total_sent: newTotalSent,
+            balance: newBalance > 0 ? newBalance : 0, // Ensure no negative balances
             txCount: combinedTxids.length,
             transactions: combinedTxids,
             updated_at: new Date()
           }, {
             where: { address: addr }
           });
+          
+          // Log if this is one of the top addresses (by received amount)
+          if (data.received > 1000 || data.sent > 1000) {
+            logger.info(`Updated significant address ${addr}: Balance=${newBalance}, Received=${newTotalReceived}, Sent=${newTotalSent}`);
+          }
         } else {
           // Create new address record
           const txidsArray = [...data.txids];

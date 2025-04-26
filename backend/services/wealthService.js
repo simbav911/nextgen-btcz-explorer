@@ -2,6 +2,7 @@ const logger = require('../utils/logger');
 const { getBlockchainInfo } = require('./bitcoinzService');
 const { getAddress } = require('../models'); // Correctly import the model getter
 const { Op } = require('sequelize');
+const { getSequelize } = require('../db'); // Import getSequelize
 
 // Helper function to calculate circulating supply based on block height
 // (Keep this function as it is)
@@ -40,22 +41,33 @@ async function getTotalSupply() {
 // Get top holders (Refactored to use Database with proper balance filtering)
 async function getTopHolders(limit = 100) {
   try {
-    logger.info(`Fetching top ${limit} holders from database`);
+    logger.info(`Fetching top ${limit} holders from database - requested limit: ${limit}`);
     const totalSupply = await getTotalSupply();
     const Address = await getAddress(); // Get the initialized model instance
+    const sequelize = getSequelize(); // Get the sequelize instance
 
-    // Query the Address table directly with balance > 0 filter
+    if (!Address) {
+      logger.error('Failed to get Address model');
+      return [];
+    }
+
+    // Ensure limit is a valid number
+    const validLimit = parseInt(limit) || 100;
+    logger.info(`Using limit: ${validLimit} for top holders query`);
+
+    // Query the Address table with simpler filtering to ensure we get results
+    // We'll focus on ensuring positive balances and proper ordering
     const topAddresses = await Address.findAll({
       attributes: ['address', 'balance', 'totalReceived', 'totalSent', 'txCount'],
       where: {
-        balance: {
-          [Op.gt]: 0 // Only include addresses with positive balances
-        }
+        balance: { [Op.gt]: 0 } // Only include addresses with positive balances
       },
       order: [['balance', 'DESC']],
-      limit: limit,
+      limit: validLimit, // Use our validated limit
       raw: true // Get plain objects
     });
+
+    logger.info(`Query returned ${topAddresses.length} addresses`);
 
     // Calculate percentage and format
     const holders = topAddresses.map(addr => ({

@@ -503,7 +503,7 @@ const WealthDistribution = () => {
                         <p className="text-xs text-gray-500">Maximum Supply</p>
                         <p className="text-sm font-bold">21,000,000 BTCZ</p>
                         <p className="text-xs text-gray-500 mt-0.5">
-                          {formatPercentage((totalSupply / 21000000) * 100)} in circulation
+                          {((totalSupply / 21000000) * 100).toFixed(2)}% in circulation
                         </p>
                       </div>
                       <div className="p-2 bg-white rounded-md shadow-sm">

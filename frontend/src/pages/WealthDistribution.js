@@ -518,9 +518,9 @@ const WealthDistribution = () => {
                       <tr>
                         <th className="py-2 px-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider w-10">Rank</th>
                         <th className="py-2 px-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Address</th>
-                        <th className="py-2 px-2 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">Balance (BTCZ)</th>
-                        <th className="py-2 px-2 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">% of Total Supply</th>
                         <th className="py-2 px-2 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">% of Top 100</th>
+                        <th className="py-2 px-2 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">% of Total Supply</th>
+                        <th className="py-2 px-2 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">Balance (BTCZ)</th>
                         <th className="py-2 px-2 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">Txs</th>
                       </tr>
                     </thead>
@@ -551,9 +551,9 @@ const WealthDistribution = () => {
                                   {holder.address}
                                 </a>
                               </td>
-                              <td className="py-1.5 px-2 text-xs text-gray-900 font-medium text-right">{formatNumber(holder.balance)}</td>
                               <td className="py-1.5 px-2 text-xs text-gray-900 text-right">{(Number(holder.percentageOfSupply) / 100).toFixed(2)}%</td>
                               <td className="py-1.5 px-2 text-xs text-gray-900 text-right">{percentOfTop100.toFixed(2)}%</td>
+                              <td className="py-1.5 px-2 text-xs text-gray-900 font-medium text-right">{formatNumber(holder.balance)}</td>
                               <td className="py-1.5 px-2 text-xs text-gray-900 text-right">{formatNumber(holder.txCount)}</td>
                             </tr>
                           );

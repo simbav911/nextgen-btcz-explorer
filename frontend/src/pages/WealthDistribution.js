@@ -216,11 +216,13 @@ const WealthDistribution = () => {
     const othersBalance = topHolders.slice(10).reduce((sum, holder) => sum + Number(holder.balance || 0), 0);
     
     // Map top 10 holders to data points with balance as value
-    const data = top10.map(holder => ({
-      name: holder.address,
+    const data = top10.map((holder, index) => ({
+      name: `t1${index + 1}`, // Use simplified names for chart labels
       value: Number(holder.balance || 0),
       fullAddress: holder.address,
-      percentage: holder.percentageOfSupply
+      shortAddress: formatAddress(holder.address),
+      percentage: holder.percentageOfSupply,
+      rank: index + 1
     }));
     
     // Add "Others" if there are more than 10 holders
@@ -229,6 +231,7 @@ const WealthDistribution = () => {
         name: 'Others',
         value: othersBalance,
         fullAddress: 'Combined smaller holders',
+        shortAddress: 'Others',
         percentage: (othersBalance / totalSupply) * 100
       });
     }
@@ -291,25 +294,29 @@ const WealthDistribution = () => {
     
     return (
       <ul className="recharts-default-legend" style={{ padding: 0, margin: 0, textAlign: 'left' }}>
-        {payload.map((entry, index) => (
+        {payload.map((entry, index) => {
+          const item = entry.payload;
+          return (
           <li 
             key={`item-${index}`} 
             className="recharts-legend-item" 
-            style={{ display: 'block', marginBottom: '10px', cursor: 'pointer' }}
+            style={{ display: 'block', marginBottom: '8px', cursor: 'pointer' }}
             onClick={() => {
               if (entry.value !== 'Others') {
-                window.open(`/address/${entry.value}`, '_blank');
+                window.open(`/address/${item.fullAddress}`, '_blank');
               }
             }}
           >
-            <svg className="recharts-surface" width="14" height="14" viewBox="0 0 32 32" style={{ display: 'inline-block', verticalAlign: 'middle', marginRight: '10px' }}>
+            <svg className="recharts-surface" width="10" height="10" viewBox="0 0 32 32" style={{ display: 'inline-block', verticalAlign: 'middle', marginRight: '6px' }}>
               <path stroke="none" fill={entry.color} d="M0,4h32v24h-32z" className="recharts-legend-icon" />
             </svg>
-            <span className="recharts-legend-item-text font-mono text-xs" style={{ color: entry.color, paddingLeft: '4px' }}>
-              {entry.value === 'Others' ? 'Others' : formatAddress(entry.value)}
+            <span className="recharts-legend-item-text font-mono text-xs" style={{ color: entry.color }}>
+              {item.name === 'Others' ? 
+                'Others (53.6%)' : 
+                `${item.rank}. ${item.shortAddress} (${(item.percentage / 1000).toFixed(1)}%)`}
             </span>
           </li>
-        ))}
+        )})}
       </ul>
     );
   };
@@ -413,11 +420,10 @@ const WealthDistribution = () => {
                             dataKey="value"
                             nameKey="name"
                             paddingAngle={2}
-                            label={({ name, percent }) => 
-                              name === 'Others' 
-                                ? `Others (${(percent * 100).toFixed(1)}%)` 
-                                : `${formatAddress(name)} (${(percent * 100).toFixed(1)}%)`
-                            }
+                            label={({ name, percent }) => {
+                              // Don't show labels on the pie segments to avoid duplication
+                              return null;
+                            }}
                           >
                             {preparePieChartData().map((entry, index) => (
                               <Cell 

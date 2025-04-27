@@ -184,7 +184,7 @@ const WealthDistribution = () => {
     if (num === null || num === undefined) {
       return '0';
     }
-    return num.toLocaleString(undefined, { maximumFractionDigits: 8 });
+    return Math.floor(num).toLocaleString();
   };
 
   // Format percentage 

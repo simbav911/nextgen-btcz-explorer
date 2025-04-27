@@ -516,10 +516,11 @@ const WealthDistribution = () => {
                   <table className="w-full table-fixed">
                     <thead className="bg-gray-100 sticky top-0">
                       <tr>
-                        <th className="py-2 px-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider w-10">#</th>
+                        <th className="py-2 px-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider w-10">Rank</th>
                         <th className="py-2 px-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Address</th>
-                        <th className="py-2 px-2 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">Balance</th>
-                        <th className="py-2 px-2 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">%</th>
+                        <th className="py-2 px-2 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">Balance (BTCZ)</th>
+                        <th className="py-2 px-2 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">% of Total Supply</th>
+                        <th className="py-2 px-2 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">% of Top 100</th>
                         <th className="py-2 px-2 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">Txs</th>
                       </tr>
                     </thead>
@@ -529,23 +530,34 @@ const WealthDistribution = () => {
                           holder.address.toLowerCase().includes(searchTerm.toLowerCase())
                         )
                         .slice(0, pageSize) // Only show the number of rows specified by pageSize
-                        .map((holder, index) => (
-                        <tr key={holder.address} className={index % 2 === 0 ? 'bg-white hover:bg-blue-50' : 'bg-gray-50 hover:bg-blue-50'}>
-                          <td className="py-1.5 px-2 text-xs font-medium text-gray-900">{index + 1}</td>
-                          <td className="py-1.5 px-2 text-xs overflow-hidden">
-                            <a 
-                              href={`/address/${holder.address}`}
-                              className="text-blue-600 hover:text-blue-800 font-mono text-xs"
-                              title={holder.address}
-                            >
-                              {holder.address}
-                            </a>
-                          </td>
-                          <td className="py-1.5 px-2 text-xs text-gray-900 font-medium text-right">{formatNumber(holder.balance)}</td>
-                          <td className="py-1.5 px-2 text-xs text-gray-900 text-right">{formatPercentage(Number(holder.percentageOfSupply))}</td>
-                          <td className="py-1.5 px-2 text-xs text-gray-900 text-right">{formatNumber(holder.txCount)}</td>
-                        </tr>
-                      ))}
+                        .map((holder, index) => {
+                          // Calculate total balance of top 100 holders
+                          const top100Balance = topHolders.slice(0, Math.min(100, topHolders.length))
+                            .reduce((sum, h) => sum + Number(h.balance || 0), 0);
+                          
+                          // Calculate percentage of top 100
+                          const percentOfTop100 = top100Balance > 0 ? 
+                            (Number(holder.balance) / top100Balance) * 100 : 0;
+                            
+                          return (
+                            <tr key={holder.address} className={index % 2 === 0 ? 'bg-white hover:bg-blue-50' : 'bg-gray-50 hover:bg-blue-50'}>
+                              <td className="py-1.5 px-2 text-xs font-medium text-gray-900">{index + 1}</td>
+                              <td className="py-1.5 px-2 text-xs overflow-hidden">
+                                <a 
+                                  href={`/address/${holder.address}`}
+                                  className="text-blue-600 hover:text-blue-800 font-mono text-xs"
+                                  title={holder.address}
+                                >
+                                  {holder.address}
+                                </a>
+                              </td>
+                              <td className="py-1.5 px-2 text-xs text-gray-900 font-medium text-right">{formatNumber(holder.balance)}</td>
+                              <td className="py-1.5 px-2 text-xs text-gray-900 text-right">{(Number(holder.percentageOfSupply) / 100).toFixed(2)}%</td>
+                              <td className="py-1.5 px-2 text-xs text-gray-900 text-right">{percentOfTop100.toFixed(2)}%</td>
+                              <td className="py-1.5 px-2 text-xs text-gray-900 text-right">{formatNumber(holder.txCount)}</td>
+                            </tr>
+                          );
+                        })}
                     </tbody>
                   </table>
                   

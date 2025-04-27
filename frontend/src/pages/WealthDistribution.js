@@ -217,7 +217,7 @@ const WealthDistribution = () => {
     
     // Map top 10 holders to data points with balance as value
     const data = top10.map((holder, index) => ({
-      name: `t1${index + 1}`, // Use simplified names for chart labels
+      name: `Rank ${index + 1}`, // Use clear rank labels instead of t1X format
       value: Number(holder.balance || 0),
       fullAddress: holder.address,
       shortAddress: formatAddress(holder.address),
@@ -276,12 +276,15 @@ const WealthDistribution = () => {
   // Custom tooltip for pie chart
   const CustomTooltip = ({ active, payload }) => {
     if (active && payload && payload.length) {
+      const data = payload[0].payload;
       return (
         <div className="bg-white p-3 border rounded shadow-md">
-          <p className="font-semibold">{payload[0].name}</p>
-          <p className="text-sm text-gray-600 break-all">{payload[0].payload.fullAddress}</p>
+          <p className="font-semibold">{data.name}</p>
+          <p className="text-sm text-gray-600 break-all">
+            {data.name === 'Others' ? 'Combined smaller holders' : data.fullAddress}
+          </p>
           <p className="text-sm mt-1">Balance: {formatNumber(payload[0].value)} BTCZ</p>
-          <p className="text-sm">Percentage: {formatPercentage(payload[0].payload.percentage)}</p>
+          <p className="text-sm">Percentage: {(data.percentage / 1000).toFixed(2)}%</p>
         </div>
       );
     }

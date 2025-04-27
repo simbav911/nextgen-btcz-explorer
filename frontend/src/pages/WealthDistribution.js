@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useContext } from 'react';
 import { FaCoins, FaChartPie, FaListOl, FaInfoCircle } from 'react-icons/fa';
 import { ToastContext } from '../contexts/ToastContext';
-import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip, Legend, BarChart, Bar, XAxis, YAxis, CartesianGrid } from 'recharts';
+import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip, Legend, BarChart, Bar, XAxis, YAxis, CartesianGrid, Sector } from 'recharts';
 import './wealthDistribution.css';
 
 // Mock data for top holders (used when API is not available)
@@ -57,6 +57,7 @@ const WealthDistribution = () => {
   const [syncStatus, setSyncStatus] = useState(null); // State for sync status
   const [pageSize, setPageSize] = useState(100); // Default show all 100 holders
   const [currentPage, setCurrentPage] = useState(1);
+  const [activeIndex, setActiveIndex] = useState(-1); // Track active/hovered pie segment
   const { showToast } = useContext(ToastContext);
 
   // Enhanced colors with better contrast
@@ -409,7 +410,7 @@ const WealthDistribution = () => {
                   {/* Pie Chart - Adjusted size */}
                   <div className="bg-gray-50 p-3 rounded-lg shadow-sm lg:col-span-2">
                     <h3 className="text-md font-semibold mb-2">Top Holders Distribution</h3>
-                    <div className="h-80"> {/* Reduced height */}
+                    <div className="h-96"> {/* Increased height from h-80 to h-96 */}
                       <ResponsiveContainer width="100%" height="100%">
                         <PieChart>
                           <Pie
@@ -417,8 +418,8 @@ const WealthDistribution = () => {
                             cx="50%"
                             cy="50%"
                             labelLine={false}
-                            outerRadius={100} /* Reduced size */
-                            innerRadius={30} /* Reduced inner radius */
+                            outerRadius={120} /* Increased size from 100 to 120 */
+                            innerRadius={40} /* Increased inner radius from 30 to 40 */
                             fill="#8884d8"
                             dataKey="value"
                             nameKey="name"
@@ -426,6 +427,47 @@ const WealthDistribution = () => {
                             label={({ name, percent }) => {
                               // Don't show labels on the pie segments to avoid duplication
                               return null;
+                            }}
+                            activeIndex={activeIndex}
+                            activeShape={(props) => {
+                              const RADIAN = Math.PI / 180;
+                              const { cx, cy, midAngle, innerRadius, outerRadius, startAngle, endAngle, fill, value, name, fullAddress, percentage } = props;
+                              const sin = Math.sin(-RADIAN * midAngle);
+                              const cos = Math.cos(-RADIAN * midAngle);
+                              const mx = cx + (outerRadius + 30) * cos;
+                              const my = cy + (outerRadius + 30) * sin;
+                              
+                              return (
+                                <g>
+                                  <text x={cx} y={cy} dy={8} textAnchor="middle" fill={fill}>
+                                    {name}
+                                  </text>
+                                  <Sector
+                                    cx={cx}
+                                    cy={cy}
+                                    innerRadius={innerRadius}
+                                    outerRadius={outerRadius + 10}
+                                    startAngle={startAngle}
+                                    endAngle={endAngle}
+                                    fill={fill}
+                                  />
+                                  <Sector
+                                    cx={cx}
+                                    cy={cy}
+                                    startAngle={startAngle}
+                                    endAngle={endAngle}
+                                    innerRadius={outerRadius + 10}
+                                    outerRadius={outerRadius + 12}
+                                    fill={fill}
+                                  />
+                                </g>
+                              );
+                            }}
+                            onMouseEnter={(data, index) => {
+                              setActiveIndex(index);
+                            }}
+                            onMouseLeave={() => {
+                              setActiveIndex(-1);
                             }}
                           >
                             {preparePieChartData().map((entry, index) => (

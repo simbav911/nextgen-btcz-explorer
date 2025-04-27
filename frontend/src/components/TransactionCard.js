@@ -56,18 +56,26 @@ const TransactionCard = ({ transaction }) => {
   // Effect to transition from loading to loaded state after component mounts
   useEffect(() => {
     if (!isPlaceholder && txid) {
+      // Longer delay to ensure loading animation is visible
       const timer = setTimeout(() => {
         setIsLoading(false);
-        setHasTransitioned(true);
-      }, 300); // Slight delay for animation
+        
+        // Add a second timer for the transition effect
+        const transitionTimer = setTimeout(() => {
+          setHasTransitioned(true);
+        }, 200);
+        
+        return () => clearTimeout(transitionTimer);
+      }, 600); // Longer delay for more noticeable loading effect
+      
       return () => clearTimeout(timer);
     }
   }, [isPlaceholder, txid]);
   
-  // If this is a placeholder or loading state, show the loading UI
+  // If this is a placeholder or loading state, show the loading UI with forced blur
   if (isPlaceholder || (isLoading && !hasTransitioned)) {
     return (
-      <div className="block card p-3 sm:p-4 border-l-4 border-blue-200 shimmer max-w-5xl mx-auto mb-4">
+      <div className="transaction-tile block card p-3 sm:p-4 border-l-4 border-blue-200 shimmer placeholder-tile max-w-5xl mx-auto mb-4" style={{filter: 'blur(6px)', opacity: 0.7}}>
         <div className="flex flex-col md:flex-row md:items-center justify-between">
           <div className="flex items-center">
             <div className="bg-blue-50 p-2 rounded-full mr-2 sm:mr-3 w-8 h-8"></div>
@@ -154,10 +162,14 @@ const TransactionCard = ({ transaction }) => {
   // Get style for current transaction type
   const style = styleMap[txType] || styleMap.other;
   
+  // Check if it's a recent/pending transaction (less than 5 minutes old)
+  const isPending = time && Date.now()/1000 - time < 300;
+  const isVeryRecent = time && Date.now()/1000 - time < 60;
+  
   return (
     <Link 
       to={`/tx/${txid}`} 
-      className={`block card p-3 sm:p-4 hover:shadow-lg transition-shadow duration-200 border-l-4 ${style.borderColor} hover:border-bitcoinz-200 max-w-5xl mx-auto mb-4 ${hasTransitioned ? 'loaded' : 'loading-blur'}`}
+      className={`transaction-tile block card p-3 sm:p-4 hover:shadow-lg transition-shadow duration-200 border-l-4 ${style.borderColor} hover:border-bitcoinz-200 max-w-5xl mx-auto mb-4 ${hasTransitioned ? 'loaded' : 'loading-blur'} ${isPending ? 'pending-transaction' : ''}`}
     >
       <div className="flex flex-col md:flex-row md:items-center justify-between">
         <div className="flex items-center">
@@ -172,8 +184,10 @@ const TransactionCard = ({ transaction }) => {
               </span>
             </h3>
             <p className="text-xs text-gray-500 flex items-center flex-wrap">
-              <FaClock className="mr-1 flex-shrink-0" size={10} />
-              <span className="mr-2">{formatRelativeTime(time)}</span>
+              <FaClock className={`mr-1 flex-shrink-0 ${isVeryRecent ? 'recent-time-icon' : ''}`} size={10} />
+              <span className={`mr-2 ${isVeryRecent ? 'font-medium text-gray-600' : ''}`}>
+                {isVeryRecent ? 'Just now' : formatRelativeTime(time)}
+              </span>
               <span className="text-xs text-gray-500">{style.description}</span>
             </p>
           </div>
@@ -192,14 +206,16 @@ const TransactionCard = ({ transaction }) => {
             </div>
           )}
           <div className="flex items-center justify-end mt-1">
-            {confirmations > 0 && (
+            {/* Show different status based on transaction age and confirmations */}
+            {isPending ? (
+              <div className="pending-label">Pending</div>
+            ) : confirmations > 0 ? (
               <div className="flex items-center text-xs text-green-600">
                 <FaCheck className="mr-1" size={10} />
                 <span>{confirmations} {confirmations === 1 ? 'Confirm' : 'Confirms'}</span>
               </div>
-            )}
-            {(!confirmations || confirmations === 0) && (
-              <div className="text-xs bg-gray-100 px-2 py-0.5 rounded text-gray-500">Unconfirmed</div>
+            ) : (
+              <div className="pending-label">Unconfirmed</div>
             )}
           </div>
         </div>

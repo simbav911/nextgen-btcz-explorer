@@ -3,6 +3,9 @@ import ReactDOM from 'react-dom/client';
 import { HashRouter } from 'react-router-dom';
 import './index.css';
 import './styles/loading-effects.css'; // Import loading effects
+import './styles/transaction-tiles.css'; // Import transaction tile styles
+import './styles/transaction-section.css'; // Import transaction section styles
+import './styles/forced-blur.css'; // Import forced blur styles (applied last)
 import App from './App';
 import reportWebVitals from './reportWebVitals';
 

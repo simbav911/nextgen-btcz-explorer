@@ -8,6 +8,29 @@
   overflow: hidden;
 }
 
+/* Pending transaction effect */
+.pending-transaction {
+  position: relative;
+  filter: blur(0.5px);
+  opacity: 0.9;
+  animation: pendingPulse 2s ease-in-out infinite;
+}
+
+@keyframes pendingPulse {
+  0% {
+    opacity: 0.9;
+    box-shadow: 0 0 3px rgba(0, 0, 0, 0.1);
+  }
+  50% {
+    opacity: 0.8;
+    box-shadow: 0 0 5px rgba(0, 0, 0, 0.15);
+  }
+  100% {
+    opacity: 0.9;
+    box-shadow: 0 0 3px rgba(0, 0, 0, 0.1);
+  }
+}
+
 @keyframes placeholderPulse {
   0% {
     background-position: -468px 0;
@@ -21,13 +44,20 @@
 .loading-blur {
   filter: blur(5px);
   opacity: 0.7;
-  transition: filter 0.5s ease-out, opacity 0.5s ease-out;
+  transition: filter 0.8s ease-out, opacity 0.8s ease-out;
 }
 
 .loaded {
   filter: blur(0);
   opacity: 1;
-  transition: filter 0.3s ease-out, opacity 0.3s ease-out;
+  transition: filter 0.5s ease-out, opacity 0.5s ease-out;
+}
+
+/* Ensure placeholder tiles stay blurred until data loads */
+.placeholder-tile {
+  filter: blur(4px);
+  opacity: 0.7;
+  transition: none; /* No transition for placeholders - they stay blurred */
 }
 
 /* Shimmer effect for loading tiles */

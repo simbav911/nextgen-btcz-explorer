@@ -1,0 +1,44 @@
+/* Special styling for transaction section */
+
+/* Force blur on transaction placeholders but not on blocks */
+.transaction-tile.placeholder-tile,
+.shimmer.placeholder-tile:not(.block-card) {
+  filter: blur(6px) !important;
+  opacity: 0.7 !important;
+  transition: none !important;
+  background-color: #f3f4f6 !important;
+  border-color: #e5e7eb !important;
+  pointer-events: none;
+}
+
+/* Extra styling for transaction cards during loading */
+.transaction-tile.placeholder-tile::before,
+.shimmer.placeholder-tile::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  z-index: 10;
+  background: rgba(255, 255, 255, 0.1);
+  backdrop-filter: blur(8px);
+}
+
+/* Add specific pulsing animation to transaction tiles */
+@keyframes transactionPulse {
+  0% {
+    opacity: 0.6;
+    filter: blur(6px);
+  }
+  50% {
+    opacity: 0.7;
+    filter: blur(8px);
+  }
+  100% {
+    opacity: 0.6;
+    filter: blur(6px);
+  }
+}
+
+/* Apply animation directly to transaction tiles */
+.latest-transactions .transaction-tile.placeholder-tile {
+  animation: transactionPulse 2s ease-in-out infinite !important;
+}

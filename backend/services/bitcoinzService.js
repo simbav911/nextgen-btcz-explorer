@@ -353,10 +353,19 @@ const getLatestTransactions = async (count = 10) => {
       logger.debug(`Fetching ${batchTxids.length} transactions from block ${block.height}`);
       
       const txPromises = batchTxids.map(txid => 
-        getRawTransaction(txid, 1).catch(err => {
-          logger.error(`Failed to fetch transaction ${txid}: ${err.message}`);
-          return null;
-        })
+        getRawTransaction(txid, 1)
+          .then(tx => {
+            // Ensure confirmations field is properly set
+            // For mempool transactions or those without confirmations, set to 0
+            if (tx.confirmations === undefined || tx.confirmations === null) {
+              tx.confirmations = 0;
+            }
+            return tx;
+          })
+          .catch(err => {
+            logger.error(`Failed to fetch transaction ${txid}: ${err.message}`);
+            return null;
+          })
       );
       
       const results = await Promise.all(txPromises);

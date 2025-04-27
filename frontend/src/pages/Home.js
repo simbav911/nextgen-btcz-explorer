@@ -88,15 +88,63 @@ const Home = () => {
           isLoading: true
         }));
         
-        const placeholderTransactions = Array(transactionCountRef.current).fill().map((_, index) => ({
-          txid: `placeholder-${Date.now()}-${index}`,
-          time: Math.floor(Date.now() / 1000) - index * 30,
-          confirmations: 0,
-          vin: [],
-          vout: [],
-          isPlaceholder: true,
-          isLoading: true
-        }));
+        const placeholderTransactions = Array(transactionCountRef.current).fill().map((_, index) => {
+          // Create varying placeholder transaction types to match UI appearance
+          let placeholderType = 't2t'; // Default type
+          
+          // Simulate different transaction types for natural appearance
+          if (index === 0) placeholderType = 'coinbase'; // First transaction is usually coinbase
+          else if (index % 5 === 1) placeholderType = 'z2z';
+          else if (index % 5 === 2) placeholderType = 't2z';
+          else if (index % 5 === 3) placeholderType = 'z2t';
+          
+          // Create a base placeholder transaction
+          const basePlaceholder = {
+            txid: `placeholder-${Date.now()}-${index}`,
+            time: Math.floor(Date.now() / 1000) - index * 30,
+            confirmations: 0,
+            isPlaceholder: true,
+            isLoading: true
+          };
+          
+          // Add specific properties based on transaction type
+          if (placeholderType === 'coinbase') {
+            return {
+              ...basePlaceholder,
+              vin: [{ coinbase: 'placeholder' }],
+              vout: [{ value: 12.5 }]
+            };
+          } else if (placeholderType === 'z2z') {
+            return {
+              ...basePlaceholder,
+              vShieldedSpend: [{}],
+              vShieldedOutput: [{}],
+              vin: [],
+              vout: []
+            };
+          } else if (placeholderType === 't2z') {
+            return {
+              ...basePlaceholder,
+              valueBalance: -10,
+              vin: [{}],
+              vout: []
+            };
+          } else if (placeholderType === 'z2t') {
+            return {
+              ...basePlaceholder,
+              valueBalance: 10,
+              vin: [],
+              vout: [{}]
+            };
+          } else {
+            // t2t transaction
+            return {
+              ...basePlaceholder,
+              vin: [{ address: 'placeholder' }],
+              vout: [{ scriptPubKey: { addresses: ['placeholder'] } }]
+            };
+          }
+        });
         
         // Set placeholders while we load the real data
         setLatestBlocks(placeholderBlocks);
@@ -174,15 +222,43 @@ const Home = () => {
     if (!socket) return;
     
     socket.on('new_block', (block) => {
+      // Immediately show toast notification for new block
+      if (!notifiedBlockHeights.current.has(block.height)) {
+        showToast(`New block #${block.height} mined`, 'info');
+        notifiedBlockHeights.current.add(block.height);
+      }
+      
       setLatestBlocks(prevBlocks => {
+        // Mark the new block as fully loaded with NO blur effect at all
+        const newBlock = {
+          ...block,
+          isLoading: false, 
+          hasTransitioned: true,
+          noBlur: true // Special flag to completely bypass any blur effect
+        };
+        
         // Combine new block with previous blocks
-        const combined = [block, ...prevBlocks];
+        const combined = [newBlock, ...prevBlocks];
+        
+        // Update existing blocks to remove blur as well - they should now load instantly
+        const updatedPrevBlocks = prevBlocks.map(b => ({
+          ...b,
+          isLoading: false,
+          hasTransitioned: true
+        }));
+        
+        // Use updated previous blocks instead of originals
+        const updatedCombined = [newBlock, ...updatedPrevBlocks];
+        
         // Use a Map to deduplicate based on block hash
-        const uniqueBlocksMap = new Map(combined.map(b => [b.hash, b]));
+        const uniqueBlocksMap = new Map(updatedCombined.map(b => [b.hash, b]));
+        
         // Convert back to an array
         let uniqueBlocksArray = Array.from(uniqueBlocksMap.values());
+        
         // Ensure blocks are sorted by height descending
         uniqueBlocksArray.sort((a, b) => b.height - a.height);
+        
         // Slice to limit based on our display count
         const finalBlocks = uniqueBlocksArray.slice(0, displayCountRef.current);
 
@@ -205,14 +281,62 @@ const Home = () => {
               } else {
                 // If we have too few, add placeholders
                 const placeholdersNeeded = transactionCountRef.current - prevTxs.length;
-                const placeholders = Array(placeholdersNeeded).fill().map((_, index) => ({
-                  txid: `placeholder-${Date.now()}-${index}`,
-                  time: Math.floor(Date.now() / 1000),
-                  confirmations: 0,
-                  vin: [],
-                  vout: [],
-                  isPlaceholder: true
-                }));
+                const placeholders = Array(placeholdersNeeded).fill().map((_, index) => {
+                  // Create varying placeholder transaction types to match UI appearance
+                  let placeholderType = 't2t'; // Default type
+                  
+                  // Simulate different transaction types for natural appearance
+                  if (index === 0) placeholderType = 'coinbase'; // First transaction is usually coinbase
+                  else if (index % 5 === 1) placeholderType = 'z2z';
+                  else if (index % 5 === 2) placeholderType = 't2z';
+                  else if (index % 5 === 3) placeholderType = 'z2t';
+                  
+                  // Create a base placeholder transaction
+                  const basePlaceholder = {
+                    txid: `placeholder-${Date.now()}-${index}`,
+                    time: Math.floor(Date.now() / 1000),
+                    confirmations: 0,
+                    isPlaceholder: true
+                  };
+                  
+                  // Add specific properties based on transaction type
+                  if (placeholderType === 'coinbase') {
+                    return {
+                      ...basePlaceholder,
+                      vin: [{ coinbase: 'placeholder' }],
+                      vout: [{ value: 12.5 }]
+                    };
+                  } else if (placeholderType === 'z2z') {
+                    return {
+                      ...basePlaceholder,
+                      vShieldedSpend: [{}],
+                      vShieldedOutput: [{}],
+                      vin: [],
+                      vout: []
+                    };
+                  } else if (placeholderType === 't2z') {
+                    return {
+                      ...basePlaceholder,
+                      valueBalance: -10,
+                      vin: [{}],
+                      vout: []
+                    };
+                  } else if (placeholderType === 'z2t') {
+                    return {
+                      ...basePlaceholder,
+                      valueBalance: 10,
+                      vin: [],
+                      vout: [{}]
+                    };
+                  } else {
+                    // t2t transaction
+                    return {
+                      ...basePlaceholder,
+                      vin: [{ address: 'placeholder' }],
+                      vout: [{ scriptPubKey: { addresses: ['placeholder'] } }]
+                    };
+                  }
+                });
                 
                 return [...prevTxs, ...placeholders];
               }
@@ -242,8 +366,19 @@ const Home = () => {
     
     socket.on('new_transactions', (transactions) => {
       setLatestTransactions(prevTxs => {
+        // Mark all new transactions from socket as unconfirmed and ensure they have current timestamp
+        const processedTransactions = transactions.map(tx => {
+          // If confirmations is undefined or null, set it explicitly to 0
+          const newTx = { 
+            ...tx, 
+            confirmations: 0, // Always treat new socket transactions as unconfirmed
+            time: tx.time || Math.floor(Date.now() / 1000) // Ensure time is current if not provided
+          };
+          return newTx;
+        });
+        
         // Combine new and previous transactions
-        const combined = [...transactions, ...prevTxs];
+        const combined = [...processedTransactions, ...prevTxs];
         // Use a Map to deduplicate based on txid
         const uniqueTxsMap = new Map(combined.map(tx => [tx.txid, tx]));
         // Convert back to an array
@@ -261,23 +396,61 @@ const Home = () => {
           const placeholdersNeeded = currentDisplayCount - finalTxs.length;
           
           // Create placeholders with loading state
-          // We'll use the existing transactions as templates if available
           const placeholders = Array(placeholdersNeeded).fill().map((_, index) => {
-            // Use a template transaction if available, otherwise create a basic one
-            const template = prevTxs[index] || {
+            // Create varying placeholder transaction types to match UI appearance
+            let placeholderType = 't2t'; // Default type
+            
+            // Simulate different transaction types for natural appearance
+            if (index === 0) placeholderType = 'coinbase'; // First transaction is usually coinbase
+            else if (index % 5 === 1) placeholderType = 'z2z';
+            else if (index % 5 === 2) placeholderType = 't2z';
+            else if (index % 5 === 3) placeholderType = 'z2t';
+            
+            // Create a base placeholder transaction
+            const basePlaceholder = {
               txid: `placeholder-${Date.now()}-${index}`,
               time: Math.floor(Date.now() / 1000),
               confirmations: 0,
-              vin: [],
-              vout: []
-            };
-            
-            // Return a placeholder based on the template
-            return {
-              ...template,
-              txid: `placeholder-${Date.now()}-${index}`,
               isPlaceholder: true
             };
+            
+            // Add specific properties based on transaction type
+            if (placeholderType === 'coinbase') {
+              return {
+                ...basePlaceholder,
+                vin: [{ coinbase: 'placeholder' }],
+                vout: [{ value: 12.5 }]
+              };
+            } else if (placeholderType === 'z2z') {
+              return {
+                ...basePlaceholder,
+                vShieldedSpend: [{}],
+                vShieldedOutput: [{}],
+                vin: [],
+                vout: []
+              };
+            } else if (placeholderType === 't2z') {
+              return {
+                ...basePlaceholder,
+                valueBalance: -10,
+                vin: [{}],
+                vout: []
+              };
+            } else if (placeholderType === 'z2t') {
+              return {
+                ...basePlaceholder,
+                valueBalance: 10,
+                vin: [],
+                vout: [{}]
+              };
+            } else {
+              // t2t transaction
+              return {
+                ...basePlaceholder,
+                vin: [{ address: 'placeholder' }],
+                vout: [{ scriptPubKey: { addresses: ['placeholder'] } }]
+              };
+            }
           });
           
           // Add placeholders to the final list
@@ -540,7 +713,7 @@ const Home = () => {
         </div>
         
         {/* Latest Transactions with shadow and glow effects */}
-        <div>
+        <div className="latest-transactions-container">
           <div className="flex justify-between items-center mb-3">
             <h2 className="text-lg font-bold flex items-center">
               <div className="bg-green-100 p-1.5 rounded-full mr-2 flex-shrink-0 shadow-sm">
@@ -555,7 +728,7 @@ const Home = () => {
               View All
             </Link>
           </div>
-          <div className="space-y-5 green-glow p-3 rounded-xl bg-white shadow-lg">
+          <div className="latest-transactions space-y-5 green-glow p-3 rounded-xl bg-white shadow-lg">
             {latestTransactions.map(tx => {
               // Use the same styling logic as in the TransactionList component
               const txType = classifyTxType(tx);
@@ -623,10 +796,12 @@ const Home = () => {
               return (
                 <div
                   key={tx.txid}
-                  className="transaction-tile"
+                  className={`transaction-tile ${tx.isPlaceholder ? 'placeholder-tile' : ''}`}
                   style={{
                     borderLeft: style.border,
-                    boxShadow: style.shadow
+                    boxShadow: style.shadow,
+                    filter: tx.isPlaceholder ? 'blur(6px)' : 'none',
+                    opacity: tx.isPlaceholder ? 0.7 : 1
                   }}
                 >
                   <Link to={`/tx/${tx.txid}`} className="block">

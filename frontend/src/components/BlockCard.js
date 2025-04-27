@@ -101,14 +101,12 @@ const BlockCard = ({ block }) => {
   const [isLoading, setIsLoading] = useState(isPlaceholder || !hash);
   const [hasTransitioned, setHasTransitioned] = useState(false);
   
-  // Effect to transition from loading to loaded state after component mounts
+  // Effect to transition from loading to loaded state IMMEDIATELY for blocks
   useEffect(() => {
     if (!isPlaceholder && hash) {
-      const timer = setTimeout(() => {
-        setIsLoading(false);
-        setHasTransitioned(true);
-      }, 300); // Slight delay for animation
-      return () => clearTimeout(timer);
+      // Almost no delay for blocks - they should appear immediately
+      setIsLoading(false);
+      setHasTransitioned(true);
     }
   }, [isPlaceholder, hash]);
   
@@ -156,15 +154,21 @@ const BlockCard = ({ block }) => {
     fetchMinerInfo();
   }, [hash, miner, minerInfo, isPlaceholder]);
   
-  // If this is a placeholder or loading state, show the loading UI
-  if (isPlaceholder || (isLoading && !hasTransitioned)) {
+  // Check if this block should have no blur effect (from socket)
+  const noBlurEffect = block.noBlur === true;
+  
+  // For blocks, show minimal loading state with very slight blur if any
+  if (isPlaceholder || (isLoading && !hasTransitioned && !noBlurEffect)) {
     return (
       <div 
-        className="block-card p-3 hover:shadow-lg transition-all duration-300 border border-gray-200 rounded-xl shimmer"
+        className="block-card p-3 hover:shadow-lg transition-all duration-100 border border-gray-200 rounded-xl"
         style={{
           position: 'relative',
           overflow: 'hidden',
           height: '98px', // Match height of loaded card
+          filter: 'blur(2px)', // Very minimal blur for blocks
+          opacity: 0.9, // Higher opacity for blocks
+          transition: 'all 0.1s ease-out' // Very fast transition
         }}
       >
         <div className="flex items-center justify-between mb-2">

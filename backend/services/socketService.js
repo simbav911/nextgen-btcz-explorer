@@ -205,8 +205,17 @@ const startUpdateIntervals = () => {
       // Get latest transactions from the node
       const transactions = await getLatestTransactions(8);
       
+      // Process transactions to ensure confirmations field is set correctly
+      const processedTransactions = transactions.map(tx => {
+        // If confirmations is undefined or null, set it explicitly to 0
+        if (tx.confirmations === undefined || tx.confirmations === null) {
+          return { ...tx, confirmations: 0 };
+        }
+        return tx;
+      });
+      
       // Filter out transactions we've already emitted
-      const newTransactions = transactions.filter(tx => !dataCache.lastTransactions.has(tx.txid));
+      const newTransactions = processedTransactions.filter(tx => !dataCache.lastTransactions.has(tx.txid));
       
       // If we have new transactions, emit them
       if (newTransactions.length > 0) {
@@ -218,6 +227,11 @@ const startUpdateIntervals = () => {
             const firstItem = dataCache.lastTransactions.values().next().value;
             dataCache.lastTransactions.delete(firstItem);
           }
+        });
+        
+        // Log transaction confirmation statuses for debugging
+        newTransactions.forEach(tx => {
+          logger.debug(`Emitting transaction ${tx.txid.substring(0, 8)}... with confirmations: ${tx.confirmations || 0}`);
         });
         
         // Emit to all connected clients

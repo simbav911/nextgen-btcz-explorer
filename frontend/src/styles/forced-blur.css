@@ -1,0 +1,54 @@
+/* Force blur ONLY on transaction placeholder elements - NO blur for blocks */
+
+/* Apply blur style to transaction placeholders only */
+[style*="transition-tile"],
+.placeholder-tile:not(.block-card):not([class*="block"]),
+.shimmer:not(.block-card):not([class*="block"]) {
+  filter: blur(6px) !important;
+  opacity: 0.7 !important;
+  transition: none !important;
+}
+
+/* NO blur for blocks */
+.block-card,
+[class*="block-card"],
+div[class*="block-"] {
+  filter: none !important; 
+  opacity: 1 !important;
+  transition: none !important; 
+}
+
+/* Override any shimmer on blocks */
+.block-card.placeholder-tile,
+.block-card.shimmer,
+div[class*="block-"].shimmer {
+  filter: none !important;
+  opacity: 1 !important;
+  transition: none !important;
+  animation: none !important;
+}
+
+/* Target specific elements in transaction section */
+.latest-transactions .transaction-tile,
+.latest-transactions .card,
+.latest-transactions [class*="shimmer"] {
+  transition: all 0.5s ease-out;
+}
+
+.latest-transactions .transaction-tile.placeholder-tile,
+.latest-transactions [class*="shimmer"].placeholder-tile,
+.latest-transactions [class*="placeholder"] {
+  filter: blur(6px) !important;
+  opacity: 0.7 !important;
+}
+
+/* Add animation to all forced blur elements */
+@keyframes forcedBlurPulse {
+  0% { filter: blur(5px) !important; }
+  50% { filter: blur(8px) !important; }
+  100% { filter: blur(5px) !important; }
+}
+
+.placeholder-tile {
+  animation: forcedBlurPulse 2s infinite !important;
+}

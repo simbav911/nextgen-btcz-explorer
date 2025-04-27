@@ -198,6 +198,15 @@ const WealthDistribution = () => {
     return (percent / 100).toFixed(2) + '%';
   };
 
+  // Format large percentages without scaling down
+  const formatLargePercentage = (percent) => {
+    if (percent === null || percent === undefined || typeof percent !== 'number') {
+      return '0.00%';
+    }
+    // For distribution table, we want to show actual percentages without scaling
+    return percent.toFixed(2) + '%';
+  };
+
   // Format address for display
   const formatAddress = (address) => {
     return `${address.substring(0, 10)}...${address.substring(address.length - 4)}`;
@@ -242,11 +251,33 @@ const WealthDistribution = () => {
 
   // Prepare data for bar chart
   const prepareBarChartData = () => {
-    return distribution.map(item => ({
-      name: item.range + ' BTCZ',
-      count: item.count,
-      percentage: (item.count / totalAddresses) * 100
-    }));
+    return distribution.map(item => {
+      // Format range for better display
+      let displayRange = item.range;
+      
+      // Replace infinity symbol with "+" for better readability
+      if (displayRange.includes('∞')) {
+        displayRange = displayRange.replace('∞', '+');
+      }
+      
+      // Add "K" for thousands and "M" for millions to make labels more compact
+      if (displayRange.includes('1000000')) {
+        displayRange = displayRange.replace('1000000', '1M');
+      } else if (displayRange.includes('100000')) {
+        displayRange = displayRange.replace('100000', '100K');
+      } else if (displayRange.includes('10000')) {
+        displayRange = displayRange.replace('10000', '10K');
+      } else if (displayRange.includes('1000')) {
+        displayRange = displayRange.replace('1000', '1K');
+      }
+      
+      return {
+        name: displayRange,
+        count: item.count,
+        percentage: (item.count / totalAddresses) * 100,
+        originalRange: item.range // Keep original range for tooltip
+      };
+    });
   };
 
   // Calculate top 10 and top 100 holder percentages
@@ -622,6 +653,32 @@ const WealthDistribution = () => {
             
             {activeTab === 'distribution' && (
               <div>
+                {/* Explanatory text */}
+                <div className="bg-blue-50 border-l-4 border-blue-500 p-4 mb-6">
+                  <div className="flex">
+                    <div className="flex-shrink-0">
+                      <FaInfoCircle className="h-5 w-5 text-blue-500" />
+                    </div>
+                    <div className="ml-3">
+                      <p className="text-sm text-blue-700 font-semibold">
+                        What am I looking at?
+                      </p>
+                      <p className="text-sm text-blue-600 mt-1">
+                        This chart shows how BitcoinZ is distributed across different wallet balance ranges. Each bar represents the number of addresses holding a specific range of BTCZ.
+                      </p>
+                      <p className="text-sm text-blue-600 mt-2">
+                        <strong>Key insights:</strong>
+                      </p>
+                      <ul className="list-disc list-inside text-sm text-blue-600 ml-2">
+                        <li>The leftmost bar (0-1 BTCZ) shows addresses with very small balances, often dust amounts</li>
+                        <li>Most addresses hold small amounts (under 10 BTCZ)</li>
+                        <li>Very few addresses hold large amounts (over 100K BTCZ)</li>
+                        <li>The table below shows the exact numbers and percentages for each range</li>
+                      </ul>
+                    </div>
+                  </div>
+                </div>
+                
                 {/* Bar Chart */}
                 <div className="bg-gray-50 p-4 rounded-lg shadow-sm mb-8">
                   <h3 className="text-lg font-semibold mb-4">Address Distribution by Balance Range</h3>
@@ -634,15 +691,32 @@ const WealthDistribution = () => {
                         <CartesianGrid strokeDasharray="3 3" />
                         <XAxis 
                           dataKey="name" 
-                          angle={-45} 
+                          angle={-35} 
                           textAnchor="end" 
-                          height={60} 
-                          tick={{ fontSize: 12 }} 
+                          height={70} 
+                          tick={{ fontSize: 12, fontWeight: 500 }}
+                          tickMargin={10}
                         />
-                        <YAxis />
+                        <YAxis 
+                          tickFormatter={(value) => {
+                            // Format Y-axis values with K for thousands and M for millions
+                            if (value >= 1000000) {
+                              return `${(value / 1000000).toFixed(1)}M`;
+                            } else if (value >= 1000) {
+                              return `${(value / 1000).toFixed(0)}K`;
+                            }
+                            return value;
+                          }}
+                        />
                         <Tooltip 
                           formatter={(value, name) => [formatNumber(value), name === 'count' ? 'Addresses' : name]}
-                          labelFormatter={(label) => `Balance Range: ${label}`}
+                          labelFormatter={(label, payload) => {
+                            if (payload && payload.length) {
+                              return `Balance Range: ${payload[0].payload.originalRange} BTCZ`;
+                            }
+                            return `Balance Range: ${label}`;
+                          }}
+                          contentStyle={{ backgroundColor: 'white', border: '1px solid #ddd', borderRadius: '4px', padding: '10px' }}
                         />
                         <Legend />
                         <Bar 
@@ -658,7 +732,13 @@ const WealthDistribution = () => {
                 
                 {/* Distribution Table */}
                 <div className="overflow-x-auto">
-                  <table className="min-w-full bg-white rounded-lg overflow-hidden">
+                  <div className="mb-4">
+                    <h3 className="text-lg font-semibold">Balance Distribution Details</h3>
+                    <p className="text-sm text-gray-600 mt-1">
+                      This table shows the exact number of addresses in each balance range and what percentage of the total address count they represent.
+                    </p>
+                  </div>
+                  <table className="min-w-full bg-white rounded-lg overflow-hidden shadow-sm">
                     <thead className="bg-gray-100">
                       <tr>
                         <th className="py-3 px-4 text-left text-xs font-medium text-gray-500 uppercase tracking-wider w-1/3">Balance Range (BTCZ)</th>
@@ -668,11 +748,11 @@ const WealthDistribution = () => {
                     </thead>
                     <tbody className="divide-y divide-gray-200">
                       {distribution.map((item, index) => (
-                        <tr key={index} className={index % 2 === 0 ? 'bg-white' : 'bg-gray-50'}>
+                        <tr key={index} className={index % 2 === 0 ? 'bg-white hover:bg-blue-50' : 'bg-gray-50 hover:bg-blue-50'}>
                           <td className="py-3 px-4 text-sm font-medium text-gray-900">{item.range}</td>
                           <td className="py-3 px-4 text-sm text-gray-900">{formatNumber(item.count)}</td>
                           <td className="py-3 px-4 text-sm text-gray-900">
-                            {formatPercentage((item.count / totalAddresses) * 100)}
+                            {formatLargePercentage((item.count / totalAddresses) * 100)}
                           </td>
                         </tr>
                       ))}

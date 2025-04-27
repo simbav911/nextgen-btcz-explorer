@@ -542,7 +542,7 @@ const WealthDistribution = () => {
                           return (
                             <tr key={holder.address} className={index % 2 === 0 ? 'bg-white hover:bg-blue-50' : 'bg-gray-50 hover:bg-blue-50'}>
                               <td className="py-1.5 px-2 text-xs font-medium text-gray-900">{index + 1}</td>
-                              <td className="py-1.5 px-2 text-xs overflow-hidden">
+                              <td className="py-1.5 px-2 text-xs">
                                 <a 
                                   href={`/address/${holder.address}`}
                                   className="text-blue-600 hover:text-blue-800 font-mono text-xs"

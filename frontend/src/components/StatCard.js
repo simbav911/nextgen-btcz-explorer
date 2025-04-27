@@ -1,52 +1,82 @@
 import React from 'react';
-import { motion } from 'framer-motion';
 
-const StatCard = ({ title, value, icon, color = 'blue', change }) => {
+const StatCard = ({ title, value, icon, color = 'blue', change, isLoading }) => {
   // Map color names to tailwind color classes
   const colorMap = {
     blue: {
       bg: 'bg-blue-100',
       border: 'border-blue-200',
       shadow: 'shadow-blue-100',
-      text: 'text-blue-600'
+      text: 'text-blue-600',
+      shimmer: 'bg-blue-50'
     },
     green: {
       bg: 'bg-green-100',
       border: 'border-green-200',
       shadow: 'shadow-green-100',
-      text: 'text-green-600'
+      text: 'text-green-600',
+      shimmer: 'bg-green-50'
     },
     red: {
       bg: 'bg-red-100',
       border: 'border-red-200',
       shadow: 'shadow-red-100',
-      text: 'text-red-600'
+      text: 'text-red-600',
+      shimmer: 'bg-red-50'
     },
     purple: {
       bg: 'bg-purple-100',
       border: 'border-purple-200',
       shadow: 'shadow-purple-100',
-      text: 'text-purple-600'
+      text: 'text-purple-600',
+      shimmer: 'bg-purple-50'
     },
     orange: {
       bg: 'bg-orange-100',
       border: 'border-orange-200',
       shadow: 'shadow-orange-100',
-      text: 'text-orange-600'
+      text: 'text-orange-600',
+      shimmer: 'bg-orange-50'
     },
     bitcoinz: {
       bg: 'bg-bitcoinz-100',
       border: 'border-bitcoinz-200',
       shadow: 'shadow-bitcoinz-100',
-      text: 'text-bitcoinz-600'
+      text: 'text-bitcoinz-600',
+      shimmer: 'bg-blue-50'
     }
   };
 
   const colors = colorMap[color] || colorMap.blue;
 
+  // If loading, show the shimmer effect
+  if (isLoading || value === 'Loading...' || !value) {
+    return (
+      <div 
+        className={`card bg-white rounded-xl flex flex-col justify-center p-3 shimmer`}
+        style={{ 
+          height: '100px',
+          position: 'relative',
+          overflow: 'hidden'
+        }}
+      >
+        <div className="flex items-center justify-between relative z-10">
+          <div className="flex-grow">
+            <div className="flex items-center mb-2">
+              <div className={`${colors.shimmer} p-2 rounded-full flex-shrink-0 mr-2 w-8 h-8`}></div>
+              <div className={`${colors.shimmer} h-4 w-24 rounded`}></div>
+            </div>
+            <div className={`${colors.shimmer} h-6 w-32 rounded mb-1`}></div>
+            <div className={`${colors.shimmer} h-3 w-16 rounded`}></div>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div 
-      className={`card bg-white rounded-xl flex flex-col justify-center p-3`}
+      className={`card bg-white rounded-xl flex flex-col justify-center p-3 loaded transition-all duration-300`}
       style={{ 
         height: '100px',
         position: 'relative',

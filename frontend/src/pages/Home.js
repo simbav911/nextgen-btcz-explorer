@@ -55,6 +55,19 @@ const Home = () => {
   const { showToast } = useContext(ToastContext);
   const notifiedBlockHeights = useRef(new Set()); // Track notified block heights
   
+  // Import loading effects CSS
+  useEffect(() => {
+    // Import loading effects stylesheet
+    const link = document.createElement('link');
+    link.rel = 'stylesheet';
+    link.href = '/styles/loading-effects.css';
+    document.head.appendChild(link);
+    
+    return () => {
+      document.head.removeChild(link);
+    };
+  }, []);
+
   // Fetch initial data with optimized loading strategy
   useEffect(() => {
     const fetchData = async () => {
@@ -71,7 +84,8 @@ const Home = () => {
           time: Math.floor(Date.now() / 1000) - index * 60,
           tx: [],
           size: 0,
-          isPlaceholder: true
+          isPlaceholder: true,
+          isLoading: true
         }));
         
         const placeholderTransactions = Array(transactionCountRef.current).fill().map((_, index) => ({
@@ -80,7 +94,8 @@ const Home = () => {
           confirmations: 0,
           vin: [],
           vout: [],
-          isPlaceholder: true
+          isPlaceholder: true,
+          isLoading: true
         }));
         
         // Set placeholders while we load the real data
@@ -450,6 +465,7 @@ const Home = () => {
               value={stats && stats.blockchainInfo ? formatNumber(stats.blockchainInfo.blocks) : 'Loading...'}
               icon={latestBlockIcon}
               color="blue"
+              isLoading={loading || !stats}
             />
           </Link>
         </div>
@@ -461,6 +477,7 @@ const Home = () => {
               value={stats && stats.blockchainInfo ? formatDifficulty(stats.blockchainInfo.difficulty) : 'Loading...'}
               icon={difficultyIcon}
               color="purple"
+              isLoading={loading || !stats}
             />
           </Link>
         </div>
@@ -472,6 +489,7 @@ const Home = () => {
               value={stats && stats.miningInfo ? `${formatNumber(stats.miningInfo.networkhashps)} H/s` : 'Loading...'}
               icon={hashrateIcon}
               color="orange"
+              isLoading={loading || !stats}
             />
           </Link>
         </div>
@@ -483,6 +501,7 @@ const Home = () => {
               value={btczPrice ? `$${btczPrice.usd.toFixed(8)}` : 'Loading...'}
               icon={priceIcon}
               color="green"
+              isLoading={loading || !btczPrice}
               change={btczPrice ? {
                 value: `${Math.abs(btczPrice.usd_24h_change).toFixed(2)}%`,
                 positive: btczPrice.usd_24h_change >= 0,

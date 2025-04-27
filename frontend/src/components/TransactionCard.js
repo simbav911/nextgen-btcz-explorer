@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { FaExchangeAlt, FaClock, FaCheck, FaArrowRight, FaCoins, FaLock, FaLockOpen, FaExclamationTriangle } from 'react-icons/fa';
 import { formatRelativeTime, formatNumber } from '../utils/formatting';
@@ -46,35 +46,50 @@ const TransactionCard = ({ transaction }) => {
     vout,
     confirmations,
     blockhash,
-    isPlaceholder
+    isPlaceholder,
+    isLoading: initialLoadingState
   } = transaction;
   
-  // If this is a placeholder transaction, show a loading state
-  if (isPlaceholder) {
+  const [isLoading, setIsLoading] = useState(isPlaceholder || initialLoadingState);
+  const [hasTransitioned, setHasTransitioned] = useState(false);
+  
+  // Effect to transition from loading to loaded state after component mounts
+  useEffect(() => {
+    if (!isPlaceholder && txid) {
+      const timer = setTimeout(() => {
+        setIsLoading(false);
+        setHasTransitioned(true);
+      }, 300); // Slight delay for animation
+      return () => clearTimeout(timer);
+    }
+  }, [isPlaceholder, txid]);
+  
+  // If this is a placeholder or loading state, show the loading UI
+  if (isPlaceholder || (isLoading && !hasTransitioned)) {
     return (
-      <div className="block card p-3 sm:p-6 border-l-4 border-gray-200 max-w-5xl mx-auto bg-white animate-pulse">
+      <div className="block card p-3 sm:p-4 border-l-4 border-blue-200 shimmer max-w-5xl mx-auto mb-4">
         <div className="flex flex-col md:flex-row md:items-center justify-between">
           <div className="flex items-center">
-            <div className="bg-gray-200 p-2 rounded-full mr-2 sm:mr-3 flex-shrink-0 w-8 h-8"></div>
+            <div className="bg-blue-50 p-2 rounded-full mr-2 sm:mr-3 w-8 h-8"></div>
             <div className="min-w-0">
-              <div className="h-4 bg-gray-200 rounded w-24 mb-2"></div>
-              <div className="h-3 bg-gray-200 rounded w-32"></div>
+              <div className="h-4 bg-blue-50 rounded w-24 mb-2"></div>
+              <div className="h-3 bg-blue-50 rounded w-32"></div>
             </div>
           </div>
           
           <div className="mt-2 md:mt-0 text-right">
-            <div className="h-3 bg-gray-200 rounded w-20 mb-1 ml-auto"></div>
-            <div className="h-3 bg-gray-200 rounded w-16 mb-1 ml-auto"></div>
-            <div className="h-3 bg-gray-200 rounded w-12 ml-auto"></div>
+            <div className="h-3 bg-blue-50 rounded w-20 mb-1 ml-auto"></div>
+            <div className="h-3 bg-blue-50 rounded w-16 mb-1 ml-auto"></div>
+            <div className="h-3 bg-blue-50 rounded w-12 ml-auto"></div>
           </div>
         </div>
         
         <div className="flex flex-col md:flex-row gap-2 mt-3 items-center">
-          <div className="bg-gray-50 p-2 rounded w-full md:w-2/5 h-12"></div>
+          <div className="bg-blue-50 p-2 rounded w-full md:w-2/5 h-12"></div>
           <div className="hidden md:flex items-center justify-center">
-            <div className="bg-gray-200 rounded-full p-2 w-8 h-8"></div>
+            <div className="bg-blue-50 rounded-full p-2 w-8 h-8"></div>
           </div>
-          <div className="bg-gray-50 p-2 rounded w-full md:w-2/5 h-12"></div>
+          <div className="bg-blue-50 p-2 rounded w-full md:w-2/5 h-12"></div>
         </div>
       </div>
     );
@@ -142,7 +157,7 @@ const TransactionCard = ({ transaction }) => {
   return (
     <Link 
       to={`/tx/${txid}`} 
-      className={`block card p-3 sm:p-6 hover:shadow-lg transition-shadow duration-200 border-l-4 ${style.borderColor} hover:border-bitcoinz-200 max-w-5xl mx-auto`}
+      className={`block card p-3 sm:p-4 hover:shadow-lg transition-shadow duration-200 border-l-4 ${style.borderColor} hover:border-bitcoinz-200 max-w-5xl mx-auto mb-4 ${hasTransitioned ? 'loaded' : 'loading-blur'}`}
     >
       <div className="flex flex-col md:flex-row md:items-center justify-between">
         <div className="flex items-center">
@@ -180,11 +195,11 @@ const TransactionCard = ({ transaction }) => {
             {confirmations > 0 && (
               <div className="flex items-center text-xs text-green-600">
                 <FaCheck className="mr-1" size={10} />
-                <span>{confirmations} conf.</span>
+                <span>{confirmations} {confirmations === 1 ? 'Confirm' : 'Confirms'}</span>
               </div>
             )}
-            {confirmations === 0 && (
-              <div className="text-xs text-orange-500">Unconfirmed</div>
+            {(!confirmations || confirmations === 0) && (
+              <div className="text-xs bg-gray-100 px-2 py-0.5 rounded text-gray-500">Unconfirmed</div>
             )}
           </div>
         </div>

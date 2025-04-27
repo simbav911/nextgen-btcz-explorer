@@ -91,18 +91,31 @@ const BlockCard = ({ block }) => {
     difficulty,
     bits,
     nonce,
-    tx_count,
-    minerInfo
+    tx,
+    tx_count = tx?.length,
+    minerInfo,
+    isPlaceholder
   } = block;
   
   const [miner, setMiner] = useState(minerInfo || null);
-  const [isLoading, setIsLoading] = useState(true);
+  const [isLoading, setIsLoading] = useState(isPlaceholder || !hash);
+  const [hasTransitioned, setHasTransitioned] = useState(false);
+  
+  // Effect to transition from loading to loaded state after component mounts
+  useEffect(() => {
+    if (!isPlaceholder && hash) {
+      const timer = setTimeout(() => {
+        setIsLoading(false);
+        setHasTransitioned(true);
+      }, 300); // Slight delay for animation
+      return () => clearTimeout(timer);
+    }
+  }, [isPlaceholder, hash]);
   
   // Try to extract miner information if not already provided
   useEffect(() => {
-    // Skip if we already have mining info
-    if (miner) {
-      setIsLoading(false);
+    // Skip if we already have mining info or it's a placeholder
+    if (miner || isPlaceholder || !hash) {
       return;
     }
     
@@ -137,18 +150,49 @@ const BlockCard = ({ block }) => {
         console.error('Error fetching mining pool data:', error);
         // Set a default value if there's an error
         setMiner('Unknown Pool');
-      } finally {
-        setIsLoading(false);
       }
     };
     
     fetchMinerInfo();
-  }, [hash, miner, minerInfo]);
+  }, [hash, miner, minerInfo, isPlaceholder]);
+  
+  // If this is a placeholder or loading state, show the loading UI
+  if (isPlaceholder || (isLoading && !hasTransitioned)) {
+    return (
+      <div 
+        className="block-card p-3 hover:shadow-lg transition-all duration-300 border border-gray-200 rounded-xl shimmer"
+        style={{
+          position: 'relative',
+          overflow: 'hidden',
+          height: '98px', // Match height of loaded card
+        }}
+      >
+        <div className="flex items-center justify-between mb-2">
+          <div className="flex items-center">
+            <div className="bg-blue-50 p-2 rounded-full mr-2 w-8 h-8"></div>
+            <div className="h-5 bg-blue-50 rounded w-28"></div>
+          </div>
+          <div className="h-5 bg-blue-50 rounded-full w-12"></div>
+        </div>
+        
+        <div className="grid grid-cols-3 gap-1 mb-2">
+          <div className="h-4 bg-blue-50 rounded w-20"></div>
+          <div className="h-4 bg-blue-50 rounded w-16 mx-auto"></div>
+          <div className="h-4 bg-blue-50 rounded w-14 ml-auto"></div>
+        </div>
+        
+        <div className="flex justify-between items-center pt-1 border-t border-gray-100">
+          <div className="h-4 bg-blue-50 rounded w-24"></div>
+          <div className="h-4 bg-blue-50 rounded w-16 ml-auto"></div>
+        </div>
+      </div>
+    );
+  }
   
   return (
     <Link 
       to={`/blocks/${hash}`} 
-      className="block-card-glowing block card p-3 hover:shadow-lg transition-all duration-300 border border-gray-200 rounded-xl"
+      className={`block-card-glowing block card p-3 hover:shadow-lg transition-all duration-300 border border-gray-200 rounded-xl ${hasTransitioned ? 'loaded' : 'loading-blur'}`}
       style={{
         position: 'relative',
         overflow: 'hidden',
@@ -176,7 +220,7 @@ const BlockCard = ({ block }) => {
           </div>
         </div>
         <div className="text-xs font-medium bg-gray-100 px-2 py-1 rounded-full text-gray-600">
-          {tx_count} {tx_count === 1 ? 'tx' : 'txs'}
+          {tx_count || 0} {tx_count === 1 ? 'tx' : 'txs'}
         </div>
       </div>
       

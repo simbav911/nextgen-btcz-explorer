@@ -21,6 +21,100 @@ const coingeckoApi = axios.create({
   },
 });
 
+// Simple cache implementation
+const apiCache = {
+  data: {},
+  
+  // Get data from cache
+  get(key) {
+    const cachedItem = this.data[key];
+    if (!cachedItem) return null;
+    
+    // Check if the cache entry is still valid
+    if (Date.now() > cachedItem.expiry) {
+      delete this.data[key];
+      return null;
+    }
+    
+    return cachedItem.data;
+  },
+  
+  // Set data in cache with expiration
+  set(key, data, ttlMs = 5000) { // Default TTL: 5 seconds
+    this.data[key] = {
+      data,
+      expiry: Date.now() + ttlMs
+    };
+  },
+  
+  // Clear all cache or specific key
+  clear(key) {
+    if (key) {
+      delete this.data[key];
+    } else {
+      this.data = {};
+    }
+  }
+};
+
+// Add caching interceptor
+api.interceptors.request.use(config => {
+  // Only cache GET requests
+  if (config.method !== 'get') return config;
+  
+  // Create a cache key from the request URL and params
+  const cacheKey = `${config.url}?${JSON.stringify(config.params || {})}`;
+  
+  // Check if we have a cached response
+  const cachedResponse = apiCache.get(cacheKey);
+  if (cachedResponse) {
+    console.log(`Using cached response for ${config.url}`);
+    
+    // Create a new promise that resolves with the cached data
+    return {
+      ...config,
+      adapter: () => Promise.resolve({
+        data: cachedResponse,
+        status: 200,
+        statusText: 'OK',
+        headers: {},
+        config,
+        cached: true
+      })
+    };
+  }
+  
+  return config;
+});
+
+// Cache successful responses
+api.interceptors.response.use(response => {
+  // Don't cache if it's already from cache
+  if (response.cached) return response;
+  
+  // Only cache GET requests
+  if (response.config.method !== 'get') return response;
+  
+  // Create a cache key from the request URL and params
+  const cacheKey = `${response.config.url}?${JSON.stringify(response.config.params || {})}`;
+  
+  // Different TTL for different endpoints
+  let ttl = 5000; // Default: 5 seconds
+  
+  if (response.config.url.includes('/blocks')) {
+    ttl = 3000; // Blocks: cache for 3 seconds
+  } else if (response.config.url.includes('/transactions')) {
+    ttl = 3000; // Transactions: cache for 3 seconds
+  } else if (response.config.url.includes('/stats')) {
+    ttl = 30000; // Stats: cache for 30 seconds
+  }
+  
+  // Cache the response data
+  apiCache.set(cacheKey, response.data, ttl);
+  
+  return response;
+});
+
 // API endpoints for blocks
 export const blockService = {
   getLatestBlocks: (limit = 10, offset = 0) => {

@@ -33,63 +33,13 @@ import backgroundManager from './utils/backgroundManager';
 // API Configuration
 const SOCKET_URL = process.env.REACT_APP_SOCKET_URL || 'http://localhost:3000';
 
-// Using the DarkHeader component instead of defining it here
-
 function App({ skipHeader = false }) {
-  // Initialize background animation
-  useEffect(() => {
-    // Initialize with the primary style
-    backgroundManager.init('primary');
-    
-    // Clean up animation on unmount
-    return () => {
-      backgroundManager.stop();
-    };
-  }, []);
+  // Initialize state and refs
   const socketRef = useRef(null);
   const [isConnected, setIsConnected] = useState(false);
   const [toast, setToast] = useState(null);
   
-  // Initialize socket connection
-  useEffect(() => {
-    if (socketRef.current) return;
-
-    socketRef.current = io(SOCKET_URL, {
-      transports: ['websocket'],
-      reconnection: true,
-      reconnectionAttempts: 5,
-      reconnectionDelay: 1000,
-    });
-    
-    const currentSocket = socketRef.current;
-    
-    currentSocket.on('connect', () => {
-      console.log('Connected to WebSocket server');
-      setIsConnected(true);
-      
-      // Subscribe to channels
-      currentSocket.emit('subscribe', 'blocks');
-      currentSocket.emit('subscribe', 'transactions');
-    });
-    
-    currentSocket.on('connect_error', (error) => {
-      console.error('WebSocket connection error:', error);
-      setIsConnected(false);
-    });
-    
-    currentSocket.on('disconnect', () => {
-      console.log('Disconnected from WebSocket server');
-      setIsConnected(false);
-    });
-    
-    return () => {
-      if (currentSocket) {
-        currentSocket.disconnect();
-        socketRef.current = null;
-      }
-    };
-  }, []);
-  
+  // Define showToast callback
   const showToast = useCallback((message, type = 'info', duration = 5000) => {
     setToast({ message, type, duration });
     
@@ -100,7 +50,121 @@ function App({ skipHeader = false }) {
     return () => clearTimeout(timer);
   }, []);
 
+  // Create toast context value
   const toastContextValue = useMemo(() => ({ showToast }), [showToast]);
+  
+  // Initialize background animation
+  useEffect(() => {
+    // Initialize with the primary style
+    backgroundManager.init('primary');
+    
+    // Clean up animation on unmount
+    return () => {
+      backgroundManager.stop();
+    };
+  }, []);
+  
+  // Initialize socket connection with better error handling and reconnection logic
+  useEffect(() => {
+    if (socketRef.current) return;
+
+    // Create socket with improved options
+    socketRef.current = io(SOCKET_URL, {
+      transports: ['websocket', 'polling'], // Try websocket first, fallback to polling
+      reconnection: true,
+      reconnectionAttempts: 10,
+      reconnectionDelay: 1000,
+      reconnectionDelayMax: 5000,
+      timeout: 10000,
+      forceNew: true
+    });
+    
+    const currentSocket = socketRef.current;
+    
+    // Connection established
+    currentSocket.on('connect', () => {
+      console.log('Connected to WebSocket server');
+      setIsConnected(true);
+      
+      // Subscribe to channels
+      currentSocket.emit('subscribe', 'blocks');
+      currentSocket.emit('subscribe', 'transactions');
+      currentSocket.emit('subscribe', 'general');
+    });
+    
+    // Connection error
+    currentSocket.on('connect_error', (error) => {
+      console.error('WebSocket connection error:', error);
+      setIsConnected(false);
+    });
+    
+    // Connection closed
+    currentSocket.on('disconnect', (reason) => {
+      console.log(`Disconnected from WebSocket server: ${reason}`);
+      setIsConnected(false);
+      
+      // If the server closed the connection, try to reconnect immediately
+      if (reason === 'io server disconnect') {
+        currentSocket.connect();
+      }
+    });
+    
+    // Receive heartbeat to confirm connection is alive
+    currentSocket.on('heartbeat', (data) => {
+      const latency = Date.now() - data.timestamp;
+      if (latency > 5000) {
+        console.warn(`High socket latency detected: ${latency}ms`);
+      }
+    });
+    
+    // Notification handling
+    currentSocket.on('notification', (notification) => {
+      if (notification.type === 'block') {
+        showToast(`New block #${notification.data.height} mined`, 'info');
+      }
+    });
+    
+    // Reconnect success
+    currentSocket.on('reconnect', (attemptNumber) => {
+      console.log(`Reconnected to WebSocket server after ${attemptNumber} attempts`);
+      setIsConnected(true);
+      
+      // Re-subscribe to channels
+      currentSocket.emit('subscribe', 'blocks');
+      currentSocket.emit('subscribe', 'transactions');
+      currentSocket.emit('subscribe', 'general');
+    });
+    
+    // Reconnection attempt
+    currentSocket.on('reconnect_attempt', (attemptNumber) => {
+      console.log(`Attempting to reconnect to WebSocket server (attempt ${attemptNumber})`);
+    });
+    
+    // Reconnection error
+    currentSocket.on('reconnect_error', (error) => {
+      console.error('WebSocket reconnection error:', error);
+    });
+    
+    // Reconnection failed
+    currentSocket.on('reconnect_failed', () => {
+      console.error('WebSocket reconnection failed, giving up');
+      showToast('Real-time updates unavailable. Please refresh the page.', 'error', 10000);
+    });
+    
+    // Cleanup on unmount
+    return () => {
+      if (currentSocket) {
+        // Unsubscribe from all channels first
+        currentSocket.emit('unsubscribe', 'blocks');
+        currentSocket.emit('unsubscribe', 'transactions');
+        currentSocket.emit('unsubscribe', 'general');
+        
+        // Then disconnect
+        currentSocket.disconnect();
+        socketRef.current = null;
+      }
+    };
+  }, [showToast]);
 
   return (
     <div className="flex flex-col min-h-screen">

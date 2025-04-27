@@ -55,34 +55,54 @@ const Home = () => {
   const { showToast } = useContext(ToastContext);
   const notifiedBlockHeights = useRef(new Set()); // Track notified block heights
   
-  // Fetch initial data
+  // Fetch initial data with optimized loading strategy
   useEffect(() => {
     const fetchData = async () => {
       try {
-        setLoading(true);
-        
-        // Set the initial display count - increasing to 8 for both blocks and transactions
+        // Set the initial display count
         const initialDisplayCount = 8;
         displayCountRef.current = initialDisplayCount;
+        transactionCountRef.current = 10;
         
-        // Fetch latest blocks, transactions, stats, and price in parallel
-        const [blocksResponse, txResponse, statsResponse, priceData] = await Promise.all([
+        // Create placeholder blocks and transactions immediately to improve perceived loading speed
+        const placeholderBlocks = Array(initialDisplayCount).fill().map((_, index) => ({
+          hash: `placeholder-${Date.now()}-${index}`,
+          height: 0,
+          time: Math.floor(Date.now() / 1000) - index * 60,
+          tx: [],
+          size: 0,
+          isPlaceholder: true
+        }));
+        
+        const placeholderTransactions = Array(transactionCountRef.current).fill().map((_, index) => ({
+          txid: `placeholder-${Date.now()}-${index}`,
+          time: Math.floor(Date.now() / 1000) - index * 30,
+          confirmations: 0,
+          vin: [],
+          vout: [],
+          isPlaceholder: true
+        }));
+        
+        // Set placeholders while we load the real data
+        setLatestBlocks(placeholderBlocks);
+        setLatestTransactions(placeholderTransactions);
+        
+        // Split up the API calls to prioritize what's visible first
+        // First fetch blocks and transactions which are immediately visible
+        const [blocksResponse, txResponse] = await Promise.all([
           blockService.getLatestBlocks(initialDisplayCount),
-          transactionService.getLatestTransactions(transactionCountRef.current * 2), // Fetch more to have a buffer
-          statsService.getNetworkStats(),
-          priceService.getBitcoinZPrice()
+          transactionService.getLatestTransactions(transactionCountRef.current * 2)
         ]);
         
-        // Update the display count based on how many blocks we actually got
-        displayCountRef.current = blocksResponse.data.blocks.length;
+        // Update with real data as soon as it's available
+        if (blocksResponse.data.blocks && blocksResponse.data.blocks.length > 0) {
+          setLatestBlocks(blocksResponse.data.blocks.slice(0, displayCountRef.current));
+        }
         
-        // Set blocks limited to our display count
-        setLatestBlocks(blocksResponse.data.blocks.slice(0, displayCountRef.current));
-        
-        // Ensure we always have enough transactions to match block tiles
-        let transactions = txResponse.data.transactions;
+        // Process transactions
+        let transactions = txResponse.data.transactions || [];
         if (transactions.length < transactionCountRef.current) {
-          // Create placeholder transactions to fill the list
+          // Keep some placeholders if needed
           const placeholdersNeeded = transactionCountRef.current - transactions.length;
           const placeholders = Array(placeholdersNeeded).fill().map((_, index) => ({
             txid: `placeholder-${Date.now()}-${index}`,
@@ -93,16 +113,22 @@ const Home = () => {
             isPlaceholder: true
           }));
           
-          // Add placeholders to the transactions list
           transactions = [...transactions, ...placeholders];
         } else {
-          // Limit transactions to our display count
           transactions = transactions.slice(0, transactionCountRef.current);
         }
         
         setLatestTransactions(transactions);
+        
+        // Then fetch stats and price data which is less time-sensitive
+        const [statsResponse, priceData] = await Promise.all([
+          statsService.getNetworkStats(),
+          priceService.getBitcoinZPrice()
+        ]);
+        
         setStats(statsResponse.data);
         setBtczPrice(priceData.bitcoinz);
+        
       } catch (error) {
         console.error('Error fetching data:', error);
         showToast('Failed to fetch blockchain data', 'error');

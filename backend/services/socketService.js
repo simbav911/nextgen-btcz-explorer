@@ -7,9 +7,9 @@ let lastEmittedBlockHash = null;
 
 // Time intervals for different updates (in milliseconds)
 const UPDATE_INTERVALS = {
-  BLOCK: 10000,   // 10 seconds
-  TRANSACTION: 5000,  // 5 seconds
-  STATS: 30000    // 30 seconds
+  BLOCK: 3000,     // 3 seconds for more responsive updates
+  TRANSACTION: 2000,  // 2 seconds for more responsive updates
+  STATS: 30000     // 30 seconds
 };
 
 // Interval references for cleanup
@@ -105,6 +105,16 @@ const setupSocket = (socketIo) => {
     socket.on('subscribe', (channel) => {
       logger.debug(`Client ${clientAddress} subscribed to ${channel}`);
       socket.join(channel);
+      
+      // Send immediate update to new subscribers
+      if (channel === 'blocks' && lastEmittedBlockHash) {
+        getBestBlockHash()
+          .then(hash => getBlock(hash, 1))
+          .then(block => {
+            socket.emit('new_block', block);
+          })
+          .catch(err => logger.error(`Error sending initial block to new subscriber: ${err.message}`));
+      }
     });
     
     // Handle unsubscriptions
@@ -132,51 +142,107 @@ const startUpdateIntervals = () => {
   // Clear any existing intervals
   clearUpdateIntervals();
   
+  // Cache for storing previous data to reduce redundant emissions
+  const dataCache = {
+    lastTransactions: new Set()
+  };
+  
   // Update latest block
   blockInterval = setInterval(async () => {
     try {
-      // Try to get real block data
-      getBestBlockHash()
-        .then(blockHash => getBlock(blockHash, 1))
-        .then(block => {
-          // Only emit if this is a new block
-          if (block.hash !== lastEmittedBlockHash) {
-            lastEmittedBlockHash = block.hash;
-            io.to('blocks').emit('new_block', block);
-          }
-        })
-        .catch(error => {
-          // If there's an error, use mock data
-          logger.error('Error updating latest block:', error);
-          const mockBlock = generateMockBlock();
-          if (mockBlock.hash !== lastEmittedBlockHash) {
-            lastEmittedBlockHash = mockBlock.hash;
-            io.to('blocks').emit('new_block', mockBlock);
-          }
-        });
+      // Get the best block hash
+      const blockHash = await getBestBlockHash();
+      
+      // Skip if we've already emitted this block
+      if (blockHash === lastEmittedBlockHash) {
+        return;
+      }
+      
+      // Get the block data
+      const block = await getBlock(blockHash, 1);
+      
+      // Verify we got valid block data
+      if (!block || !block.hash) {
+        logger.warn('Received invalid block data from RPC');
+        return;
+      }
+      
+      // Update the cache
+      lastEmittedBlockHash = block.hash;
+      
+      // Emit to all connected clients
+      io.to('blocks').emit('new_block', block);
+      logger.debug(`Emitted new block ${block.height} to ${io.sockets.adapter.rooms.get('blocks')?.size || 0} clients`);
+      
+      // Also emit a notification in the 'general' room for UI updates
+      io.to('general').emit('notification', {
+        type: 'block',
+        message: `New block #${block.height} mined`,
+        data: {
+          height: block.height,
+          hash: block.hash,
+          time: block.time
+        }
+      });
     } catch (error) {
-      logger.error('Error in block update interval:', error.message);
+      logger.error('Error updating latest block:', error);
+      
+      // Only use mock data in development environment for debugging
+      if (process.env.NODE_ENV === 'development') {
+        const mockBlock = generateMockBlock();
+        if (mockBlock.hash !== lastEmittedBlockHash) {
+          lastEmittedBlockHash = mockBlock.hash;
+          io.to('blocks').emit('new_block', mockBlock);
+          logger.debug('Emitted mock block due to error');
+        }
+      }
     }
   }, UPDATE_INTERVALS.BLOCK);
   
   // Update latest transactions
   txInterval = setInterval(async () => {
     try {
-      // Try to get real transaction data
-      getLatestTransactions(5)
-        .then(transactions => {
-          io.to('transactions').emit('new_transactions', transactions);
-        })
-        .catch(error => {
-          // If there's an error, use mock data
-          logger.error('Error updating latest transactions:', error);
-          const mockTransactions = Array(5).fill().map(() => generateMockTransaction());
-          io.to('transactions').emit('new_transactions', mockTransactions);
+      // Get latest transactions from the node
+      const transactions = await getLatestTransactions(8);
+      
+      // Filter out transactions we've already emitted
+      const newTransactions = transactions.filter(tx => !dataCache.lastTransactions.has(tx.txid));
+      
+      // If we have new transactions, emit them
+      if (newTransactions.length > 0) {
+        // Update the cache with new txids (keep only the most recent 100)
+        newTransactions.forEach(tx => {
+          dataCache.lastTransactions.add(tx.txid);
+          // Keep cache size reasonable
+          if (dataCache.lastTransactions.size > 100) {
+            const firstItem = dataCache.lastTransactions.values().next().value;
+            dataCache.lastTransactions.delete(firstItem);
+          }
         });
+        
+        // Emit to all connected clients
+        io.to('transactions').emit('new_transactions', newTransactions);
+        logger.debug(`Emitted ${newTransactions.length} new transactions to ${io.sockets.adapter.rooms.get('transactions')?.size || 0} clients`);
+      }
     } catch (error) {
-      logger.error('Error in transaction update interval:', error.message);
+      logger.error('Error updating latest transactions:', error);
+      
+      // Only use mock data in development environment
+      if (process.env.NODE_ENV === 'development') {
+        const mockTransactions = Array(3).fill().map(() => generateMockTransaction());
+        io.to('transactions').emit('new_transactions', mockTransactions);
+        logger.debug('Emitted mock transactions due to error');
+      }
     }
   }, UPDATE_INTERVALS.TRANSACTION);
+  
+  // Add a heartbeat to notify clients of server status
+  const heartbeatInterval = setInterval(() => {
+    io.emit('heartbeat', { timestamp: Date.now() });
+  }, 15000); // Every 15 seconds
+  
+  // Store the heartbeat interval for cleanup
+  statsInterval = heartbeatInterval;
 };
 
 /**

@@ -5,35 +5,110 @@ const models = require('../models'); // Import the models module
 const logger = require('../utils/logger');
 const { Op } = require('sequelize'); // Import Op for queries
 
-// Get latest transactions (Prioritize Database)
+// Get latest transactions (Hybrid approach for faster loading)
 router.get('/', async (req, res, next) => {
   try {
     const limit = parseInt(req.query.limit) || 10;
     const offset = parseInt(req.query.offset) || 0;
-    logger.info(`Fetching latest transactions from DB (limit: ${limit}, offset: ${offset})`);
+    logger.info(`Fetching latest transactions (limit: ${limit}, offset: ${offset})`);
 
-    const Transaction = await models.getTransaction(); // Get Transaction model instance
-    if (!Transaction) {
-       throw new Error('Transaction model not initialized');
+    // Try DB first for cached results
+    try {
+      const Transaction = await models.getTransaction(); // Get Transaction model instance
+      if (Transaction) {
+        // Fetch latest transactions from the database with a short timeout
+        const { count, rows: transactions } = await Promise.race([
+          Transaction.findAndCountAll({
+            order: [['blocktime', 'DESC']],
+            limit: limit,
+            offset: offset,
+            raw: true
+          }),
+          new Promise((_, reject) => setTimeout(() => reject(new Error('DB query timeout')), 500))
+        ]);
+
+        if (transactions && transactions.length > 0) {
+          logger.info(`Fetched ${transactions.length} transactions from DB, total count: ${count}`);
+          return res.json({
+            transactions,
+            count: count,
+            offset,
+            source: 'db'
+          });
+        }
+      }
+    } catch (dbError) {
+      logger.warn(`DB transaction fetch failed or timed out: ${dbError.message}, falling back to RPC`);
     }
 
-    // Fetch latest transactions from the database, ordered by block time
-    const { count, rows: transactions } = await Transaction.findAndCountAll({
-      order: [['blocktime', 'DESC']], // Order by blocktime (assuming it's reliably populated)
-      limit: limit,
-      offset: offset,
-      raw: true // Get plain objects
-    });
+    // Fallback to direct RPC if DB fails or is empty
+    // Fetch recent blocks first
+    const bestBlockHash = await bitcoinzService.getBestBlockHash();
+    let currentBlockHash = bestBlockHash;
+    let fetchedTransactions = [];
+    let blocksProcessed = 0;
+    const MAX_BLOCKS = 10;
 
-    logger.info(`Fetched ${transactions.length} transactions from DB, total count: ${count}`);
-
+    // Process blocks in parallel batches
+    const processBlocks = async (blockHashes) => {
+      const blockPromises = blockHashes.map(hash => 
+        bitcoinzService.getBlock(hash, 1)
+          .catch(err => {
+            logger.error(`Error fetching block ${hash}: ${err.message}`);
+            return null;
+          })
+      );
+      
+      const blocks = (await Promise.all(blockPromises)).filter(b => b !== null);
+      let nextHashes = [];
+      
+      for (const block of blocks) {
+        // Get a subset of transactions from each block to avoid overwhelming the node
+        const txsToProcess = block.tx.slice(0, Math.min(10, block.tx.length));
+        const txPromises = txsToProcess.map(txid => 
+          bitcoinzService.getRawTransaction(txid, 1)
+            .catch(err => {
+              logger.error(`Error fetching transaction ${txid}: ${err.message}`);
+              return null;
+            })
+        );
+        
+        const blockTxs = (await Promise.all(txPromises)).filter(tx => tx !== null);
+        fetchedTransactions = [...fetchedTransactions, ...blockTxs];
+        
+        if (block.previousblockhash) {
+          nextHashes.push(block.previousblockhash);
+        }
+      }
+      
+      return nextHashes;
+    };
+    
+    // Start with the best block
+    let blockHashes = [currentBlockHash];
+    
+    // Process blocks until we have enough transactions or reach the limit
+    while (fetchedTransactions.length < limit + offset && blocksProcessed < MAX_BLOCKS && blockHashes.length > 0) {
+      blockHashes = await processBlocks(blockHashes);
+      blocksProcessed += blockHashes.length;
+    }
+    
+    // Sort transactions by time (newest first)
+    fetchedTransactions.sort((a, b) => (b.time || 0) - (a.time || 0));
+    
+    // Apply pagination
+    const paginatedTransactions = fetchedTransactions.slice(offset, offset + limit);
+    
+    logger.info(`Fetched ${paginatedTransactions.length} transactions via RPC from ${blocksProcessed} blocks`);
+    
     res.json({
-      transactions,
-      count: count, // Total count in the database
-      offset
+      transactions: paginatedTransactions,
+      count: fetchedTransactions.length,
+      offset,
+      source: 'rpc'
     });
   } catch (error) {
-    logger.error('Error fetching latest transactions from DB:', error);
+    logger.error('Error fetching latest transactions:', error);
     next(error);
   }
 });

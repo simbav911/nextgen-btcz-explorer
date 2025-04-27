@@ -5,7 +5,7 @@ const models = require('../models'); // Import the models module
 const logger = require('../utils/logger');
 const { Op } = require('sequelize'); // Import Op for queries if needed
 
-// Get latest blocks (Fetch directly from Node for real-time view)
+// Get latest blocks (Fetch in parallel batches for faster loading)
 router.get('/', async (req, res, next) => {
   try {
     const limit = parseInt(req.query.limit) || 10;
@@ -17,24 +17,32 @@ router.get('/', async (req, res, next) => {
 
     logger.info(`Fetching latest blocks directly from node (height ${bestHeight}, offset ${offset}, limit ${limit})`);
 
-    // Get blocks directly from node, starting from latest and going back (SEQUENTIALLY)
-    const fetchedBlocks = [];
+    // Prepare array of heights to fetch
+    const heightsToFetch = [];
     for (let i = 0; i < limit && (bestHeight - i - offset) >= 0; i++) {
-      const height = bestHeight - i - offset;
-      try {
-        // Fetch blocks one by one to avoid overloading the node
-        const block = await bitcoinzService.getBlockByHeight(height, 1); // Verbosity 1 for list view
-        if (block) {
-          fetchedBlocks.push(block);
-        }
-      } catch (err) {
-        logger.error(`Error fetching block at height ${height} via RPC: ${err.message}`);
-        // Optionally break the loop or continue trying next blocks depending on desired behavior
-        // For now, we log the error and continue to try fetching the rest
-      }
+      heightsToFetch.push(bestHeight - i - offset);
     }
 
-    logger.info(`Fetched ${fetchedBlocks.length} blocks via RPC (sequentially)`);
+    // Fetch blocks in parallel batches to improve performance
+    const batchSize = 4; // Process 4 blocks at a time to avoid overwhelming the node
+    const fetchedBlocks = [];
+    
+    // Process blocks in batches
+    for (let i = 0; i < heightsToFetch.length; i += batchSize) {
+      const batch = heightsToFetch.slice(i, i + batchSize);
+      const batchPromises = batch.map(height => 
+        bitcoinzService.getBlockByHeight(height, 1)
+          .catch(err => {
+            logger.error(`Error fetching block at height ${height} via RPC: ${err.message}`);
+            return null;
+          })
+      );
+      
+      const batchResults = await Promise.all(batchPromises);
+      fetchedBlocks.push(...batchResults.filter(block => block !== null));
+    }
+
+    logger.info(`Fetched ${fetchedBlocks.length} blocks via RPC (parallel batches)`);
 
     res.json({
       blocks: fetchedBlocks,

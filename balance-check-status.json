@@ -1,9 +1,9 @@
 {
-  "timestamp": "2025-04-27T22:19:34.038Z",
-  "totalAddresses": "1566938",
-  "fixedAddresses": 3,
-  "positiveBalances": "126489",
-  "totalBalance": 14716488666.28709,
+  "timestamp": "2025-04-27T22:37:07.093Z",
+  "totalAddresses": "1566941",
+  "fixedAddresses": 2,
+  "positiveBalances": "126488",
+  "totalBalance": 14717039416.290993,
   "topHolder": "t1ZxcShs9kasNany95XePW4vaEw56zQnUmZ",
   "success": true
 }

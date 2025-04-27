@@ -6,7 +6,7 @@ import { FaExchangeAlt, FaCheckCircle, FaClock } from 'react-icons/fa';
 import Spinner from '../components/Spinner';
 import DetailCard from '../components/DetailCard';
 import HashLink from '../components/HashLink';
-import TransactionExplanation from '../components/TransactionExplanation';
+import TransactionInfoCard from '../components/TransactionInfoCard';
 
 // Services
 import { transactionService } from '../services/api';
@@ -403,165 +403,10 @@ const Transaction = () => {
         </div>
       </div>
       
-      {/* Add Transaction Explanation Section */}
-      <div className="mb-6">
-        <TransactionExplanation txType={classifyTxType(transaction)} transaction={transaction} />
-      </div>
-      
-      {/* Shielded Transaction Components - Modernized */}
+      {/* Add Transaction Info Card */}
       {hasShieldedComponents && (
         <div className="mb-6">
-          <div className="bg-white rounded-lg shadow-md overflow-hidden">
-            <div className="px-6 py-4 bg-gradient-to-r from-indigo-600 to-purple-600">
-              <h2 className="text-xl font-semibold text-white" style={{ textShadow: '0 1px 2px rgba(0,0,0,0.3)' }}>
-                Shielded Components
-              </h2>
-            </div>
-            
-            <div className="p-6">
-              {/* Add simplified explanation of the transaction */}
-              <div className="bg-blue-50 p-4 mb-6 rounded-md border-l-4 border-blue-400">
-                <h3 className="font-bold text-blue-700 mb-2">What's happening in this transaction?</h3>
-                <p className="text-sm text-gray-700">
-                  {transaction.vShieldedSpend && transaction.vShieldedSpend.length > 0 && 
-                   transaction.vout && transaction.vout.length > 0 && (
-                    <>
-                      This is a <strong>deshielding transaction</strong> where funds are being moved from the private (shielded) pool to the public (transparent) pool.
-                      <br />
-                      <span className="text-xs mt-1 block">Funds are being taken from a shielded address and sent to a transparent address.</span>
-                    </>
-                  )}
-                  {transaction.vin && transaction.vin.length > 0 && 
-                   transaction.vShieldedOutput && transaction.vShieldedOutput.length > 0 && (
-                    <>
-                      This is a <strong>shielding transaction</strong> where funds are being moved from the public (transparent) pool to the private (shielded) pool.
-                      <br />
-                      <span className="text-xs mt-1 block">Funds are being taken from a transparent address and sent to a shielded address.</span>
-                    </>
-                  )}
-                  {transaction.vShieldedSpend && transaction.vShieldedSpend.length > 0 && 
-                   transaction.vShieldedOutput && transaction.vShieldedOutput.length > 0 && (
-                    <>
-                      This is a <strong>shielded-to-shielded transaction</strong> where funds are being transferred entirely within the private (shielded) pool.
-                      <br />
-                      <span className="text-xs mt-1 block">Both the sender and recipient addresses are private.</span>
-                    </>
-                  )}
-                </p>
-              </div>
-              
-              {/* Visual flow indicator */}
-              <div className="flex items-center justify-center py-4 mb-6 bg-gray-50 rounded-lg">
-                <div className="w-1/3 text-center">
-                  {transaction.vin && transaction.vin.length > 0 ? (
-                    <div className="bg-gray-100 rounded-md p-3 mx-2 shadow-sm">
-                      <p className="font-medium">Transparent Input</p>
-                      <p className="text-sm text-gray-500">Public</p>
-                    </div>
-                  ) : transaction.vShieldedSpend && transaction.vShieldedSpend.length > 0 ? (
-                    <div className="bg-blue-100 rounded-md p-3 mx-2 shadow-sm">
-                      <p className="font-medium">Shielded Input</p>
-                      <p className="text-sm text-gray-500">Private</p>
-                    </div>
-                  ) : (
-                    <div className="bg-gray-50 rounded-md p-3 mx-2 border border-dashed border-gray-300">
-                      <p className="font-medium text-gray-400">No Inputs</p>
-                    </div>
-                  )}
-                </div>
-                
-                <div className="w-1/3 flex justify-center">
-                  <div className="flex items-center">
-                    <div className="h-0.5 w-12 bg-gray-300"></div>
-                    <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M14 5l7 7m0 0l-7 7m7-7H3" />
-                    </svg>
-                    <div className="h-0.5 w-12 bg-gray-300"></div>
-                  </div>
-                </div>
-                
-                <div className="w-1/3 text-center">
-                  {transaction.vout && transaction.vout.length > 0 ? (
-                    <div className="bg-gray-100 rounded-md p-3 mx-2 shadow-sm">
-                      <p className="font-medium">Transparent Output</p>
-                      <p className="text-sm text-gray-500">Public</p>
-                    </div>
-                  ) : transaction.vShieldedOutput && transaction.vShieldedOutput.length > 0 ? (
-                    <div className="bg-blue-100 rounded-md p-3 mx-2 shadow-sm">
-                      <p className="font-medium">Shielded Output</p>
-                      <p className="text-sm text-gray-500">Private</p>
-                    </div>
-                  ) : (
-                    <div className="bg-gray-50 rounded-md p-3 mx-2 border border-dashed border-gray-300">
-                      <p className="font-medium text-gray-400">No Outputs</p>
-                    </div>
-                  )}
-                </div>
-              </div>
-              
-              {transaction.valueBalance !== undefined && (
-                <div className="mb-6 p-4 bg-gray-50 rounded-lg">
-                  <div className="flex justify-between items-center">
-                    <div>
-                      <p className="font-medium">Value Balance:</p>
-                      <p className="text-xs text-gray-500">Amount moving between shielded and transparent pools</p>
-                    </div>
-                    <div className="text-right">
-                      <p className="text-lg font-semibold text-bitcoinz-600">{formatBTCZ(transaction.valueBalance)}</p>
-                    </div>
-                  </div>
-                </div>
-              )}
-              
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                <div className="bg-gray-50 p-4 rounded-lg">
-                  <p className="font-medium">Shielded Spends ({transaction.vShieldedSpend ? transaction.vShieldedSpend.length : 0})</p>
-                  <p className="text-xs text-gray-500 mb-2">Funds taken from the shielded pool</p>
-                  {transaction.vShieldedSpend && transaction.vShieldedSpend.length > 0 ? (
-                    <div className="mt-2 p-3 bg-white rounded-md shadow-sm">
-                      {transaction.vShieldedSpend.map((spend, index) => (
-                        <div key={index} className="text-sm text-gray-500 mb-2">
-                          <p className="font-medium text-gray-700">Spend {index + 1}</p>
-                          {spend.cv && <p className="truncate"><span className="font-medium">CV:</span> {spend.cv}</p>}
-                          {spend.anchor && <p className="truncate"><span className="font-medium">Anchor:</span> {spend.anchor}</p>}
-                        </div>
-                      ))}
-                    </div>
-                  ) : (
-                    <p className="text-sm text-gray-500 mt-1">No shielded spends</p>
-                  )}
-                </div>
-                
-                <div className="bg-gray-50 p-4 rounded-lg">
-                  <p className="font-medium">Shielded Outputs ({transaction.vShieldedOutput ? transaction.vShieldedOutput.length : 0})</p>
-                  <p className="text-xs text-gray-500 mb-2">Funds sent to the shielded pool</p>
-                  {transaction.vShieldedOutput && transaction.vShieldedOutput.length > 0 ? (
-                    <div className="mt-2 p-3 bg-white rounded-md shadow-sm">
-                      {transaction.vShieldedOutput.map((output, index) => (
-                        <div key={index} className="text-sm text-gray-500 mb-2">
-                          <p className="font-medium text-gray-700">Output {index + 1}</p>
-                          {output.cv && <p className="truncate"><span className="font-medium">CV:</span> {output.cv}</p>}
-                          {output.cmu && <p className="truncate"><span className="font-medium">CMU:</span> {output.cmu}</p>}
-                        </div>
-                      ))}
-                    </div>
-                  ) : (
-                    <p className="text-sm text-gray-500 mt-1">No shielded outputs</p>
-                  )}
-                </div>
-              </div>
-              
-              {transaction.bindingSig && (
-                <div className="mt-6 p-4 bg-gray-50 rounded-lg">
-                  <p className="font-medium">Binding Signature:</p>
-                  <p className="text-xs text-gray-500 mb-1">Cryptographic proof that the transaction balances correctly</p>
-                  <p className="text-sm font-mono text-gray-500 mt-1 break-all bg-white p-3 rounded-md">
-                    {transaction.bindingSig}
-                  </p>
-                </div>
-              )}
-            </div>
-          </div>
+          <TransactionInfoCard txType={classifyTxType(transaction)} transaction={transaction} />
         </div>
       )}
       

@@ -6,6 +6,7 @@ import { FaExchangeAlt, FaCheckCircle, FaClock } from 'react-icons/fa';
 import Spinner from '../components/Spinner';
 import DetailCard from '../components/DetailCard';
 import HashLink from '../components/HashLink';
+import TransactionExplanation from '../components/TransactionExplanation';
 
 // Services
 import { transactionService } from '../services/api';
@@ -129,6 +130,41 @@ const Transaction = () => {
     );
   }
   
+  // Classify transaction type
+  const classifyTxType = (tx) => {
+    const isCoinbase = tx.vin && tx.vin.length > 0 && !!tx.vin[0].coinbase;
+    if (isCoinbase) return 'coinbase';
+
+    // Shielded fields
+    const hasValueBalance = typeof tx.valueBalance === 'number' && tx.valueBalance !== 0;
+    const hasVJoinSplit = tx.vjoinsplit && tx.vjoinsplit.length > 0;
+    const hasShieldedSpends = tx.vShieldedSpend && tx.vShieldedSpend.length > 0;
+    const hasShieldedOutputs = tx.vShieldedOutput && tx.vShieldedOutput.length > 0;
+    
+    // Transparent fields
+    const hasTransparentInputs = tx.vin && tx.vin.length > 0 && !tx.vin[0].coinbase;
+    const hasTransparentOutputs = tx.vout && tx.vout.length > 0;
+    
+    // t->z: Shielding (transparent input, shielded output, valueBalance<0)
+    if (hasTransparentInputs && (hasShieldedOutputs || hasVJoinSplit || (hasValueBalance && tx.valueBalance < 0))) {
+      return 't2z';
+    }
+    // z->t: Deshielding (shielded input, transparent output, valueBalance>0)
+    if ((hasShieldedSpends || hasVJoinSplit || (hasValueBalance && tx.valueBalance > 0)) && (hasTransparentOutputs || tx.vout?.length > 0)) {
+      return 'z2t';
+    }
+    // z->z: Fully shielded (shielded spends and outputs, no transparent)
+    if ((hasShieldedSpends || hasVJoinSplit) && (hasShieldedOutputs || hasVJoinSplit) && !hasTransparentInputs && !hasTransparentOutputs) {
+      return 'z2z';
+    }
+    // t->t: Fully transparent
+    if (hasTransparentInputs && hasTransparentOutputs && !hasShieldedSpends && !hasShieldedOutputs && !hasVJoinSplit && !hasValueBalance) {
+      return 't2t';
+    }
+    // Fallback
+    return 'other';
+  };
+
   // Calculate fee if available
   const calculateFee = () => {
     // If fee is directly provided in the transaction data
@@ -365,6 +401,11 @@ const Transaction = () => {
             </div>
           </div>
         </div>
+      </div>
+      
+      {/* Add Transaction Explanation Section */}
+      <div className="mb-6">
+        <TransactionExplanation txType={classifyTxType(transaction)} transaction={transaction} />
       </div>
       
       {/* Shielded Transaction Components - Modernized */}

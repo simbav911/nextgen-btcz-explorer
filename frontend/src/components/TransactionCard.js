@@ -277,6 +277,13 @@ const TransactionCard = ({ transaction }) => {
           )}
         </div>
       </div>
+      
+      {/* Add Transaction Explanation Section */}
+      <div className="mt-3 px-1">
+        <div className="bg-blue-50 p-2 rounded text-xs border border-blue-100 text-blue-900">
+          <span className="font-medium">{style.label}:</span> {style.description}
+        </div>
+      </div>
     </Link>
   );
 };

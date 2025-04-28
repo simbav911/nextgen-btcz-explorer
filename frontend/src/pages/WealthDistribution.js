@@ -55,7 +55,7 @@ const WealthDistribution = () => {
   const [searchTerm, setSearchTerm] = useState('');
   const [dataVersion, setDataVersion] = useState(0); // Add a version to prevent data changing on refresh
   const [syncStatus, setSyncStatus] = useState(null); // State for sync status
-  const [pageSize, setPageSize] = useState(100); // Default show all 100 holders
+  const [pageSize, setPageSize] = useState(25); // Default show 25 holders
   const [currentPage, setCurrentPage] = useState(1);
   const [activeIndex, setActiveIndex] = useState(-1); // Track active/hovered pie segment
   const { showToast } = useContext(ToastContext);

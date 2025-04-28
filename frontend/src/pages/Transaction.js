@@ -404,11 +404,9 @@ const Transaction = () => {
       </div>
       
       {/* Add Transaction Info Card */}
-      {hasShieldedComponents && (
-        <div className="mb-6">
-          <TransactionInfoCard txType={classifyTxType(transaction)} transaction={transaction} />
-        </div>
-      )}
+      <div className="mb-6">
+        <TransactionInfoCard txType={classifyTxType(transaction)} transaction={transaction} />
+      </div>
       
       {/* Inputs - Modernized */}
       <div className="mb-6">

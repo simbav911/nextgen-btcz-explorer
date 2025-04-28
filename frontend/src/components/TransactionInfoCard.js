@@ -1,5 +1,5 @@
 import React from 'react';
-import { FaLock, FaLockOpen, FaExchangeAlt, FaArrowRight, FaInfoCircle, FaShieldAlt } from 'react-icons/fa';
+import { FaLock, FaLockOpen, FaExchangeAlt, FaArrowRight, FaInfoCircle, FaShieldAlt, FaCoins } from 'react-icons/fa';
 
 /**
  * Provides a detailed explanation of transaction flow with visual representation
@@ -7,6 +7,19 @@ import { FaLock, FaLockOpen, FaExchangeAlt, FaArrowRight, FaInfoCircle, FaShield
 const TransactionInfoCard = ({ txType, transaction }) => {
   // Define transaction types and their explanations
   const txInfo = {
+    coinbase: {
+      title: "Mining Reward Transaction",
+      description: "This is a coinbase transaction that creates new coins as a reward for mining a block.",
+      subDescription: "These newly generated coins are sent to the miner who successfully mined this block.",
+      fromType: "Coinbase (New Coins)",
+      fromPrivacy: "Generated",
+      toType: "Miner Address",
+      toPrivacy: "Public",
+      icon: <FaCoins className="text-white" size={20} />,
+      headerBg: "bg-yellow-600",
+      valuePrefix: "+",
+      valueColor: "text-yellow-600"
+    },
     t2z: {
       title: "Shielding Transaction",
       description: "This is a shielding transaction where funds are being moved from the public (transparent) pool to the private (shielded) pool.",
@@ -55,9 +68,9 @@ const TransactionInfoCard = ({ txType, transaction }) => {
       toType: "Transparent Output",
       toPrivacy: "Public",
       icon: <FaExchangeAlt className="text-white" size={20} />,
-      headerBg: "bg-blue-500",
+      headerBg: "bg-orange-500",
       valuePrefix: "",
-      valueColor: "text-blue-600"
+      valueColor: "text-orange-600"
     }
   };
 
@@ -79,17 +92,19 @@ const TransactionInfoCard = ({ txType, transaction }) => {
   // Calculate value to display
   const valueToDisplay = transaction?.valueBalance 
     ? Math.abs(transaction.valueBalance).toFixed(8) 
-    : transaction?.valueOut || 0;
+    : txType === 'coinbase' && transaction?.vout && transaction.vout[0]
+      ? transaction.vout[0].value
+      : transaction?.valueOut || 0;
 
   return (
     <div className="mb-6">
       {/* Transaction Type Header - Purple with icon */}
-      <div className={`flex items-center p-3 ${txType === 't2z' ? 'bg-purple-600' : info.headerBg} rounded-t-lg`}>
+      <div className={`flex items-center p-3 ${info.headerBg} rounded-t-lg`}>
         <div className="mr-2">
-          {txType === 't2z' ? <FaLock className="text-white" size={20} /> : info.icon}
+          {info.icon}
         </div>
         <h3 className="font-bold text-white">
-          {txType === 't2z' ? 'Shielding Transaction' : info.title}
+          {info.title}
         </h3>
       </div>
 
@@ -99,25 +114,21 @@ const TransactionInfoCard = ({ txType, transaction }) => {
         <div className="mb-6">
           <h4 className="font-medium text-gray-800 mb-2">What's happening in this transaction?</h4>
           <p className="text-sm text-gray-700">
-            {txType === 't2z' 
-              ? "This is a shielding transaction where funds are being moved from the public (transparent) pool to the private (shielded) pool." 
-              : info.description}
+            {info.description}
           </p>
           <p className="text-sm text-gray-700 mt-1">
-            {txType === 't2z'
-              ? "Funds are being taken from a transparent address and sent to a shielded address."
-              : info.subDescription}
+            {info.subDescription}
           </p>
         </div>
 
         {/* Transaction Flow Visualization */}
         <div className="flex justify-between items-center mb-6">
-          <div className="w-5/12 bg-gray-100 rounded-lg p-4 text-center">
+          <div className={`w-5/12 ${txType === 'coinbase' ? 'bg-yellow-100' : 'bg-gray-100'} rounded-lg p-4 text-center`}>
             <h5 className="font-medium text-sm mb-1">
-              {txType === 't2z' ? 'Transparent Input' : info.fromType}
+              {info.fromType}
             </h5>
             <p className="text-xs text-gray-600">
-              {txType === 't2z' ? 'Public' : info.fromPrivacy}
+              {info.fromPrivacy}
             </p>
           </div>
 
@@ -125,12 +136,12 @@ const TransactionInfoCard = ({ txType, transaction }) => {
             <FaArrowRight className="text-gray-400" size={20} />
           </div>
 
-          <div className="w-5/12 bg-blue-100 rounded-lg p-4 text-center">
+          <div className={`w-5/12 ${txType === 'coinbase' ? 'bg-gray-100' : (txType === 't2z' ? 'bg-blue-100' : (txType === 't2t' ? 'bg-orange-100' : 'bg-gray-100'))} rounded-lg p-4 text-center`}>
             <h5 className="font-medium text-sm mb-1">
-              {txType === 't2z' ? 'Shielded Output' : info.toType}
+              {info.toType}
             </h5>
             <p className="text-xs text-gray-600">
-              {txType === 't2z' ? 'Private' : info.toPrivacy}
+              {info.toPrivacy}
             </p>
           </div>
         </div>
@@ -138,11 +149,17 @@ const TransactionInfoCard = ({ txType, transaction }) => {
         {/* Value Balance */}
         {valueToDisplay > 0 && (
           <div className="mt-4">
-            <h4 className="font-medium text-sm mb-2">Value Balance:</h4>
-            <p className={`text-xl font-bold ${txType === 't2z' ? 'text-purple-600' : info.valueColor}`}>
-              {txType === 't2z' ? '-' : info.valuePrefix}{valueToDisplay} BTCZ
+            <h4 className="font-medium text-sm mb-2">
+              {txType === 'coinbase' ? 'Block Reward:' : 'Value Balance:'}
+            </h4>
+            <p className={`text-xl font-bold ${info.valueColor}`}>
+              {info.valuePrefix}{valueToDisplay} BTCZ
             </p>
-            <p className="text-xs text-gray-500 mt-1">Amount moving between shielded and transparent pools</p>
+            <p className="text-xs text-gray-500 mt-1">
+              {txType === 'coinbase' 
+                ? 'New coins generated as a reward for mining this block' 
+                : 'Amount moving between shielded and transparent pools'}
+            </p>
           </div>
         )}
       </div>

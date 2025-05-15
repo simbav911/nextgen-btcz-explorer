@@ -27,4 +27,4 @@ Thumbs.db
 
 # Build output (optional, add if needed)
 # build/
-# dist/
+# dist/backups/*.gz

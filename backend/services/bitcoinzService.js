@@ -98,29 +98,42 @@ const initializeNodeConnection = async () => {
   const rpcOptions = {
     host: process.env.BITCOINZ_RPC_HOST || '127.0.0.1',
     port: process.env.BITCOINZ_RPC_PORT || 1978,
-    user: process.env.BITCOINZ_RPC_USER || '2a629aa93a1847',  // Use the values from .env as fallback
+    user: process.env.BITCOINZ_RPC_USER || '2a629aa93a1847',
     pass: process.env.BITCOINZ_RPC_PASS || 'ca3bd775e7722cf2a9babab65d4ad',
     protocol: 'http'
   };
 
-  logger.info(`Initializing RPC connection to ${rpcOptions.protocol}://${rpcOptions.host}:${rpcOptions.port}`);
+  const maxRetries = 1000; // Keep trying for a longer time
+  let retryCount = 0;
+  let lastLogTime = 0;
+  const logInterval = 10000; // Log every 10 seconds
   
-  rpcClient = {
-    url: `${rpcOptions.protocol}://${rpcOptions.host}:${rpcOptions.port}`,
-    auth: {
-      username: rpcOptions.user,
-      password: rpcOptions.pass
-    }
-  };
+  while (retryCount < maxRetries) {
+    try {
+      const now = Date.now();
+      if (now - lastLogTime >= logInterval) {
+        logger.info(`Waiting for BitcoinZ node at ${rpcOptions.protocol}://${rpcOptions.host}:${rpcOptions.port}...`);
+        lastLogTime = now;
+      }
+      
+      rpcClient = {
+        url: `${rpcOptions.protocol}://${rpcOptions.host}:${rpcOptions.port}`,
+        auth: {
+          username: rpcOptions.user,
+          password: rpcOptions.pass
+        }
+      };
 
-  try {
-    const info = await getBlockchainInfo();
-    logger.info(`Connected to BitcoinZ node. Version: ${info.version}, Blocks: ${info.blocks}`);
-    return info;
-  } catch (error) {
-    logger.error('Failed to connect to BitcoinZ node:', error.message);
-    throw error;
+      const info = await getBlockchainInfo();
+      logger.info(`Successfully connected to BitcoinZ node. Version: ${info.version}, Blocks: ${info.blocks}`);
+      return info;
+    } catch (error) {
+      retryCount++;
+      await new Promise(resolve => setTimeout(resolve, 10000)); // Wait 10 seconds between retries
+    }
   }
+  logger.error('Failed to connect to BitcoinZ node after maximum retries');
+  throw new Error('Failed to connect to BitcoinZ node');
 };
 
 /**
@@ -131,44 +144,58 @@ const executeRpcCommand = async (method, params = [], timeout = 30000) => {
     throw new Error('BitcoinZ node not initialized');
   }
 
-  try {
-    logger.debug(`Executing RPC command: ${method} with params: ${JSON.stringify(params)}`);
-    
-    const response = await axios.post(rpcClient.url, {
-      jsonrpc: '1.0',
-      id: 'bitcoinz-explorer',
-      method: method,
-      params: params
-    }, {
-      auth: rpcClient.auth,
-      headers: {
-        'Content-Type': 'application/json'
-      },
-      timeout: timeout
-    });
+  const maxRetries = 3;
+  let retryCount = 0;
+  let lastLogTime = 0;
+  const logInterval = 5000; // Log every 5 seconds
 
-    if (response.data.error) {
-      logger.error(`RPC Error from ${method}: ${JSON.stringify(response.data.error)}`);
-      throw new Error(`RPC Error: ${response.data.error.message || JSON.stringify(response.data.error)}`);
-    }
+  while (retryCount <= maxRetries) {
+    try {
+      const now = Date.now();
+      if (retryCount > 0 && now - lastLogTime >= logInterval) {
+        logger.info(`Waiting for RPC command '${method}' response...`);
+        lastLogTime = now;
+      }
 
-    // Debug log the response for certain commands to help with troubleshooting
-    if (['getaddressbalance', 'getaddresstxids', 'getaddressutxos'].includes(method)) {
-      logger.debug(`RPC ${method} response: ${JSON.stringify(response.data.result)}`);
-    }
+      const response = await axios.post(rpcClient.url, {
+        jsonrpc: '1.0',
+        id: 'bitcoinz-explorer',
+        method: method,
+        params: params
+      }, {
+        auth: rpcClient.auth,
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        timeout: timeout
+      });
 
-    return response.data.result;
-  } catch (error) {
-    if (error.code === 'ECONNABORTED') {
-      logger.error(`RPC command '${method}' timed out after ${timeout}ms`);
-      throw new Error(`RPC command timed out: ${method}`);
+      if (response.data.error) {
+        logger.error(`RPC Error from ${method}: ${JSON.stringify(response.data.error)}`);
+        throw new Error(`RPC Error: ${response.data.error.message || JSON.stringify(response.data.error)}`);
+      }
+
+      // Debug log the response for certain commands to help with troubleshooting
+      if (['getaddressbalance', 'getaddresstxids', 'getaddressutxos'].includes(method)) {
+        logger.debug(`RPC ${method} response: ${JSON.stringify(response.data.result)}`);
+      }
+
+      return response.data.result;
+    } catch (error) {
+      if (error.code === 'ECONNREFUSED' || error.code === 'ECONNABORTED' || error.code === 'ECONNRESET') {
+        if (retryCount < maxRetries) {
+          logger.info(`Connection failed for '${method}', will retry...`);
+          retryCount++;
+          continue;
+        }
+      }
+      
+      logger.error(`RPC command '${method}' failed after ${retryCount + 1} attempts:`, error.message);
+      if (error.response) {
+        logger.error(`Response status: ${error.response.status}, data: ${JSON.stringify(error.response.data || {})}`);
+      }
+      throw error;
     }
-    
-    logger.error(`RPC command '${method}' failed:`, error.message);
-    if (error.response) {
-      logger.error(`Response status: ${error.response.status}, data: ${JSON.stringify(error.response.data || {})}`);
-    }
-    throw error;
   }
 };
 

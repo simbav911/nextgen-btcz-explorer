@@ -213,7 +213,7 @@ const Charts = () => {
           // For Pool Stat, try the mined blocks endpoint as a fallback
           if (activeChart === chartTypes.POOL_STAT) {
             const fallbackResponse = await chartService.getMinedBlocks({ 
-              date: displayDate, 
+              date: date,
               days: 1
             });
             
@@ -246,7 +246,7 @@ const Charts = () => {
               const poolStatData = {
                 ...fallbackResponse.data,
                 chartType: 'pool-stat',
-                date: displayDate,
+                date: date,
                 data: poolStats
               };
               

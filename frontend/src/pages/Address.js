@@ -4,14 +4,15 @@ import { FaWallet, FaArrowUp, FaArrowDown, FaCopy, FaExchangeAlt, FaHistory, FaC
 import { Line } from 'react-chartjs-2';
 import { Chart, CategoryScale, LinearScale, PointElement, LineElement, Title, Tooltip, Legend, Filler } from 'chart.js';
 import moment from 'moment';
-
-// Register Chart.js components
-Chart.register(CategoryScale, LinearScale, PointElement, LineElement, Title, Tooltip, Legend, Filler);
-
-// Components
+import { addressService } from '../services/api';
+import apiInstance from '../services/api';
+import { formatBTCZ, formatNumber } from '../utils/formatting';
 import Spinner from '../components/Spinner';
 import TransactionCard from '../components/TransactionCard';
 import Pagination from '../components/Pagination';
+
+// Register Chart.js components
+Chart.register(CategoryScale, LinearScale, PointElement, LineElement, Title, Tooltip, Legend, Filler);
 
 // Constants for time ranges
 const TIME_RANGES = {
@@ -24,13 +25,6 @@ const TIME_RANGES = {
 // Transaction threshold for displaying the balance history chart
 const TX_THRESHOLD = 10000;
 
-
-// Services
-import { addressService } from '../services/api';
-import apiInstance from '../services/api';
-
-// Utils
-import { formatBTCZ, formatNumber } from '../utils/formatting';
 
 const Address = () => {
   const { address } = useParams();

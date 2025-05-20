@@ -199,11 +199,18 @@ const TransactionCard = ({ transaction }) => {
             <span className="font-mono text-xs ml-1 text-gray-700">{txid.substring(0, 8)}...</span>
           </div>
           {blockhash && (
-            <div className="text-xs text-gray-500">
-              Block: <Link to={`/blocks/${blockhash}`} className="text-bitcoinz-600 hover:underline" onClick={(e) => e.stopPropagation()}>
-                {transaction.height || blockhash.substring(0, 6)}...
-              </Link>
-            </div>
+          <div className="text-xs text-gray-500">
+            Block: <button
+              type="button"
+              className="text-bitcoinz-600 hover:underline bg-transparent border-none p-0 font-inherit"
+              onClick={(e) => {
+                e.stopPropagation(); // Prevent outer link navigation
+                window.location.href = `/blocks/${blockhash}`;
+              }}
+            >
+              {transaction.height || blockhash.substring(0, 6)}...
+            </button>
+          </div>
           )}
           <div className="flex items-center justify-end mt-1">
             {/* Show different status based on transaction age and confirmations */}

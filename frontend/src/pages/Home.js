@@ -3,10 +3,7 @@ import { Link } from 'react-router-dom';
 import {
   FaCube,
   FaExchangeAlt,
-  FaNetworkWired,
-  FaSearch,
   FaDollarSign,
-  FaHashtag,
   FaMountain,
   FaLayerGroup,
   FaBalanceScale,
@@ -20,7 +17,6 @@ import SearchBox from '../components/SearchBox';
 import BlockCard from '../components/BlockCard';
 import TransactionCard from '../components/TransactionCard';
 import StatCard from '../components/StatCard';
-import Spinner from '../components/Spinner';
 
 // Contexts
 import { SocketContext } from '../contexts/SocketContext';
@@ -226,9 +222,6 @@ const Home = () => {
           hasTransitioned: true,
           noBlur: true // Special flag to completely bypass any blur effect
         };
-
-        // Combine new block with previous blocks
-        const combined = [newBlock, ...prevBlocks];
 
         // Update existing blocks to remove blur as well - they should now load instantly
         const updatedPrevBlocks = prevBlocks.map(b => ({
@@ -467,33 +460,6 @@ const Home = () => {
     };
   }, [socket, showToast, latestBlocks]);
 
-  // Format price with change indicator
-  const formatPrice = (price) => {
-    if (!price) return 'Loading...';
-
-    // Format the price to 6 decimal places
-    return `$${price.usd.toFixed(6)}`;
-  };
-
-  // Create price change object for StatCard
-  const getPriceChange = () => {
-    if (!btczPrice || btczPrice.usd_24h_change === undefined) return null;
-
-    return {
-      positive: btczPrice.usd_24h_change >= 0,
-      value: `${Math.abs(btczPrice.usd_24h_change).toFixed(2)}%`,
-      period: '24h'
-    };
-  };
-
-  // Format difficulty to be more readable
-  const formatReadableDifficulty = (difficulty) => {
-    if (!difficulty) return 'Loading...';
-
-    // Format with commas for better readability
-    return difficulty.toLocaleString(undefined, { maximumFractionDigits: 2 });
-  };
-
   // Transaction type classifier
   const classifyTxType = (tx) => {
     const isCoinbase = tx.vin && tx.vin.length > 0 && !!tx.vin[0].coinbase;
@@ -510,7 +476,7 @@ const Home = () => {
     const hasTransparentOutputs = tx.vout && tx.vout.some(v => v.scriptPubKey && v.scriptPubKey.addresses);
 
     // t->z: Shielding
-    if ((hasTransparentInputs || tx.vin?.length > 0) && (hasValueBalance && tx.valueBalance < 0 || hasShieldedOutputs || hasVJoinSplit) && !hasShieldedSpends) {
+    if ((hasTransparentInputs || tx.vin?.length > 0) && ((hasValueBalance && tx.valueBalance < 0) || hasShieldedOutputs || hasVJoinSplit) && !hasShieldedSpends) {
       return 't2z';
     }
     // z->t: Deshielding
@@ -535,13 +501,6 @@ const Home = () => {
       <BlockCard key={block.hash} block={block} />
     ));
   }, [latestBlocks]);
-
-  // Memoize the rendered list of transactions
-  const transactionCards = useMemo(() => {
-    return latestTransactions.map(tx => (
-      <TransactionCard key={tx.txid} transaction={tx} />
-    ));
-  }, [latestTransactions]);
 
   useEffect(() => {
     // Create a style element
@@ -832,15 +791,19 @@ const Home = () => {
                             {isCoinbase ? 'Mining Reward' : `${tx.vout ? formatBTCZ(tx.vout.reduce((sum, output) => sum + (output.value || 0), 0)) : '0.00 BTCZ'}`}
                           </span>
                         </div>
-                        <div className="flex items-center">
+                        <div className="flex items-center" onClick={(e) => e.stopPropagation()}>
                           <span className="text-xs text-gray-500 mr-1">Block:</span>
-                          <Link
-                            to={tx.blockhash ? `/blocks/${tx.blockhash}` : '#'}
-                            className="text-blue-600 hover:underline"
-                            onClick={(e) => tx.blockhash ? e.stopPropagation() : e.preventDefault()}
-                          >
-                            {tx.height || (tx.blockhash ? tx.blockhash.substring(0, 6) + '...' : 'Pending')}
-                          </Link>
+                          {tx.blockhash ? (
+                            <button
+                              type="button"
+                              className="text-blue-600 hover:underline cursor-pointer bg-transparent border-none p-0 font-inherit text-left"
+                              onClick={() => window.location.href = `/blocks/${tx.blockhash}`}
+                            >
+                              {tx.height || tx.blockhash.substring(0, 6) + '...'}
+                            </button>
+                          ) : (
+                            <span>Pending</span>
+                          )}
                         </div>
                       </div>
                     </div>

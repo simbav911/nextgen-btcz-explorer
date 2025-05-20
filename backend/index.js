@@ -1,4 +1,5 @@
 require('dotenv').config();
+const path = require('path'); // Ensure path is required
 const express = require('express');
 const http = require('http');
 const socketIo = require('socket.io');
@@ -38,6 +39,14 @@ setupSocket(io);
 
 // API Routes
 app.use('/api', routes);
+
+// Serve static files from the React frontend app
+app.use(express.static(path.join(__dirname, '../frontend/build')));
+
+// AFTER all other routes, send index.html for any other requests for SPA routing
+app.get('*', (req, res) => {
+  res.sendFile(path.join(__dirname, '../frontend/build/index.html'));
+});
 
 // Error handling middleware
 app.use((err, req, res, next) => {
@@ -95,7 +104,7 @@ const startServer = async () => {
     }
     
     // Start server
-    const PORT = process.env.PORT || 3001;
+    const PORT = process.env.PORT || 3000; // Changed default to 3000
     const HOST = process.env.HOST || '0.0.0.0';
     server.listen(PORT, HOST, () => {
       logger.info(`Server running on ${HOST}:${PORT}`);

@@ -11,20 +11,9 @@ module.exports = {
       autorestart: true,
       watch: false,
       max_memory_restart: '1G'
-    },
-    {
-      name: 'btcz-explorer-frontend',
-      cwd: './frontend',
-      script: 'npm',
-      args: 'start',
-      env: {
-        NODE_ENV: 'production',
-        PORT: 3000
-      },
-      instances: 1,
-      autorestart: true,
-      watch: false,
-      max_memory_restart: '1G'
     }
+    // The frontend is a static build served by the backend or Apache.
+    // No separate PM2 process is needed to "run" the frontend in production
+    // after `npm run build` has been executed.
   ]
 };

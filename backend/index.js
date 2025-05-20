@@ -17,8 +17,15 @@ const server = http.createServer(app);
 const io = socketIo(server, {
   cors: {
     origin: '*',
-    methods: ['GET', 'POST']
-  }
+    methods: ['GET', 'POST'],
+    credentials: true
+  },
+  transports: ['websocket', 'polling'],
+  pingTimeout: 60000,
+  pingInterval: 25000,
+  upgradeTimeout: 30000,
+  allowUpgrades: true,
+  cookie: false
 });
 
 // Middleware
@@ -89,9 +96,10 @@ const startServer = async () => {
     
     // Start server
     const PORT = process.env.PORT || 3001;
-    server.listen(PORT, () => {
-      logger.info(`Server running on port ${PORT}`);
-      logger.info(`BitcoinZ Explorer API available at http://localhost:${PORT}/api`);
+    const HOST = process.env.HOST || '0.0.0.0';
+    server.listen(PORT, HOST, () => {
+      logger.info(`Server running on ${HOST}:${PORT}`);
+      logger.info(`BitcoinZ Explorer API available at http://${HOST}:${PORT}/api`);
     });
   } catch (err) {
     logger.error('Failed to start server:', err);

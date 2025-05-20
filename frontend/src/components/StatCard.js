@@ -1,6 +1,6 @@
 import React from 'react';
 
-const StatCard = ({ title, value, icon, color = 'blue', change, isLoading }) => {
+const StatCard = ({ title, value, icon, color = 'blue', change, isLoading, onClick }) => {
   // Map color names to tailwind color classes
   const colorMap = {
     blue: {
@@ -52,9 +52,9 @@ const StatCard = ({ title, value, icon, color = 'blue', change, isLoading }) => 
   // If loading, show the shimmer effect
   if (isLoading || value === 'Loading...' || !value) {
     return (
-      <div 
+      <div
         className={`card bg-white rounded-xl flex flex-col justify-center p-3 shimmer`}
-        style={{ 
+        style={{
           height: '100px',
           position: 'relative',
           overflow: 'hidden'
@@ -75,25 +75,26 @@ const StatCard = ({ title, value, icon, color = 'blue', change, isLoading }) => 
   }
 
   return (
-    <div 
-      className={`card bg-white rounded-xl flex flex-col justify-center p-3 loaded transition-all duration-300`}
-      style={{ 
+    <div
+      className={`card bg-white rounded-xl flex flex-col justify-center p-3 loaded transition-all duration-300 ${onClick ? 'cursor-pointer hover:shadow-lg' : ''}`}
+      style={{
         height: '100px',
         position: 'relative',
         overflow: 'hidden'
       }}
+      onClick={onClick}
     >
       <div className="flex items-center justify-between relative z-10">
         <div className="flex-grow">
           <div className="flex items-center mb-2">
-            <div className={`${colors.bg} p-2 rounded-full flex-shrink-0 mr-2 shadow-md`} 
+            <div className={`${colors.bg} p-2 rounded-full flex-shrink-0 mr-2 shadow-md`}
                  style={{ boxShadow: `0 2px 10px ${colors.text}40` }}>
               {React.cloneElement(icon, { size: 18 })}
             </div>
             <p className="text-gray-700 text-sm font-medium">{title}</p>
           </div>
           <h3 className={`text-xl sm:text-2xl font-bold ${colors.text} break-words`}>{value}</h3>
-          
+
           {change && (
             <div className={`text-xs mt-1 flex items-center ${change.positive ? 'text-green-600' : 'text-red-600'}`}>
               <span className="font-medium">{change.positive ? '↑' : '↓'} {change.value}</span>
@@ -102,13 +103,13 @@ const StatCard = ({ title, value, icon, color = 'blue', change, isLoading }) => 
           )}
         </div>
       </div>
-      
+
       {/* Background glow effect */}
-      <div 
-        className="absolute inset-0 opacity-10" 
-        style={{ 
+      <div
+        className="absolute inset-0 opacity-10"
+        style={{
           background: `radial-gradient(circle at 70% 30%, ${colors.text}, transparent 70%)`,
-          zIndex: 1 
+          zIndex: 1
         }}
       />
     </div>

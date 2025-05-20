@@ -1,10 +1,10 @@
 import React, { useState, useEffect, useContext, useRef, useMemo } from 'react';
 import { Link } from 'react-router-dom';
-import { 
-  FaCube, 
-  FaExchangeAlt, 
-  FaNetworkWired, 
-  FaSearch, 
+import {
+  FaCube,
+  FaExchangeAlt,
+  FaNetworkWired,
+  FaSearch,
   FaDollarSign,
   FaHashtag,
   FaMountain,
@@ -44,29 +44,19 @@ const Home = () => {
   const [latestTransactions, setLatestTransactions] = useState([]);
   const [stats, setStats] = useState(null);
   const [btczPrice, setBtczPrice] = useState(null);
-  
+
   // Use a ref to track the desired count of items to display
   const displayCountRef = useRef(8);
-  
+
   // Use a separate ref for transaction count
   const transactionCountRef = useRef(10);
-  
+
   const socket = useContext(SocketContext);
   const { showToast } = useContext(ToastContext);
   const notifiedBlockHeights = useRef(new Set()); // Track notified block heights
-  
-  // Import loading effects CSS
-  useEffect(() => {
-    // Import loading effects stylesheet
-    const link = document.createElement('link');
-    link.rel = 'stylesheet';
-    link.href = '/styles/loading-effects.css';
-    document.head.appendChild(link);
-    
-    return () => {
-      document.head.removeChild(link);
-    };
-  }, []);
+
+  // Loading effects CSS is now imported globally in index.js
+  // No need to dynamically add/remove the stylesheet
 
   // Fetch initial data with optimized loading strategy
   useEffect(() => {
@@ -76,7 +66,7 @@ const Home = () => {
         const initialDisplayCount = 8;
         displayCountRef.current = initialDisplayCount;
         transactionCountRef.current = 10;
-        
+
         // Create placeholder blocks and transactions immediately to improve perceived loading speed
         const placeholderBlocks = Array(initialDisplayCount).fill().map((_, index) => ({
           hash: `placeholder-${Date.now()}-${index}`,
@@ -87,17 +77,17 @@ const Home = () => {
           isPlaceholder: true,
           isLoading: true
         }));
-        
+
         const placeholderTransactions = Array(transactionCountRef.current).fill().map((_, index) => {
           // Create varying placeholder transaction types to match UI appearance
           let placeholderType = 't2t'; // Default type
-          
+
           // Simulate different transaction types for natural appearance
           if (index === 0) placeholderType = 'coinbase'; // First transaction is usually coinbase
           else if (index % 5 === 1) placeholderType = 'z2z';
           else if (index % 5 === 2) placeholderType = 't2z';
           else if (index % 5 === 3) placeholderType = 'z2t';
-          
+
           // Create a base placeholder transaction
           const basePlaceholder = {
             txid: `placeholder-${Date.now()}-${index}`,
@@ -106,7 +96,7 @@ const Home = () => {
             isPlaceholder: true,
             isLoading: true
           };
-          
+
           // Add specific properties based on transaction type
           if (placeholderType === 'coinbase') {
             return {
@@ -145,23 +135,23 @@ const Home = () => {
             };
           }
         });
-        
+
         // Set placeholders while we load the real data
         setLatestBlocks(placeholderBlocks);
         setLatestTransactions(placeholderTransactions);
-        
+
         // Split up the API calls to prioritize what's visible first
         // First fetch blocks and transactions which are immediately visible
         const [blocksResponse, txResponse] = await Promise.all([
           blockService.getLatestBlocks(initialDisplayCount),
           transactionService.getLatestTransactions(transactionCountRef.current * 2)
         ]);
-        
+
         // Update with real data as soon as it's available
         if (blocksResponse.data.blocks && blocksResponse.data.blocks.length > 0) {
           setLatestBlocks(blocksResponse.data.blocks.slice(0, displayCountRef.current));
         }
-        
+
         // Process transactions
         let transactions = txResponse.data.transactions || [];
         if (transactions.length < transactionCountRef.current) {
@@ -175,23 +165,23 @@ const Home = () => {
             vout: [],
             isPlaceholder: true
           }));
-          
+
           transactions = [...transactions, ...placeholders];
         } else {
           transactions = transactions.slice(0, transactionCountRef.current);
         }
-        
+
         setLatestTransactions(transactions);
-        
+
         // Then fetch stats and price data which is less time-sensitive
         const [statsResponse, priceData] = await Promise.all([
           statsService.getNetworkStats(),
           priceService.getBitcoinZPrice()
         ]);
-        
+
         setStats(statsResponse.data);
         setBtczPrice(priceData.bitcoinz);
-        
+
       } catch (error) {
         console.error('Error fetching data:', error);
         showToast('Failed to fetch blockchain data', 'error');
@@ -199,9 +189,9 @@ const Home = () => {
         setLoading(false);
       }
     };
-    
+
     fetchData();
-    
+
     // Set up interval to refresh price every 5 minutes
     const priceRefreshInterval = setInterval(async () => {
       try {
@@ -211,61 +201,61 @@ const Home = () => {
         console.error('Error refreshing price:', error);
       }
     }, 5 * 60 * 1000);
-    
+
     return () => {
       clearInterval(priceRefreshInterval);
     };
   }, [showToast]);
-  
+
   // Listen for new blocks and transactions via socket
   useEffect(() => {
     if (!socket) return;
-    
+
     socket.on('new_block', (block) => {
       // Immediately show toast notification for new block
       if (!notifiedBlockHeights.current.has(block.height)) {
         showToast(`New block #${block.height} mined`, 'info');
         notifiedBlockHeights.current.add(block.height);
       }
-      
+
       setLatestBlocks(prevBlocks => {
         // Mark the new block as fully loaded with NO blur effect at all
         const newBlock = {
           ...block,
-          isLoading: false, 
+          isLoading: false,
           hasTransitioned: true,
           noBlur: true // Special flag to completely bypass any blur effect
         };
-        
+
         // Combine new block with previous blocks
         const combined = [newBlock, ...prevBlocks];
-        
+
         // Update existing blocks to remove blur as well - they should now load instantly
         const updatedPrevBlocks = prevBlocks.map(b => ({
           ...b,
           isLoading: false,
           hasTransitioned: true
         }));
-        
+
         // Use updated previous blocks instead of originals
         const updatedCombined = [newBlock, ...updatedPrevBlocks];
-        
+
         // Use a Map to deduplicate based on block hash
         const uniqueBlocksMap = new Map(updatedCombined.map(b => [b.hash, b]));
-        
+
         // Convert back to an array
         let uniqueBlocksArray = Array.from(uniqueBlocksMap.values());
-        
+
         // Ensure blocks are sorted by height descending
         uniqueBlocksArray.sort((a, b) => b.height - a.height);
-        
+
         // Slice to limit based on our display count
         const finalBlocks = uniqueBlocksArray.slice(0, displayCountRef.current);
 
         // Update our display count if the number of blocks has changed
         if (finalBlocks.length !== displayCountRef.current) {
           displayCountRef.current = finalBlocks.length;
-          
+
           // Force an update of transactions to match the new block count
           setTimeout(() => {
             setLatestTransactions(prevTxs => {
@@ -273,7 +263,7 @@ const Home = () => {
               if (prevTxs.length === transactionCountRef.current) {
                 return prevTxs;
               }
-              
+
               // Otherwise, adjust the transaction list to match
               if (prevTxs.length > transactionCountRef.current) {
                 // If we have too many, slice them down
@@ -284,13 +274,13 @@ const Home = () => {
                 const placeholders = Array(placeholdersNeeded).fill().map((_, index) => {
                   // Create varying placeholder transaction types to match UI appearance
                   let placeholderType = 't2t'; // Default type
-                  
+
                   // Simulate different transaction types for natural appearance
                   if (index === 0) placeholderType = 'coinbase'; // First transaction is usually coinbase
                   else if (index % 5 === 1) placeholderType = 'z2z';
                   else if (index % 5 === 2) placeholderType = 't2z';
                   else if (index % 5 === 3) placeholderType = 'z2t';
-                  
+
                   // Create a base placeholder transaction
                   const basePlaceholder = {
                     txid: `placeholder-${Date.now()}-${index}`,
@@ -298,7 +288,7 @@ const Home = () => {
                     confirmations: 0,
                     isPlaceholder: true
                   };
-                  
+
                   // Add specific properties based on transaction type
                   if (placeholderType === 'coinbase') {
                     return {
@@ -337,7 +327,7 @@ const Home = () => {
                     };
                   }
                 });
-                
+
                 return [...prevTxs, ...placeholders];
               }
             });
@@ -356,56 +346,56 @@ const Home = () => {
           return prevBlocks;
         }
       });
-      
+
       // Show toast only once per block height
       if (!notifiedBlockHeights.current.has(block.height)) {
         showToast(`New block #${block.height} mined`, 'info');
         notifiedBlockHeights.current.add(block.height);
       }
     });
-    
+
     socket.on('new_transactions', (transactions) => {
       setLatestTransactions(prevTxs => {
         // Mark all new transactions from socket as unconfirmed and ensure they have current timestamp
         const processedTransactions = transactions.map(tx => {
           // If confirmations is undefined or null, set it explicitly to 0
-          const newTx = { 
-            ...tx, 
+          const newTx = {
+            ...tx,
             confirmations: 0, // Always treat new socket transactions as unconfirmed
             time: tx.time || Math.floor(Date.now() / 1000) // Ensure time is current if not provided
           };
           return newTx;
         });
-        
+
         // Combine new and previous transactions
         const combined = [...processedTransactions, ...prevTxs];
         // Use a Map to deduplicate based on txid
         const uniqueTxsMap = new Map(combined.map(tx => [tx.txid, tx]));
         // Convert back to an array
         const uniqueTxsArray = Array.from(uniqueTxsMap.values());
-        
+
         // Use our consistent display count
         const currentDisplayCount = transactionCountRef.current;
-        
+
         // Ensure we always have exactly the right number of transactions
         let finalTxs = uniqueTxsArray.slice(0, currentDisplayCount);
-        
+
         // If we have fewer transactions than needed, add placeholder transactions
         if (finalTxs.length < currentDisplayCount) {
           // Get the number of placeholders needed
           const placeholdersNeeded = currentDisplayCount - finalTxs.length;
-          
+
           // Create placeholders with loading state
           const placeholders = Array(placeholdersNeeded).fill().map((_, index) => {
             // Create varying placeholder transaction types to match UI appearance
             let placeholderType = 't2t'; // Default type
-            
+
             // Simulate different transaction types for natural appearance
             if (index === 0) placeholderType = 'coinbase'; // First transaction is usually coinbase
             else if (index % 5 === 1) placeholderType = 'z2z';
             else if (index % 5 === 2) placeholderType = 't2z';
             else if (index % 5 === 3) placeholderType = 'z2t';
-            
+
             // Create a base placeholder transaction
             const basePlaceholder = {
               txid: `placeholder-${Date.now()}-${index}`,
@@ -413,7 +403,7 @@ const Home = () => {
               confirmations: 0,
               isPlaceholder: true
             };
-            
+
             // Add specific properties based on transaction type
             if (placeholderType === 'coinbase') {
               return {
@@ -452,7 +442,7 @@ const Home = () => {
               };
             }
           });
-          
+
           // Add placeholders to the final list
           finalTxs = [...finalTxs, ...placeholders];
         }
@@ -470,25 +460,25 @@ const Home = () => {
         }
       });
     });
-    
+
     return () => {
       socket.off('new_block');
       socket.off('new_transactions');
     };
   }, [socket, showToast, latestBlocks]);
-  
+
   // Format price with change indicator
   const formatPrice = (price) => {
     if (!price) return 'Loading...';
-    
+
     // Format the price to 6 decimal places
     return `$${price.usd.toFixed(6)}`;
   };
-  
+
   // Create price change object for StatCard
   const getPriceChange = () => {
     if (!btczPrice || btczPrice.usd_24h_change === undefined) return null;
-    
+
     return {
       positive: btczPrice.usd_24h_change >= 0,
       value: `${Math.abs(btczPrice.usd_24h_change).toFixed(2)}%`,
@@ -499,11 +489,11 @@ const Home = () => {
   // Format difficulty to be more readable
   const formatReadableDifficulty = (difficulty) => {
     if (!difficulty) return 'Loading...';
-    
+
     // Format with commas for better readability
     return difficulty.toLocaleString(undefined, { maximumFractionDigits: 2 });
   };
-  
+
   // Transaction type classifier
   const classifyTxType = (tx) => {
     const isCoinbase = tx.vin && tx.vin.length > 0 && !!tx.vin[0].coinbase;
@@ -552,11 +542,11 @@ const Home = () => {
       <TransactionCard key={tx.txid} transaction={tx} />
     ));
   }, [latestTransactions]);
-  
+
   useEffect(() => {
     // Create a style element
     const styleEl = document.createElement('style');
-    
+
     // Define the animation keyframes
     const animationCSS = `
       @keyframes electricTilePulse {
@@ -577,13 +567,13 @@ const Home = () => {
         }
       }
     `;
-    
+
     // Set the CSS content
     styleEl.textContent = animationCSS;
-    
+
     // Append to document head
     document.head.appendChild(styleEl);
-    
+
     // Clean up on unmount
     return () => {
       document.head.removeChild(styleEl);
@@ -594,7 +584,7 @@ const Home = () => {
     <div className="container-custom py-4">
       {/* Hero Section with Search - Enhanced with shadow effects */}
       <div className="bg-gradient-to-r from-blue-600 to-bitcoinz-600 rounded-xl shadow-lg mb-5 p-4 sm:p-5 relative"
-           style={{ 
+           style={{
              boxShadow: `
                0 10px 25px rgba(59, 130, 246, 0.3),
                0 15px 30px rgba(37, 99, 235, 0.4),
@@ -611,10 +601,10 @@ const Home = () => {
           <p className="text-white text-sm opacity-90 mb-3">Search for blocks, transactions, and addresses on the BitcoinZ blockchain</p>
         </div>
         <SearchBox />
-        
+
         {/* Electric glow effect under the tile */}
-        <div 
-          className="electric-glow-tile" 
+        <div
+          className="electric-glow-tile"
           style={{
             position: 'absolute',
             width: '90%',
@@ -632,43 +622,46 @@ const Home = () => {
       {/* Stats Overview - Equal sized cards with colored shadow effects */}
       <div className="stats-grid">
         <div className="stats-card-blue rounded-xl">
-          <Link to="/blocks" className="block">
+          <div className="block">
             <StatCard
               title="Latest Block"
               value={stats && stats.blockchainInfo ? formatNumber(stats.blockchainInfo.blocks) : 'Loading...'}
               icon={latestBlockIcon}
               color="blue"
               isLoading={loading || !stats}
+              onClick={() => window.location.href = '/blocks'}
             />
-          </Link>
+          </div>
         </div>
-        
+
         <div className="stats-card-purple rounded-xl">
-          <Link to="/stats" className="block">
+          <div className="block">
             <StatCard
               title="Difficulty"
               value={stats && stats.blockchainInfo ? formatDifficulty(stats.blockchainInfo.difficulty) : 'Loading...'}
               icon={difficultyIcon}
               color="purple"
               isLoading={loading || !stats}
+              onClick={() => window.location.href = '/stats'}
             />
-          </Link>
+          </div>
         </div>
-        
+
         <div className="stats-card-orange rounded-xl">
-          <Link to="/stats" className="block">
+          <div className="block">
             <StatCard
               title="Network Hashrate"
               value={stats && stats.miningInfo ? `${formatNumber(stats.miningInfo.networkhashps)} H/s` : 'Loading...'}
               icon={hashrateIcon}
               color="orange"
               isLoading={loading || !stats}
+              onClick={() => window.location.href = '/stats'}
             />
-          </Link>
+          </div>
         </div>
-        
+
         <div className="stats-card-green rounded-xl">
-          <Link to="/charts" className="block">
+          <div className="block">
             <StatCard
               title="BTCZ Price"
               value={btczPrice ? `$${btczPrice.usd.toFixed(8)}` : 'Loading...'}
@@ -680,8 +673,9 @@ const Home = () => {
                 positive: btczPrice.usd_24h_change >= 0,
                 period: '24h'
               } : null}
+              onClick={() => window.location.href = '/charts'}
             />
-          </Link>
+          </div>
         </div>
       </div>
 
@@ -696,8 +690,8 @@ const Home = () => {
               </div>
               Latest Blocks
             </h2>
-            <Link 
-              to="/blocks" 
+            <Link
+              to="/blocks"
               className="text-blue-600 hover:text-blue-800 text-sm font-medium bg-blue-50 px-3 py-1 rounded-full hover:bg-blue-100 transition-colors duration-200"
             >
               View All
@@ -711,7 +705,7 @@ const Home = () => {
             )}
           </div>
         </div>
-        
+
         {/* Latest Transactions with shadow and glow effects */}
         <div className="latest-transactions-container">
           <div className="flex justify-between items-center mb-3">
@@ -721,8 +715,8 @@ const Home = () => {
               </div>
               Latest Transactions
             </h2>
-            <Link 
-              to="/transactions" 
+            <Link
+              to="/transactions"
               className="text-green-600 hover:text-green-800 text-sm font-medium bg-green-50 px-3 py-1 rounded-full hover:bg-green-100 transition-colors duration-200"
             >
               View All
@@ -733,7 +727,7 @@ const Home = () => {
               // Use the same styling logic as in the TransactionList component
               const txType = classifyTxType(tx);
               const isCoinbase = txType === 'coinbase';
-              
+
               // Style map - same as in TransactionList
               const styleMap = {
                 coinbase: {
@@ -792,7 +786,7 @@ const Home = () => {
                 },
               };
               const style = styleMap[txType] || styleMap.other;
-              
+
               return (
                 <div
                   key={tx.txid}
@@ -819,7 +813,7 @@ const Home = () => {
                           {tx.confirmations > 0 ? `${tx.confirmations} Confirms` : 'Unconfirmed'}
                         </span>
                       </div>
-                      
+
                       {/* Transaction ID and time */}
                       <div className="flex justify-between items-center text-xs text-gray-500 mb-1">
                         <div className="font-mono overflow-hidden text-overflow-ellipsis">
@@ -830,7 +824,7 @@ const Home = () => {
                           {formatRelativeTime(tx.time)}
                         </div>
                       </div>
-                      
+
                       {/* From/To section - simplified for homepage */}
                       <div className="mt-1 flex justify-between text-xs">
                         <div className="flex-grow">
@@ -840,8 +834,8 @@ const Home = () => {
                         </div>
                         <div className="flex items-center">
                           <span className="text-xs text-gray-500 mr-1">Block:</span>
-                          <Link 
-                            to={tx.blockhash ? `/blocks/${tx.blockhash}` : '#'} 
+                          <Link
+                            to={tx.blockhash ? `/blocks/${tx.blockhash}` : '#'}
                             className="text-blue-600 hover:underline"
                             onClick={(e) => tx.blockhash ? e.stopPropagation() : e.preventDefault()}
                           >

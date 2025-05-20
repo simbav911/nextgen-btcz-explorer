@@ -1,0 +1,15 @@
+BitcoinZ Explorer Logo Instructions
+
+1. Save the BitcoinZ logo to this directory as "logo.png"
+   (The logo should be the circular blue gradient with white "B" and blue "Z")
+
+2. Recommended specifications:
+   - Format: PNG with transparent background
+   - Size: At least 120x120 pixels (higher resolution is better)
+   - File name: logo.png
+
+3. Logo location:
+   Save the logo file to: /public/logo.png
+
+4. If no logo is provided, the explorer will use a fallback URL:
+   https://bitcoinz.global/wp-content/uploads/branding/btcz-website-logo.png

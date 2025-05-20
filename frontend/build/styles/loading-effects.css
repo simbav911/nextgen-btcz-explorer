@@ -1,0 +1,114 @@
+/**
+ * Loading effects and animations for the BitcoinZ Explorer
+ */
+
+/* Shimmer loading effect */
+.shimmer {
+  position: relative;
+  overflow: hidden;
+}
+
+.shimmer::after {
+  content: '';
+  position: absolute;
+  top: 0;
+  right: 0;
+  bottom: 0;
+  left: 0;
+  transform: translateX(-100%);
+  background-image: linear-gradient(
+    90deg,
+    rgba(255, 255, 255, 0) 0,
+    rgba(255, 255, 255, 0.2) 20%,
+    rgba(255, 255, 255, 0.5) 60%,
+    rgba(255, 255, 255, 0)
+  );
+  animation: shimmer 2s infinite;
+}
+
+@keyframes shimmer {
+  100% {
+    transform: translateX(100%);
+  }
+}
+
+/* Placeholder tile styling */
+.placeholder-tile {
+  position: relative;
+  transition: all 0.3s ease-in-out;
+}
+
+/* Loading blur effect */
+.loading-blur {
+  filter: blur(4px);
+  opacity: 0.7;
+  transition: filter 0.3s ease-out, opacity 0.3s ease-out;
+}
+
+.loaded {
+  filter: blur(0);
+  opacity: 1;
+}
+
+/* Pulse animation for recent items */
+.recent-time-icon {
+  animation: pulse 1.5s infinite;
+}
+
+@keyframes pulse {
+  0% {
+    transform: scale(1);
+    opacity: 1;
+  }
+  50% {
+    transform: scale(1.2);
+    opacity: 0.7;
+  }
+  100% {
+    transform: scale(1);
+    opacity: 1;
+  }
+}
+
+/* Pending transaction animation */
+.pending-label {
+  display: inline-block;
+  padding: 2px 6px;
+  border-radius: 4px;
+  background-color: #f0f9ff;
+  color: #0369a1;
+  font-size: 0.75rem;
+  font-weight: 500;
+  animation: pendingPulse 2s infinite;
+}
+
+@keyframes pendingPulse {
+  0% {
+    background-color: #f0f9ff;
+  }
+  50% {
+    background-color: #e0f2fe;
+  }
+  100% {
+    background-color: #f0f9ff;
+  }
+}
+
+/* Electric glow animation */
+@keyframes electricTilePulse {
+  0% {
+    opacity: 0.4;
+    filter: blur(10px);
+    box-shadow: 0 0 20px rgba(37, 99, 235, 0.6);
+  }
+  50% {
+    opacity: 0.8;
+    filter: blur(15px);
+    box-shadow: 0 0 40px rgba(37, 99, 235, 0.8);
+  }
+  100% {
+    opacity: 0.4;
+    filter: blur(10px);
+    box-shadow: 0 0 20px rgba(37, 99, 235, 0.6);
+  }
+}

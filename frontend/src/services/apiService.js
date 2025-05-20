@@ -1,7 +1,18 @@
 import axios from 'axios';
 
 // Get API base URL from environment variables or use default
-const API_URL = process.env.REACT_APP_API_URL || 'http://localhost:3001/api';
+let apiUrlFromEnv = process.env.REACT_APP_API_URL || 'https://explorer.getbtcz.com/api';
+
+const isSecure = window.location.protocol === 'https:';
+
+if (isSecure) {
+    // If the page is secure, ensure the API URL is secure
+    if (apiUrlFromEnv.startsWith('http://')) {
+        apiUrlFromEnv = apiUrlFromEnv.replace('http://', 'https://');
+    }
+}
+
+const API_URL = apiUrlFromEnv;
 
 // Create an axios instance with the base URL configuration
 const api = axios.create({

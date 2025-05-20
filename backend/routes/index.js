@@ -12,6 +12,7 @@ const wealthRoutes = require('./wealthRoutes');
 const poolStatsRoutes = require('./poolStatsRoutes');
 const syncRoutes = require('./syncRoutes'); // Import sync routes
 const cmcRoutes = require('./cmcRoutes');
+const miningRoutes = require('./miningRoutes');
 
 // Use route modules
 router.use('/blocks', blockRoutes);
@@ -24,6 +25,7 @@ router.use('/wealth', wealthRoutes);
 router.use('/pool-stats', poolStatsRoutes);
 router.use('/sync', syncRoutes); // Register sync routes
 router.use('/cmc', cmcRoutes);
+router.use('/mining', miningRoutes);
 
 // Root endpoint - API info
 router.get('/', (req, res) => {
@@ -40,7 +42,8 @@ router.get('/', (req, res) => {
       wealth: '/api/wealth',
       poolStats: '/api/pool-stats',
       sync: '/api/sync', // Add sync endpoint info
-      cmc: '/api/cmc'
+      cmc: '/api/cmc',
+      mining: '/api/mining'
     }
   });
 });

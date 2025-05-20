@@ -9,7 +9,7 @@ const {
   DB_PORT = 5432,
   DB_NAME = 'bitcoinz_explorer',
   DB_USER = 'postgres',
-  DB_PASSWORD = ''
+  DB_PASSWORD = 'postgres'
 } = process.env;
 
 // Create a database pool

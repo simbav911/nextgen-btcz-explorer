@@ -13,9 +13,9 @@ const DB_CONFIG = {
 
 const RPC_CONFIG = {
   host: process.env.BITCOINZ_RPC_HOST || '127.0.0.1',
-  port: process.env.BITCOINZ_RPC_PORT || 1978,
-  user: process.env.BITCOINZ_RPC_USER || '2a629aa93a1847',
-  pass: process.env.BITCOINZ_RPC_PASS || 'ca3bd775e7722cf2a9babab65d4ad'
+  port: process.env.BITCOINZ_RPC_PORT || 1979,
+  user: process.env.BITCOINZ_RPC_USER || 'bitcoinzrpc',
+  pass: process.env.BITCOINZ_RPC_PASS || 'bitcoinz9jk01Amn3Z'
 };
 
 // Settings - very conservative defaults

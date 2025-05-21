@@ -4,7 +4,7 @@ const PoolOperators = () => {
   return (
     <div className="container mx-auto px-4 py-8">
       <h1 className="text-3xl font-bold mb-6 text-center">Pool Operators</h1>
-      <div className="bg-white shadow-md rounded-lg p-6">
+      <div className="bg-white shadow-md rounded-lg p-6 md:p-8 mx-auto max-w-4xl">
         <h2 className="text-2xl font-semibold mb-4">Information for Pool Operators</h2>
         <p className="mb-4">
           This explorer provides complete REST and WebSocket APIs that can be used for writing web wallets and other apps that need more advanced blockchain queries than provided by bitcoinzd RPC.

@@ -60,28 +60,33 @@ const apiCache = {
 
 // Add caching interceptor
 api.interceptors.request.use(config => {
-  // Only cache GET requests
-  if (config.method !== 'get') return config;
+  // Only process GET requests for caching
+  if (config.method !== 'get') {
+    return config;
+  }
 
-  // Create a cache key from the request URL and params
   const cacheKey = `${config.url}?${JSON.stringify(config.params || {})}`;
-
-  // Check if we have a cached response
   const cachedResponse = apiCache.get(cacheKey);
+
   if (cachedResponse) {
     console.log(`Using cached response for ${config.url}`);
-
-    // Create a new promise that resolves with the cached data
     return {
       ...config,
-      adapter: () => Promise.resolve({
-        data: cachedResponse,
-        status: 200,
-        statusText: 'OK',
-        headers: {},
-        config,
-        cached: true
-      })
+      adapter: () => {
+        // If a cancelToken is provided and has been used, reject the promise.
+        if (config.cancelToken && config.cancelToken.reason) {
+          return Promise.reject(config.cancelToken.reason);
+        }
+        // Otherwise, resolve with the cached data.
+        return Promise.resolve({
+          data: cachedResponse,
+          status: 200,
+          statusText: 'OK (cached)',
+          headers: {},
+          config: config, // Pass the original config
+          cached: true     // Mark as cached
+        });
+      }
     };
   }
 
@@ -118,29 +123,29 @@ api.interceptors.response.use(response => {
 
 // API endpoints for blocks
 export const blockService = {
-  getLatestBlocks: (limit = 10, offset = 0) => {
-    return api.get(`/blocks?limit=${limit}&offset=${offset}`);
+  getLatestBlocks: (limit = 10, offset = 0, config = {}) => {
+    return api.get(`/blocks?limit=${limit}&offset=${offset}`, config);
   },
-  getBlockByHash: (hash) => {
-    return api.get(`/blocks/hash/${hash}`);
+  getBlockByHash: (hash, config = {}) => {
+    return api.get(`/blocks/hash/${hash}`, config);
   },
-  getBlockByHeight: (height) => {
-    return api.get(`/blocks/height/${height}`);
+  getBlockByHeight: (height, config = {}) => {
+    return api.get(`/blocks/height/${height}`, config);
   },
-  getLatestBlock: () => {
-    return api.get('/blocks/latest');
+  getLatestBlock: (config = {}) => {
+    return api.get('/blocks/latest', config);
   },
 };
 
 // API endpoints for transactions
 export const transactionService = {
-  getLatestTransactions: (limit = 10, offset = 0) => {
-    return api.get(`/transactions?limit=${limit}&offset=${offset}`);
+  getLatestTransactions: (limit = 10, offset = 0, config = {}) => {
+    return api.get(`/transactions?limit=${limit}&offset=${offset}`, config);
   },
-  getTransaction: (txid) => {
-    return api.get(`/transactions/${txid}`);
+  getTransaction: (txid, config = {}) => {
+    return api.get(`/transactions/${txid}`, config);
   },
-  getBlockTransactions: (blockhash) => {
+  getBlockTransactions: (blockhash, config = {}) => {
     return api.get(`/transactions/block/${blockhash}`);
   },
 };

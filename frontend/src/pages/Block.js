@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { useParams, Link, useNavigate } from 'react-router-dom';
 import { FaCube, FaArrowLeft, FaArrowRight } from 'react-icons/fa';
 import moment from 'moment';
@@ -28,6 +28,9 @@ const Block = () => {
   const [totalPages, setTotalPages] = useState(1);
   
   const txsPerPage = 20;
+
+  const isMountedRef = useRef(true);
+  const transactionFetchControllerRef = useRef(null);
   
   // Helper function to decode hex to ASCII
   const hexToAscii = (hex) => {
@@ -67,64 +70,96 @@ const Block = () => {
     return poolUrls[poolName] || `https://www.google.com/search?q=${encodeURIComponent(poolName)}+mining+pool`;
   };
 
-  // Fetch block data
-  useEffect(() => {
-    const fetchBlock = async () => {
-      try {
-        setLoading(true);
-        
-        // Determine if hash is a block hash or height
-        const isHeight = /^\d+$/.test(hash);
-        
-        let response;
-        if (isHeight) {
-          response = await blockService.getBlockByHeight(parseInt(hash));
-        } else {
-          response = await blockService.getBlockByHash(hash);
-        }
-        
-        setBlock(response.data);
-        
-        // Calculate total pages based on transaction count
-        const txCount = response.data.tx.length;
-        setTotalPages(Math.ceil(txCount / txsPerPage));
-        
-        // Fetch first page of transactions
-        await fetchTransactions(response.data.tx, 1);
-      } catch (error) {
-        console.error('Error fetching block:', error);
-      } finally {
-        setLoading(false);
-      }
-    };
-    
-    fetchBlock();
-  }, [hash]);
-  
   // Fetch transaction details for the current page
-  const fetchTransactions = async (txids, page) => {
+  const fetchTransactions = async (txids, page, cancelTokenForService) => {
     try {
       const startIndex = (page - 1) * txsPerPage;
       const endIndex = startIndex + txsPerPage;
       const pageTransactionIds = txids.slice(startIndex, endIndex);
       
-      // Fetch details for each transaction
       const txPromises = pageTransactionIds.map(txid => 
-        transactionService.getTransaction(txid)
+        transactionService.getTransaction(txid, { cancelToken: cancelTokenForService })
       );
       
       const results = await Promise.all(txPromises);
-      setTransactions(results.map(res => res.data));
-      setCurrentPage(page);
+
+      if (isMountedRef.current) {
+        setTransactions(results.map(res => res.data));
+        setCurrentPage(page);
+      }
     } catch (error) {
-      console.error('Error fetching transactions:', error);
+      if (axios.isCancel(error)) {
+        console.log('Transaction fetch request canceled by service', error.message);
+      } else if (isMountedRef.current) {
+        console.error('Error fetching transactions:', error);
+      }
     }
   };
+
+  // Main data fetching effect
+  useEffect(() => {
+    isMountedRef.current = true;
+    const source = axios.CancelToken.source();
+
+    const fetchBlockData = async () => {
+      try {
+        setLoading(true);
+        const isHeight = /^\d+$/.test(hash);
+        let response;
+        if (isHeight) {
+          response = await blockService.getBlockByHeight(parseInt(hash), { cancelToken: source.token });
+        } else {
+          response = await blockService.getBlockByHash(hash, { cancelToken: source.token });
+        }
+        
+        if (isMountedRef.current) {
+          setBlock(response.data);
+          if (response.data && response.data.tx) {
+            const txCount = response.data.tx.length;
+            setTotalPages(Math.ceil(txCount / txsPerPage));
+            await fetchTransactions(response.data.tx, 1, source.token);
+          } else {
+            setTotalPages(0); // Handle case where tx might be undefined
+          }
+        }
+      } catch (error) {
+        if (axios.isCancel(error)) {
+          console.log('Block fetch request canceled', error.message);
+        } else if (isMountedRef.current) {
+          console.error('Error fetching block:', error);
+          setBlock(null); // Clear block on error
+        }
+      } finally {
+        if (isMountedRef.current) {
+          setLoading(false);
+        }
+      }
+    };
+    
+    fetchBlockData();
+
+    return () => {
+      isMountedRef.current = false;
+      source.cancel('Component unmounted or hash changed, cancelling block fetch.');
+      if (transactionFetchControllerRef.current) {
+        transactionFetchControllerRef.current.cancel('Component unmounted or hash changed, cancelling active transaction fetch.');
+        transactionFetchControllerRef.current = null;
+      }
+    };
+  }, [hash]);
   
   // Handle page change
   const handlePageChange = (page) => {
-    fetchTransactions(block.tx, page);
-    // Scroll to transaction list
+    if (!block || !block.tx) return;
+
+    if (transactionFetchControllerRef.current) {
+      transactionFetchControllerRef.current.cancel('New page selected, cancelling previous transaction fetch.');
+    }
+
+    transactionFetchControllerRef.current = axios.CancelToken.source();
+    
+    fetchTransactions(block.tx, page, transactionFetchControllerRef.current.token);
+    
     document.getElementById('transactions-list').scrollIntoView({
       behavior: 'smooth'
     });
@@ -222,17 +257,31 @@ const Block = () => {
   
   // Add miner information when available
   useEffect(() => {
-    if (block && transactions.length > 0) {
+    // Only attempt to extract miner info if block data is present,
+    // transactions are loaded, and minerInfo hasn't been set on the block yet.
+    if (block && !block.minerInfo && transactions.length > 0) {
       extractMinerInfo().then(minerInfo => {
-        if (minerInfo.name !== 'Unknown Pool') {
-          setBlock(prevBlock => ({
-            ...prevBlock,
-            minerInfo: minerInfo.name,
-            minerUrl: minerInfo.url
-          }));
+        if (isMountedRef.current && minerInfo.name !== 'Unknown Pool') {
+          setBlock(prevBlock => {
+            if (!prevBlock) return null;
+            // Only update if minerInfo actually changed or was not set, to prevent unnecessary re-renders.
+            if (prevBlock.minerInfo === minerInfo.name && prevBlock.minerUrl === minerInfo.url) {
+              return prevBlock; // Return the same object if no effective change
+            }
+            return {
+              ...prevBlock,
+              minerInfo: minerInfo.name,
+              minerUrl: minerInfo.url
+            };
+          });
+        }
+      }).catch(error => {
+        if (isMountedRef.current) {
+          console.error('Error in extractMinerInfo promise:', error);
         }
       });
     }
+    // Dependencies: block (to check for its existence and minerInfo), transactions (to ensure they are loaded).
   }, [block, transactions]);
   
   if (loading) {

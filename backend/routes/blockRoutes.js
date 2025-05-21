@@ -30,19 +30,39 @@ router.get('/', async (req, res, next) => {
     // Process blocks in batches
     for (let i = 0; i < heightsToFetch.length; i += batchSize) {
       const batch = heightsToFetch.slice(i, i + batchSize);
-      const batchPromises = batch.map(height => 
-        bitcoinzService.getBlockByHeight(height, 1)
-          .catch(err => {
-            logger.error(`Error fetching block at height ${height} via RPC: ${err.message}`);
-            return null;
-          })
-      );
+      const batchPromises = batch.map(async height => {
+        try {
+          const block = await bitcoinzService.getBlockByHeight(height, 1);
+          if (block && block.tx && block.tx.length > 0) {
+            const coinbaseTxid = block.tx[0];
+            try {
+              const coinbaseTx = await bitcoinzService.getRawTransaction(coinbaseTxid, 1); // verbose = 1
+              if (coinbaseTx && coinbaseTx.vin && coinbaseTx.vin.length > 0 && coinbaseTx.vin[0].coinbase) {
+                block.coinbaseHex = coinbaseTx.vin[0].coinbase;
+              } else {
+                block.coinbaseHex = null; // Or some indicator that it couldn't be fetched
+                logger.warn(`Could not retrieve coinbase hex for block ${height}, txid ${coinbaseTxid}`);
+              }
+            } catch (txError) {
+              logger.error(`Error fetching coinbase transaction ${coinbaseTxid} for block ${height}: ${txError.message}`);
+              block.coinbaseHex = null;
+            }
+          } else {
+            if (block) block.coinbaseHex = null;
+            logger.warn(`Block ${height} has no transactions or tx array is missing.`);
+          }
+          return block;
+        } catch (err) {
+          logger.error(`Error fetching block at height ${height} via RPC: ${err.message}`);
+          return null;
+        }
+      });
       
       const batchResults = await Promise.all(batchPromises);
       fetchedBlocks.push(...batchResults.filter(block => block !== null));
     }
 
-    logger.info(`Fetched ${fetchedBlocks.length} blocks via RPC (parallel batches)`);
+    logger.info(`Fetched ${fetchedBlocks.length} blocks via RPC (parallel batches), with coinbase hex`);
 
     res.json({
       blocks: fetchedBlocks,

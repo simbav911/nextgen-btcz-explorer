@@ -20,7 +20,7 @@ import apiInstance from '../services/api';
 import { formatNumber, formatTimestamp, formatRelativeTime } from '../utils/formatting';
 
 const BLOCKS_PER_PAGE = 50;
-const LOADING_POOL_NAME_PLACEHOLDER = 'LOADING_POOL_NAME_PLACEHOLDER';
+// const LOADING_POOL_NAME_PLACEHOLDER = 'LOADING_POOL_NAME_PLACEHOLDER'; // No longer needed
 
 // Helper function to decode hex to ASCII
 const hexToAscii = (hex) => {
@@ -38,8 +38,8 @@ const hexToAscii = (hex) => {
   }
 };
 
-const extractPoolName = (coinbaseHex, coinbaseTx) => {
-  if (!coinbaseHex) return null;
+const extractPoolName = (coinbaseHex, coinbaseTx = null) => { // coinbaseTx is now optional
+  if (!coinbaseHex) return 'Unknown Pool'; // Return default if no hex
   const coinbaseAscii = hexToAscii(coinbaseHex);
   const poolPatterns = [
     { pattern: /zpool\.ca/i, name: 'Zpool' },
@@ -82,39 +82,7 @@ const extractPoolName = (coinbaseHex, coinbaseTx) => {
   return null;
 };
 
-// Optimized getBlockPoolNames with parallel fetching and cancellation
-const getBlockPoolNames = async (blocks, cancelToken) => {
-  const blockDetailPromises = blocks.map(block => {
-    if (block.miningPoolName) return Promise.resolve(block); // Already has pool name
-
-    // Use blockService and transactionService which accept cancelToken
-    return blockService.getBlockByHash(block.hash, { cancelToken })
-      .then(blockDetailResponse => {
-        if (!blockDetailResponse.data || !blockDetailResponse.data.tx || blockDetailResponse.data.tx.length === 0) {
-          return { ...block, miningPoolName: 'Unknown (No TX)' };
-        }
-        const coinbaseTxid = blockDetailResponse.data.tx[0];
-        return transactionService.getTransaction(coinbaseTxid, { cancelToken })
-          .then(txDetailResponse => {
-            if (!txDetailResponse.data || !txDetailResponse.data.vin || txDetailResponse.data.vin.length === 0) {
-              return { ...block, miningPoolName: 'Unknown (No VIN)' };
-            }
-            const coinbaseVin = txDetailResponse.data.vin[0];
-            const poolName = extractPoolName(coinbaseVin.coinbase, txDetailResponse.data);
-            return { ...block, miningPoolName: poolName || 'Unknown Pool' };
-          });
-      })
-      .catch(error => {
-        if (axios.isCancel(error)) {
-          // Don't log cancellation as an error, it's expected
-        } else {
-          console.error(`Error fetching pool name for block ${block.hash}:`, error);
-        }
-        return { ...block, miningPoolName: 'Unknown (Error)' }; // Fallback
-      });
-  });
-  return Promise.all(blockDetailPromises);
-};
+// getBlockPoolNames is no longer needed as backend provides coinbaseHex
 
 const BlockList = () => {
   const [loading, setLoading] = useState(true);
@@ -136,33 +104,10 @@ const BlockList = () => {
     isMountedRef.current = true;
     const cancelTokenSource = axios.CancelToken.source();
 
-    const fetchAndSetPoolNamesForBlocks = async (blocksData, token) => {
-      try {
-        const blocksWithPools = await getBlockPoolNames(blocksData, token);
-        if (isMountedRef.current) {
-          setBlocks(currentSetBlocks => {
-            const poolDataMap = new Map(blocksWithPools.map(b => [b.hash, b.miningPoolName]));
-            return currentSetBlocks.map(csb => 
-              poolDataMap.has(csb.hash) 
-                ? { ...csb, miningPoolName: poolDataMap.get(csb.hash) } 
-                : csb
-            );
-          });
-        }
-      } catch (error) {
-        if (axios.isCancel(error)) {
-          console.log('Pool name fetching for list cancelled.');
-        } else if (isMountedRef.current) {
-          console.error('Error fetching and setting pool names:', error);
-          // Optionally update blocks to show an error state for pool names
-        }
-      }
-    };
-
     const fetchBlocksForPage = async (pageToFetch) => {
       try {
         if (!isMountedRef.current) return;
-        setLoading(true); // For the initial list structure
+        setLoading(true);
         
         const infoResponse = await statsService.getBlockchainInfo({ cancelToken: cancelTokenSource.token });
         if (!isMountedRef.current) return;
@@ -173,24 +118,24 @@ const BlockList = () => {
         const listResponse = await blockService.getLatestBlocks(BLOCKS_PER_PAGE, offset, { cancelToken: cancelTokenSource.token });
         if (!isMountedRef.current) return;
         
-        const initialBlocksWithPlaceholders = listResponse.data.blocks.map(b => ({
-          ...b,
-          miningPoolName: LOADING_POOL_NAME_PLACEHOLDER
+        const blocksWithPoolData = listResponse.data.blocks.map(block => ({
+          ...block,
+          miningPoolName: extractPoolName(block.coinbaseHex) // Extract pool name directly
         }));
-        setBlocks(initialBlocksWithPlaceholders);
-        setLoading(false); // Initial list structure is loaded
-
-        if (isMountedRef.current && listResponse.data.blocks.length > 0) {
-          fetchAndSetPoolNamesForBlocks(listResponse.data.blocks, cancelTokenSource.token);
-        }
         
+        if (isMountedRef.current) {
+          setBlocks(blocksWithPoolData);
+        }
       } catch (error) {
         if (axios.isCancel(error)) {
-          console.log('Initial block list fetch cancelled');
+          console.log('Block list fetch cancelled');
         } else if (isMountedRef.current) {
-          console.error('Error fetching initial blocks:', error);
+          console.error('Error fetching blocks:', error);
           showToast('Failed to fetch blocks', 'error');
-          setLoading(false); 
+        }
+      } finally {
+        if (isMountedRef.current) {
+          setLoading(false);
         }
       }
     };
@@ -205,52 +150,43 @@ const BlockList = () => {
   
   // Listen for new blocks via WebSocket
   useEffect(() => {
-    if (!socket) return; // No isMountedRef check here as it's for the lifetime of the listener setup
+    if (!socket) return;
 
-    const newBlockHandler = async (newBlockData) => {
-      // Check mounted status inside the handler before async operations or state updates
+    const newBlockHandler = async (newBlockDataFromSocket) => {
       if (!isMountedRef.current) return;
 
-      if (currentPage === 1) { // Only update if on the first page
-        const newBlockCancelTokenSource = axios.CancelToken.source();
-        try {
-          // Fetch details for the new block to get pool name
-          const blockDetail = await blockService.getBlockByHash(newBlockData.hash, { cancelToken: newBlockCancelTokenSource.token });
-          if (!isMountedRef.current) return;
+      if (currentPage === 1) {
+        let finalNewBlock = { ...newBlockDataFromSocket, miningPoolName: 'Unknown Pool' };
 
-          const coinbaseTxid = blockDetail.data.tx[0];
-          const txDetail = await transactionService.getTransaction(coinbaseTxid, { cancelToken: newBlockCancelTokenSource.token });
-          if (!isMountedRef.current) return;
-
-          const coinbaseVin = txDetail.data.vin[0];
-          const poolName = extractPoolName(coinbaseVin.coinbase, txDetail.data);
-          
-          const blockWithPool = { ...newBlockData, miningPoolName: poolName || 'Unknown Pool' };
-          
-          if (isMountedRef.current) {
-            setBlocks(prevBlocks => {
-              if (prevBlocks.some(b => b.hash === blockWithPool.hash)) return prevBlocks;
-              return [blockWithPool, ...prevBlocks.slice(0, BLOCKS_PER_PAGE - 1)];
-            });
-            setTotalBlocks(prev => prev + 1); // Increment total blocks
-          }
-        } catch (error) {
-          if (axios.isCancel(error)) {
-            console.log('New block processing cancelled.');
-          } else if (isMountedRef.current) {
-            console.error('Error processing new block from socket:', error);
-            // Add block with unknown pool as fallback
-            const blockWithUnknownPool = { ...newBlockData, miningPoolName: 'Unknown Pool' };
-            setBlocks(prevBlocks => {
-              if (prevBlocks.some(b => b.hash === blockWithUnknownPool.hash)) return prevBlocks;
-              return [blockWithUnknownPool, ...prevBlocks.slice(0, BLOCKS_PER_PAGE - 1)];
-            });
-            setTotalBlocks(prev => prev + 1);
+        if (newBlockDataFromSocket.coinbaseHex) {
+          finalNewBlock.miningPoolName = extractPoolName(newBlockDataFromSocket.coinbaseHex);
+        } else {
+          // If coinbaseHex is not in socket data, fetch the full block to get it
+          const newBlockCancelTokenSource = axios.CancelToken.source();
+          try {
+            const fullBlockData = await blockService.getBlockByHash(newBlockDataFromSocket.hash, { cancelToken: newBlockCancelTokenSource.token });
+            if (isMountedRef.current && fullBlockData.data.coinbaseHex) {
+              finalNewBlock.miningPoolName = extractPoolName(fullBlockData.data.coinbaseHex);
+            }
+          } catch (error) {
+            if (axios.isCancel(error)) {
+              console.log('New block (full fetch) processing cancelled.');
+            } else if (isMountedRef.current) {
+              console.error('Error fetching full new block from socket:', error);
+            }
           }
         }
+        
+        if (isMountedRef.current) {
+          setBlocks(prevBlocks => {
+            if (prevBlocks.some(b => b.hash === finalNewBlock.hash)) return prevBlocks;
+            return [finalNewBlock, ...prevBlocks.slice(0, BLOCKS_PER_PAGE - 1)];
+          });
+          setTotalBlocks(prev => prev + 1);
+        }
       }
-      if (isMountedRef.current) { // Check again before showing toast
-        showToast(`New block #${newBlockData.height} mined`, 'info');
+      if (isMountedRef.current) {
+        showToast(`New block #${newBlockDataFromSocket.height} mined`, 'info');
       }
     };
 
@@ -258,10 +194,8 @@ const BlockList = () => {
     
     return () => {
       socket.off('new_block', newBlockHandler);
-      // isMountedRef will be false here if component unmounted,
-      // so newBlockHandler won't run or will bail early.
     };
-  }, [socket, currentPage, showToast]); // Add currentPage to dependencies
+  }, [socket, currentPage, showToast]);
   
   // Effect to handle animation when totalBlocks changes
   useEffect(() => {
@@ -341,9 +275,7 @@ const BlockList = () => {
                           <td className="py-1.5 px-4">{formatNumber(block.tx.length)}</td>
                           <td className="py-1.5 px-4">{formatNumber(block.size)} bytes</td>
                           <td className="py-1.5 px-4 text-center">
-                            {block.miningPoolName === LOADING_POOL_NAME_PLACEHOLDER
-                              ? <span className="text-xs italic text-gray-500">Loading...</span>
-                              : (block.miningPoolName || block.poolName || block.pool || 'Unknown Pool')}
+                            {block.miningPoolName || 'Unknown Pool'}
                           </td>
                           <td className="py-1.5 px-4 font-mono text-xs">
                             <Link to={`/blocks/${block.hash}`} className="text-bitcoinz-600 hover:underline" onClick={e => e.stopPropagation()}>

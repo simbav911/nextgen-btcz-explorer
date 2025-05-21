@@ -38,6 +38,12 @@ const Footer = () => {
               <li>
                 <Link to="/stats" className="text-black hover:text-blue-600 text-sm nav-item-hover px-2 py-1 rounded-md">Network Statistics</Link>
               </li>
+              <li>
+                <Link to="/developers" className="text-black hover:text-blue-600 text-sm nav-item-hover px-2 py-1 rounded-md">Developers</Link>
+              </li>
+              <li>
+                <Link to="/pool-operators" className="text-black hover:text-blue-600 text-sm nav-item-hover px-2 py-1 rounded-md">Pool Operators</Link>
+              </li>
             </ul>
           </div>
 

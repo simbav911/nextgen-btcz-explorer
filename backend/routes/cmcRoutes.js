@@ -7,7 +7,7 @@ const logger = require('../utils/logger');
 router.get('/supply', async (req, res) => {
   try {
     // Max supply for BitcoinZ is 21 billion
-    const maxSupply = 21000000000;
+    let maxSupply = 21000000000;
 
     // Use the existing getTotalSupply function from wealthService
     const totalSupply = await getTotalSupply();
@@ -29,9 +29,13 @@ router.get('/supply', async (req, res) => {
 
     logger.info(`Successfully retrieved total supply for CMC: ${totalSupply}`);
 
+    // Convert to tenths of a coin
+    const formattedTotalSupply = Math.floor(totalSupply * 10);
+    const formattedMaxSupply = maxSupply * 10;
+
     res.json({
-      totalSupply: totalSupply,
-      maxSupply: maxSupply,
+      totalSupply: formattedTotalSupply,
+      maxSupply: formattedMaxSupply,
     });
   } catch (error) {
     logger.error('Error fetching supply for CMC:', error.message, error.stack);

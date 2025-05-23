@@ -15,7 +15,7 @@ const CACHE_DURATION_MS = 5 * 60 * 1000; // 5 minutes
 // Helper function to calculate circulating supply based on block height
 // (Keep this function as it is)
 function calculateCirculatingSupply(blockHeight) {
-  const initialReward = 12.5;
+  const initialReward = 12500; // Adjusted for 21 billion max supply
   const halvingInterval = 840000;
   let supply = 0;
   let currentReward = initialReward;
@@ -51,7 +51,7 @@ async function getTotalSupply() {
     logger.warn('Error calculating supply:', error.message);
   }
   // Fallback, but don't cache this default if calculation failed
-  return 21000000; 
+  return 21000000000; // Adjusted for 21 billion max supply
 }
 
 // Get top holders (Refactored to use Database with proper balance filtering and caching)

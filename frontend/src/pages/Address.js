@@ -559,7 +559,8 @@ const Address = () => {
     return <Spinner message="Loading address data..." />;
   }
   
-  if (error || !addressInfo) {
+  // Show error if there's an error state, or if addressInfo is null, or if addressInfo is an empty object (or lacks a balance)
+  if (error || !addressInfo || typeof addressInfo.balance === 'undefined') {
     return (
       <div className="max-w-7xl mx-auto px-4 sm:px-6 py-8">
         <div className="bg-white rounded-xl shadow-lg p-8 text-center">

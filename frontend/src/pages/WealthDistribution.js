@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useContext } from 'react';
+import { Link, useNavigate } from 'react-router-dom'; // Import Link and useNavigate
 import { FaCoins, FaChartPie, FaListOl, FaInfoCircle } from 'react-icons/fa';
 import { ToastContext } from '../contexts/ToastContext';
 import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip, Legend, BarChart, Bar, XAxis, YAxis, CartesianGrid, Sector } from 'recharts';
@@ -59,6 +60,7 @@ const WealthDistribution = () => {
   const [currentPage, setCurrentPage] = useState(1);
   const [activeIndex, setActiveIndex] = useState(-1); // Track active/hovered pie segment
   const { showToast } = useContext(ToastContext);
+  const navigate = useNavigate(); // Initialize useNavigate
 
   // Enhanced colors with better contrast
   const COLORS = [
@@ -337,8 +339,11 @@ const WealthDistribution = () => {
             className="recharts-legend-item" 
             style={{ display: 'block', marginBottom: '8px', cursor: 'pointer' }}
             onClick={() => {
-              if (entry.value !== 'Others') {
-                window.open(`/address/${item.fullAddress}`, '_blank');
+              if (item.name !== 'Others' && item.fullAddress) { // Ensure fullAddress exists and not 'Others'
+                // For same-tab navigation:
+                navigate(`/address/${item.fullAddress}`);
+                // If new tab is strictly required:
+                // window.open(`/#/address/${item.fullAddress}`, '_blank');
               }
             }}
           >
@@ -532,9 +537,9 @@ const WealthDistribution = () => {
                       </div>
                       <div className="p-2 bg-white rounded-md shadow-sm">
                         <p className="text-xs text-gray-500">Maximum Supply</p>
-                        <p className="text-sm font-bold">21,000,000 BTCZ</p>
+                        <p className="text-sm font-bold">21,000,000,000 BTCZ</p>
                         <p className="text-xs text-gray-500 mt-0.5">
-                          {((totalSupply / 21000000) * 100).toFixed(2)}% in circulation
+                          {((totalSupply / 21000000000) * 100).toFixed(2)}% in circulation
                         </p>
                       </div>
                       <div className="p-2 bg-white rounded-md shadow-sm">
@@ -600,10 +605,10 @@ const WealthDistribution = () => {
                       <tr>
                         <th className="py-2 px-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider w-10">Rank</th>
                         <th className="py-2 px-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Address</th>
-                        <th className="py-2 px-2 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">Balance (BTCZ)</th>
-                        <th className="py-2 px-2 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">% of Total Supply	</th>
-                        <th className="py-2 px-2 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">% of Top 100</th>
-                        <th className="py-2 px-2 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">Txs</th>
+                        <th className="py-2 px-2 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">Balance</th>
+                        <th className="py-2 px-2 text-right text-xs font-medium text-gray-500 uppercase tracking-wider hidden sm:table-cell">% of Supply</th>
+                        <th className="py-2 px-2 text-right text-xs font-medium text-gray-500 uppercase tracking-wider hidden md:table-cell">% of Top 100</th>
+                        <th className="py-2 px-2 text-right text-xs font-medium text-gray-500 uppercase tracking-wider hidden md:table-cell">Txs</th>
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-gray-200">
@@ -622,21 +627,22 @@ const WealthDistribution = () => {
                             (Number(holder.balance) / top100Balance) * 100 : 0;
                             
                           return (
-                            <tr key={holder.address} className={index % 2 === 0 ? 'bg-white hover:bg-blue-50' : 'bg-gray-50 hover:bg-blue-50'}>
-                              <td className="py-1.5 px-2 text-xs font-medium text-gray-900">{index + 1}</td>
-                              <td className="py-1.5 px-2 text-xs">
-                                <a 
-                                  href={`/address/${holder.address}`}
-                                  className="text-blue-600 hover:text-blue-800 font-mono text-xs"
+                            <tr key={holder.address} className={`${index % 2 === 0 ? 'bg-white' : 'bg-gray-50'} hover:bg-blue-50 text-xs sm:text-sm`}>
+                              <td className="py-1.5 px-2 font-medium text-gray-900">{index + 1}</td>
+                              <td className="py-1.5 px-2">
+                                <Link 
+                                  to={`/address/${holder.address}`}
+                                  className="text-blue-600 hover:text-blue-800 font-mono" // text-xs removed, will inherit from tr
                                   title={holder.address}
                                 >
-                                  {holder.address}
-                                </a>
+                                  <span className="hidden sm:inline">{holder.address}</span>
+                                  <span className="sm:hidden">{formatAddress(holder.address)}</span> {/* Use formatAddress for mobile */}
+                                </Link>
                               </td>
-                              <td className="py-1.5 px-2 text-xs text-gray-900 font-medium text-right">{formatNumber(holder.balance)}</td>
-                              <td className="py-1.5 px-2 text-xs text-gray-900 text-right">{percentOfTop100.toFixed(2)}%</td>
-                              <td className="py-1.5 px-2 text-xs text-gray-900 text-right">{(Number(holder.percentageOfSupply) / 100).toFixed(2)}%</td>
-                              <td className="py-1.5 px-2 text-xs text-gray-900 text-right">{formatNumber(holder.txCount)}</td>
+                              <td className="py-1.5 px-2 text-gray-900 font-medium text-right">{formatNumber(holder.balance)}</td>
+                              <td className="py-1.5 px-2 text-gray-900 text-right hidden sm:table-cell">{(Number(holder.percentageOfSupply) / 100).toFixed(2)}%</td>
+                              <td className="py-1.5 px-2 text-gray-900 text-right hidden md:table-cell">{percentOfTop100.toFixed(2)}%</td>
+                              <td className="py-1.5 px-2 text-gray-900 text-right hidden md:table-cell">{formatNumber(holder.txCount)}</td>
                             </tr>
                           );
                         })}

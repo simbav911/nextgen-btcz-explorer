@@ -29,9 +29,9 @@ router.get('/supply', async (req, res) => {
 
     logger.info(`Successfully retrieved total supply for CMC: ${totalSupply}`);
 
-    // Convert to tenths of a coin
-    const formattedTotalSupply = Math.floor(totalSupply * 10);
-    const formattedMaxSupply = maxSupply * 10;
+    // Supply in main coin unit
+    const formattedTotalSupply = Math.floor(totalSupply);
+    const formattedMaxSupply = maxSupply;
 
     res.json({
       totalSupply: formattedTotalSupply,

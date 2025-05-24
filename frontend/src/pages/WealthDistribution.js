@@ -318,7 +318,7 @@ const WealthDistribution = () => {
             {data.name === 'Others' ? 'Combined smaller holders' : data.fullAddress}
           </p>
           <p className="text-sm mt-1">Balance: {formatNumber(payload[0].value)} BTCZ</p>
-          <p className="text-sm">Percentage: {(data.percentage / 1000).toFixed(2)}%</p>
+          <p className="text-sm">Percentage: {Number(data.percentage).toFixed(2)}%</p>
         </div>
       );
     }
@@ -351,9 +351,7 @@ const WealthDistribution = () => {
               <path stroke="none" fill={entry.color} d="M0,4h32v24h-32z" className="recharts-legend-icon" />
             </svg>
             <span className="recharts-legend-item-text font-mono text-xs" style={{ color: entry.color }}>
-              {item.name === 'Others' ? 
-                'Others (53.6%)' : 
-                `${item.rank}. ${item.shortAddress} (${(item.percentage / 1000).toFixed(1)}%)`}
+              {item.name === 'Others' ? `Others (${Number(item.percentage).toFixed(1)}%)` : `${item.rank}. ${item.shortAddress} (${Number(item.percentage).toFixed(1)}%)`}
             </span>
           </li>
         )})}
@@ -545,13 +543,13 @@ const WealthDistribution = () => {
                       <div className="p-2 bg-white rounded-md shadow-sm">
                         <p className="text-xs text-gray-500">Top 10 Holders</p>
                         <p className="text-sm font-bold">
-                          {(getTop10Percentage() / 1000).toFixed(2)}%
+                          {getTop10Percentage().toFixed(2)}%
                         </p>
                       </div>
                       <div className="p-2 bg-white rounded-md shadow-sm">
                         <p className="text-xs text-gray-500">Top 100 Holders</p>
                         <p className="text-sm font-bold">
-                          {(getTop100Percentage() / 1000).toFixed(2)}%
+                          {getTop100Percentage().toFixed(2)}%
                         </p>
                       </div>
                       <div className="p-2 bg-white rounded-md shadow-sm col-span-2">
@@ -640,7 +638,7 @@ const WealthDistribution = () => {
                                 </Link>
                               </td>
                               <td className="py-1.5 px-2 text-gray-900 font-medium text-right">{formatNumber(holder.balance)}</td>
-                              <td className="py-1.5 px-2 text-gray-900 text-right hidden sm:table-cell">{(Number(holder.percentageOfSupply) / 100).toFixed(2)}%</td>
+                              <td className="py-1.5 px-2 text-gray-900 text-right hidden sm:table-cell">{Number(holder.percentageOfSupply).toFixed(2)}%</td>
                               <td className="py-1.5 px-2 text-gray-900 text-right hidden md:table-cell">{percentOfTop100.toFixed(2)}%</td>
                               <td className="py-1.5 px-2 text-gray-900 text-right hidden md:table-cell">{formatNumber(holder.txCount)}</td>
                             </tr>

@@ -1,7 +1,9 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useParams, Link, useNavigate } from 'react-router-dom';
 import { FaCube, FaArrowLeft, FaArrowRight } from 'react-icons/fa';
-import moment from 'moment';
+import dayjs from 'dayjs';
+import relativeTime from 'dayjs/plugin/relativeTime';
+dayjs.extend(relativeTime);
 import axios from 'axios';
 
 // Components
@@ -305,7 +307,7 @@ const Block = () => {
     { label: 'Hash', value: block.hash },
     { label: 'Height', value: formatNumber(block.height) },
     { label: 'Confirmations', value: formatNumber(block.confirmations) },
-    { label: 'Timestamp', value: `${formatTimestamp(block.time)} (${moment.unix(block.time).fromNow()})` },
+    { label: 'Timestamp', value: `${formatTimestamp(block.time)} (${dayjs.unix(block.time).fromNow()})` },
     { label: 'Difficulty', value: block.difficulty.toFixed(8) },
     { label: 'Merkle Root', value: block.merkleroot },
     { label: 'Size', value: `${formatNumber(block.size)} bytes` },

@@ -621,100 +621,35 @@ const updateAddressBalances = async () => {
 };
 
 /**
- * Update balance for a specific address
+ * Update balance for a specific address using RPC getaddressbalance
+ * (replaces slow JSONB full-table scans with direct address-index lookup)
  */
 const updateAddressBalance = async (address) => {
   try {
-    // Calculate balance from transactions
-    const received = await calculateAddressReceived(address);
-    const sent = await calculateAddressSent(address);
-    const balance = received - sent;
-    
-    // Update address record
-    await Address.update({
-      balance,
-      totalReceived: received,
-      totalSent: sent,
-      lastUpdated: new Date()
-    }, {
-      where: { address }
-    });
-    
-    return { address, balance, totalReceived: received, totalSent: sent };
+    const result = await bitcoinzService.executeRpcCommand('getaddressbalance', [{ addresses: [address] }]);
+
+    if (result && 'balance' in result && 'received' in result) {
+      const balance = parseFloat(result.balance) / 1e8;
+      const totalReceived = parseFloat(result.received) / 1e8;
+      const totalSent = totalReceived - balance;
+
+      await Address.update({
+        balance,
+        totalReceived,
+        totalSent,
+        lastUpdated: new Date()
+      }, {
+        where: { address }
+      });
+
+      return { address, balance, totalReceived, totalSent };
+    }
+
+    logger.warn(`Invalid getaddressbalance response for ${address}`);
+    return { address, balance: 0, totalReceived: 0, totalSent: 0 };
   } catch (error) {
     logger.error(`Error updating balance for address ${address}:`, error);
     throw error;
-  }
-};
-
-/**
- * Calculate total received amount for an address
- */
-const calculateAddressReceived = async (address) => {
-  try {
-    // Find all transactions where this address received funds
-    const transactions = await Transaction.findAll({
-      where: {
-        // Use a raw query condition since we need to check JSONB data
-        [Op.or]: [
-          sequelize.literal(`vout @> '[{"scriptPubKey": {"addresses": ["${address}"]}}]'::jsonb`)
-        ]
-      }
-    });
-    
-    let totalReceived = 0;
-    
-    for (const tx of transactions) {
-      if (tx.vout) {
-        for (const output of tx.vout) {
-          if (output.scriptPubKey && 
-              output.scriptPubKey.addresses && 
-              output.scriptPubKey.addresses.includes(address) &&
-              output.value) {
-            totalReceived += output.value;
-          }
-        }
-      }
-    }
-    
-    return totalReceived;
-  } catch (error) {
-    logger.error(`Error calculating received amount for address ${address}:`, error);
-    return 0;
-  }
-};
-
-/**
- * Calculate total sent amount for an address
- */
-const calculateAddressSent = async (address) => {
-  try {
-    // Find all transactions where this address sent funds
-    const transactions = await Transaction.findAll({
-      where: {
-        // Use a raw query condition since we need to check JSONB data
-        [Op.or]: [
-          sequelize.literal(`vin @> '[{"address": "${address}"}]'::jsonb`)
-        ]
-      }
-    });
-    
-    let totalSent = 0;
-    
-    for (const tx of transactions) {
-      if (tx.vin) {
-        for (const input of tx.vin) {
-          if (input.address === address && input.value) {
-            totalSent += input.value;
-          }
-        }
-      }
-    }
-    
-    return totalSent;
-  } catch (error) {
-    logger.error(`Error calculating sent amount for address ${address}:`, error);
-    return 0;
   }
 };
 

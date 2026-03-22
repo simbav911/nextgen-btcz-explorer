@@ -105,14 +105,14 @@ api.interceptors.response.use(response => {
   const cacheKey = `${response.config.url}?${JSON.stringify(response.config.params || {})}`;
 
   // Different TTL for different endpoints
-  let ttl = 5000; // Default: 5 seconds
+  let ttl = 10000; // Default: 10 seconds
 
   if (response.config.url.includes('/blocks')) {
-    ttl = 3000; // Blocks: cache for 3 seconds
+    ttl = 15000; // Blocks: cache for 15 seconds (block time is 2.5min)
   } else if (response.config.url.includes('/transactions')) {
-    ttl = 3000; // Transactions: cache for 3 seconds
+    ttl = 15000; // Transactions: cache for 15 seconds
   } else if (response.config.url.includes('/stats')) {
-    ttl = 30000; // Stats: cache for 30 seconds
+    ttl = 60000; // Stats: cache for 60 seconds
   }
 
   // Cache the response data

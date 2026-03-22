@@ -19,8 +19,8 @@ const RPC_CONFIG = {
 };
 
 // Settings - very conservative defaults
-const BATCH_SIZE = parseInt(process.env.BATCH_SIZE || '50');
-const CONCURRENT_BLOCKS = parseInt(process.env.CONCURRENT_BLOCKS || '3');
+const BATCH_SIZE = parseInt(process.env.BATCH_SIZE || '200');
+const CONCURRENT_BLOCKS = parseInt(process.env.CONCURRENT_BLOCKS || '5');
 const RETRY_DELAY = parseInt(process.env.RETRY_DELAY || '1000');
 const UPDATE_UI_INTERVAL = 10; // Update UI every 10 blocks
 

@@ -93,11 +93,15 @@ const startServer = async () => {
     if (dbType === 'postgres') {
       try {
         initializeModels();
-        
-        // Start the blockchain indexer service
-        logger.info('Starting blockchain indexer service...');
-        await initializeIndexer();
-        logger.info('Blockchain indexer service started');
+
+        // Only run the indexer on instance 0 (cluster mode) to avoid duplicate work
+        if (process.env.NODE_APP_INSTANCE === '0' || !process.env.NODE_APP_INSTANCE) {
+          logger.info('Starting blockchain indexer service...');
+          await initializeIndexer();
+          logger.info('Blockchain indexer service started');
+        } else {
+          logger.info(`Skipping indexer on instance ${process.env.NODE_APP_INSTANCE}`);
+        }
       } catch (modelError) {
         logger.warn('Model initialization failed:', modelError.message);
       }

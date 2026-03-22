@@ -78,4 +78,4 @@ const HashLink = ({ hash, type = 'tx', length = 10, showCopy = true, className =
   );
 };
 
-export default HashLink;
+export default React.memo(HashLink);

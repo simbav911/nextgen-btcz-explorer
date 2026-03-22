@@ -1,5 +1,6 @@
 const axios = require('axios');
 const logger = require('../utils/logger');
+const cache = require('../utils/cache');
 const fs = require('fs');
 const path = require('path');
 const os = require('os');
@@ -200,10 +201,14 @@ const executeRpcCommand = async (method, params = [], timeout = 30000) => {
 };
 
 /**
- * Get blockchain info
+ * Get blockchain info (cached 5s)
  */
 const getBlockchainInfo = async () => {
-  return executeRpcCommand('getblockchaininfo');
+  const cached = cache.get('blockchaininfo');
+  if (cached) return cached;
+  const result = await executeRpcCommand('getblockchaininfo');
+  cache.set('blockchaininfo', result, 5000);
+  return result;
 };
 
 /**
@@ -219,13 +224,18 @@ const getBestBlockHash = async () => {
 const getBlock = async (hash, verbosity = 1) => {
   try {
     logger.debug(`Getting block with hash ${hash} (verbosity ${verbosity})`);
-    
+
     // Handle invalid or non-hex hash format
     if (!hash || typeof hash !== 'string' || !/^[0-9a-fA-F]+$/.test(hash)) {
       logger.error(`Invalid block hash format: ${hash}`);
       throw new Error(`Invalid block hash format: ${hash}`);
     }
-    
+
+    // Cache blocks for 60s (immutable once confirmed)
+    const cacheKey = `block:${hash}:${verbosity}`;
+    const cached = cache.get(cacheKey);
+    if (cached) return cached;
+
     // Add timeout to get better error messages
     const result = await executeRpcCommand('getblock', [hash, verbosity], 15000);
     
@@ -233,7 +243,8 @@ const getBlock = async (hash, verbosity = 1) => {
       // Log some basic block information
       logger.debug(`Block ${hash.substring(0, 8)}... retrieved: height=${result.height}, txs=${result.tx.length}, size=${result.size}`);
     }
-    
+
+    cache.set(cacheKey, result, 60000);
     return result;
   } catch (error) {
     // Improve error reporting
@@ -308,49 +319,73 @@ const getTransaction = async (txid, includeWatchonly = true) => {
  */
 const getRawTransaction = async (txid, verbose = 1) => {
   try {
+    // Cache raw transactions for 60s (immutable once confirmed)
+    const cacheKey = `rawtx:${txid}:${verbose}`;
+    const cached = cache.get(cacheKey);
+    if (cached) return cached;
+
     const transaction = await executeRpcCommand('getrawtransaction', [txid, verbose]);
-    
+
     if (verbose === 1 && transaction) {
       if (transaction.valueBalance !== undefined) {
         logger.debug(`Processing shielded transaction: ${txid}`);
-        
+
         if (!transaction.vShieldedSpend) {
           transaction.vShieldedSpend = [];
         }
-        
+
         if (!transaction.vShieldedOutput) {
           transaction.vShieldedOutput = [];
         }
-        
+
         logger.debug(`Shielded transaction details: valueBalance=${transaction.valueBalance}, spends=${transaction.vShieldedSpend.length}, outputs=${transaction.vShieldedOutput.length}`);
       }
-      
+
       if (transaction.vin && transaction.vin.length > 0) {
-        for (const input of transaction.vin) {
-          if (input.coinbase) continue;
-          
-          if (input.txid && input.vout !== undefined && (!input.address || input.value === undefined)) {
-            try {
-              const prevTx = await executeRpcCommand('getrawtransaction', [input.txid, 1]);
-              if (prevTx && prevTx.vout && prevTx.vout[input.vout]) {
-                const prevOutput = prevTx.vout[input.vout];
-                
-                if (prevOutput.scriptPubKey && prevOutput.scriptPubKey.addresses && prevOutput.scriptPubKey.addresses.length > 0) {
-                  input.address = prevOutput.scriptPubKey.addresses[0];
-                }
-                
-                if (prevOutput.value !== undefined) {
-                  input.value = prevOutput.value;
-                }
+        // Resolve all previous outputs in parallel (fixes N+1 sequential RPC calls)
+        const inputsToResolve = transaction.vin.filter(
+          input => !input.coinbase && input.txid && input.vout !== undefined && (!input.address || input.value === undefined)
+        );
+
+        if (inputsToResolve.length > 0) {
+          // Deduplicate txids to avoid redundant RPC calls
+          const uniqueTxids = [...new Set(inputsToResolve.map(i => i.txid))];
+          const prevTxMap = new Map();
+
+          const prevTxResults = await Promise.all(
+            uniqueTxids.map(prevTxid =>
+              executeRpcCommand('getrawtransaction', [prevTxid, 1])
+                .then(tx => ({ txid: prevTxid, tx }))
+                .catch(err => {
+                  logger.error(`Failed to fetch previous transaction ${prevTxid}: ${err.message}`);
+                  return { txid: prevTxid, tx: null };
+                })
+            )
+          );
+
+          for (const { txid: prevTxid, tx } of prevTxResults) {
+            if (tx) prevTxMap.set(prevTxid, tx);
+          }
+
+          for (const input of inputsToResolve) {
+            const prevTx = prevTxMap.get(input.txid);
+            if (prevTx && prevTx.vout && prevTx.vout[input.vout]) {
+              const prevOutput = prevTx.vout[input.vout];
+
+              if (prevOutput.scriptPubKey && prevOutput.scriptPubKey.addresses && prevOutput.scriptPubKey.addresses.length > 0) {
+                input.address = prevOutput.scriptPubKey.addresses[0];
               }
-            } catch (err) {
-              logger.error(`Failed to fetch previous transaction ${input.txid}: ${err.message}`);
+
+              if (prevOutput.value !== undefined) {
+                input.value = prevOutput.value;
+              }
             }
           }
         }
       }
     }
-    
+
+    cache.set(cacheKey, transaction, 60000);
     return transaction;
   } catch (error) {
     logger.error(`Failed to get raw transaction ${txid}:`, error.message);
@@ -420,6 +455,8 @@ const getLatestTransactions = async (count = 10) => {
  * Get network stats
  */
 const getNetworkStats = async () => {
+  const cached = cache.get('networkstats');
+  if (cached) return cached;
   try {
     const [blockchainInfo, networkInfo, miningInfo] = await Promise.all([
       executeRpcCommand('getblockchaininfo'),
@@ -448,11 +485,9 @@ const getNetworkStats = async () => {
       logger.debug(`Using reindexing progress: ${lastReindexProgress.percentage}%`);
     }
     
-    return {
-      blockchainInfo,
-      networkInfo,
-      miningInfo
-    };
+    const result = { blockchainInfo, networkInfo, miningInfo };
+    cache.set('networkstats', result, 30000);
+    return result;
   } catch (error) {
     logger.error('Failed to get network stats:', error.message);
     throw error;
@@ -554,26 +589,13 @@ const getAddressInfo = async (address) => {
     } catch (txidsError) {
       logger.error(`Failed to get txids for address ${address}: ${txidsError.message}`);
       
-      // If getaddresstxids fails, try importing the address first
+      // If getaddresstxids fails, fire-and-forget importaddress for future lookups
       if (txIds.size === 0) {
-        try {
-          logger.debug(`No transactions found for ${address}, trying importaddress`);
-          await executeRpcCommand('importaddress', [address, '', false]);
-          logger.debug(`Successfully imported address ${address}`);
-          
-          const utxos = await executeRpcCommand('listunspent', [0, 9999999, [address]]);
-          logger.debug(`After import: Found ${utxos.length} UTXOs for address ${address}`);
-          
-          for (const utxo of utxos) {
-            balance += utxo.amount;
-            
-            if (!txIds.has(utxo.txid)) {
-              txIds.add(utxo.txid);
-            }
-          }
-        } catch (importError) {
-          logger.error(`Error importing address ${address}: ${importError.message}`);
-        }
+        setImmediate(() => {
+          executeRpcCommand('importaddress', [address, '', false])
+            .then(() => logger.debug(`Successfully imported address ${address}`))
+            .catch(err => logger.error(`Error importing address ${address}: ${err.message}`));
+        });
       }
     }
     

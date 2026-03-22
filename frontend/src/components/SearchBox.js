@@ -107,4 +107,4 @@ const SearchBox = ({ placeholder = 'Enter a block height, transaction hash, or a
   );
 };
 
-export default SearchBox;
+export default React.memo(SearchBox);

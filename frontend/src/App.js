@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react';
+import React, { useState, useEffect, useRef, useCallback, useMemo, Suspense } from 'react';
 import { Routes, Route, createRoutesFromElements } from 'react-router-dom';
 import { io } from 'socket.io-client';
 
@@ -9,24 +9,25 @@ import './styles/background.css';
 import ModernHeader from './components/ModernHeader';
 import Footer from './components/Footer';
 import Toast from './components/Toast';
+import Spinner from './components/Spinner';
 
 // Import configuration
 import config from './config';
 
-// Pages
-import Home from './pages/Home';
-import Block from './pages/Block';
-import Transaction from './pages/Transaction';
-import Address from './pages/Address';
-import BlockList from './pages/BlockList';
-import TransactionList from './pages/TransactionList';
-import Status from './pages/Status';
-import Charts from './pages/Charts';
-import Search from './pages/Search';
-import NotFound from './pages/NotFound';
-import WealthDistribution from './pages/WealthDistribution';
-import Developers from './pages/Developers';
-import PoolOperators from './pages/PoolOperators';
+// Lazy-loaded pages (code splitting — only loads JS when route is visited)
+const Home = React.lazy(() => import('./pages/Home'));
+const Block = React.lazy(() => import('./pages/Block'));
+const Transaction = React.lazy(() => import('./pages/Transaction'));
+const Address = React.lazy(() => import('./pages/Address'));
+const BlockList = React.lazy(() => import('./pages/BlockList'));
+const TransactionList = React.lazy(() => import('./pages/TransactionList'));
+const Status = React.lazy(() => import('./pages/Status'));
+const Charts = React.lazy(() => import('./pages/Charts'));
+const Search = React.lazy(() => import('./pages/Search'));
+const NotFound = React.lazy(() => import('./pages/NotFound'));
+const WealthDistribution = React.lazy(() => import('./pages/WealthDistribution'));
+const Developers = React.lazy(() => import('./pages/Developers'));
+const PoolOperators = React.lazy(() => import('./pages/PoolOperators'));
 
 // Context
 import { SocketContext } from './contexts/SocketContext';
@@ -175,21 +176,23 @@ function App({ skipHeader = false }) {
       <SocketContext.Provider value={socketRef.current}>
         <ToastContext.Provider value={toastContextValue}>
           <main className="flex-grow py-4 sm:py-6 md:py-8 content-container">
-            <Routes>
-              <Route path="/" element={<Home />} />
-              <Route path="/blocks" element={<BlockList />} />
-              <Route path="/blocks/:hash" element={<Block />} />
-              <Route path="/transactions" element={<TransactionList />} />
-              <Route path="/tx/:txid" element={<Transaction />} />
-              <Route path="/address/:address" element={<Address />} />
-              <Route path="/stats" element={<Status />} />
-              <Route path="/charts" element={<Charts />} />
-              <Route path="/wealth-distribution" element={<WealthDistribution />} />
-              <Route path="/search" element={<Search />} />
-              <Route path="/developers" element={<Developers />} />
-              <Route path="/pool-operators" element={<PoolOperators />} />
-              <Route path="*" element={<NotFound />} />
-            </Routes>
+            <Suspense fallback={<Spinner />}>
+              <Routes>
+                <Route path="/" element={<Home />} />
+                <Route path="/blocks" element={<BlockList />} />
+                <Route path="/blocks/:hash" element={<Block />} />
+                <Route path="/transactions" element={<TransactionList />} />
+                <Route path="/tx/:txid" element={<Transaction />} />
+                <Route path="/address/:address" element={<Address />} />
+                <Route path="/stats" element={<Status />} />
+                <Route path="/charts" element={<Charts />} />
+                <Route path="/wealth-distribution" element={<WealthDistribution />} />
+                <Route path="/search" element={<Search />} />
+                <Route path="/developers" element={<Developers />} />
+                <Route path="/pool-operators" element={<PoolOperators />} />
+                <Route path="*" element={<NotFound />} />
+              </Routes>
+            </Suspense>
           </main>
           <Footer />
           {toast && <Toast message={toast.message} type={toast.type} />}

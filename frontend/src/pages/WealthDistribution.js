@@ -1,9 +1,13 @@
-import React, { useState, useEffect, useContext } from 'react';
-import { Link, useNavigate } from 'react-router-dom'; // Import Link and useNavigate
+import React, { useState, useEffect, useContext, useRef } from 'react';
+import { Link, useNavigate } from 'react-router-dom';
 import { FaCoins, FaChartPie, FaListOl, FaInfoCircle } from 'react-icons/fa';
 import { ToastContext } from '../contexts/ToastContext';
-import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip, Legend, BarChart, Bar, XAxis, YAxis, CartesianGrid, Sector } from 'recharts';
+import { Pie, Bar } from 'react-chartjs-2';
+import { Chart, ArcElement, BarElement, CategoryScale, LinearScale, Tooltip as ChartTooltip, Legend as ChartLegend } from 'chart.js';
 import './wealthDistribution.css';
+
+// Register Chart.js components
+Chart.register(ArcElement, BarElement, CategoryScale, LinearScale, ChartTooltip, ChartLegend);
 
 // Mock data for top holders (used when API is not available)
 const MOCK_TOP_HOLDERS = [
@@ -33,17 +37,18 @@ const MOCK_DISTRIBUTION = [
   { range: '1000 - 10000', count: 3500, min: 1000, max: 10000 },
   { range: '10000 - 100000', count: 850, min: 10000, max: 100000 },
   { range: '100000 - 1000000', count: 120, min: 100000, max: 1000000 },
-  { range: '1000000 - ∞', count: 15, min: 1000000, max: Infinity },
+  { range: '1000000 - \u221E', count: 15, min: 1000000, max: Infinity },
 ];
 
-// Mock total supply
 const MOCK_TOTAL_SUPPLY = 21000000;
-
-// Mock total addresses
 const MOCK_TOTAL_ADDRESSES = 272485;
-
-// API base URL - use relative URLs for proxy to work
 const API_BASE_URL = '/api';
+
+const COLORS = [
+  '#0088FE', '#00C49F', '#FFBB28', '#FF8042',
+  '#8884d8', '#82ca9d', '#ffc658', '#8dd1e1',
+  '#a4de6c', '#d0ed57', '#83a6ed'
+];
 
 const WealthDistribution = () => {
   const [topHolders, setTopHolders] = useState([]);
@@ -54,98 +59,56 @@ const WealthDistribution = () => {
   const [totalAddresses, setTotalAddresses] = useState(0);
   const [usingMockData, setUsingMockData] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
-  const [dataVersion, setDataVersion] = useState(0); // Add a version to prevent data changing on refresh
-  const [syncStatus, setSyncStatus] = useState(null); // State for sync status
-  const [pageSize, setPageSize] = useState(25); // Default show 25 holders
+  const [dataVersion, setDataVersion] = useState(0);
+  const [syncStatus, setSyncStatus] = useState(null);
+  const [pageSize, setPageSize] = useState(25);
   const [currentPage, setCurrentPage] = useState(1);
-  const [activeIndex, setActiveIndex] = useState(-1); // Track active/hovered pie segment
   const { showToast } = useContext(ToastContext);
-  const navigate = useNavigate(); // Initialize useNavigate
-
-  // Enhanced colors with better contrast
-  const COLORS = [
-    '#0088FE', '#00C49F', '#FFBB28', '#FF8042', 
-    '#8884d8', '#82ca9d', '#ffc658', '#8dd1e1',
-    '#a4de6c', '#d0ed57', '#83a6ed', '#8884d8',
-    '#fa8072', '#ff6347', '#ff7f50', '#ffa500'
-  ];
+  const navigate = useNavigate();
+  const pieRef = useRef(null);
 
   useEffect(() => {
     const fetchRealData = async () => {
       try {
         setLoading(true);
-        console.log('Attempting to fetch real data from:', `${API_BASE_URL}/wealth/top-holders`);
-        
-        // Attempt to fetch real data first
-        const holdersResponse = await fetch(`${API_BASE_URL}/wealth/top-holders?limit=100&v=${Date.now()}`, {
-          headers: {
-            'Cache-Control': 'no-cache, no-store, must-revalidate',
-            'Pragma': 'no-cache',
-            'Expires': '0'
-          }
-        });
-        
-        // Process holders data
+
+        const holdersResponse = await fetch(`${API_BASE_URL}/wealth/top-holders?limit=100`);
         const holdersData = await holdersResponse.json();
-        console.log('Received holders data:', holdersData);
-        
-        // Set top holders data
+
         if (holdersData && holdersData.topHolders && holdersData.topHolders.length > 0) {
-          // Debug: Log the first few holders to check percentage values
-          console.log('First 5 holders percentages:', holdersData.topHolders.slice(0, 5).map(h => h.percentageOfSupply));
-          
           setTopHolders(holdersData.topHolders);
           setTotalSupply(holdersData.totalSupply || MOCK_TOTAL_SUPPLY);
           setTotalAddresses(holdersData.totalAddressesAnalyzed || MOCK_TOTAL_ADDRESSES);
         } else {
-          // If no top holders data, use mock data
           setTopHolders(MOCK_TOP_HOLDERS);
           setTotalSupply(MOCK_TOTAL_SUPPLY);
           setTotalAddresses(MOCK_TOTAL_ADDRESSES);
           setUsingMockData(true);
         }
-        
-        // Fetch distribution data
-        console.log('Fetching distribution data from:', `${API_BASE_URL}/wealth/distribution`);
-        const distributionResponse = await fetch(`${API_BASE_URL}/wealth/distribution?v=${Date.now()}`, {
-          headers: {
-            'Cache-Control': 'no-cache, no-store, must-revalidate',
-            'Pragma': 'no-cache',
-            'Expires': '0'
-          }
-        });
-        
-        // Process distribution data
+
+        const distributionResponse = await fetch(`${API_BASE_URL}/wealth/distribution`);
         const distributionData = await distributionResponse.json();
-        console.log('Received distribution data:', distributionData);
-        
-        // Set distribution data
+
         if (distributionData && distributionData.distribution && distributionData.distribution.length > 0) {
           setDistribution(distributionData.distribution);
-          // Only update totalAddresses if we haven't already got it from top holders
           if (!holdersData || !holdersData.totalAddressesAnalyzed) {
             setTotalAddresses(distributionData.totalAddresses || MOCK_TOTAL_ADDRESSES);
           }
           setUsingMockData(false);
         } else {
-          // If no distribution data, use mock data
           setDistribution(MOCK_DISTRIBUTION);
           setUsingMockData(true);
         }
-        
-        // Successfully completed data fetch
+
         setLoading(false);
-        
-        if (!holdersData || !holdersData.topHolders || !distributionData || !distributionData.distribution) {
-          console.log('Using mock data for some or all elements');
+
+        if (!holdersData?.topHolders || !distributionData?.distribution) {
           showToast('Using partially simulated data for wealth distribution', 'info');
         } else {
-          console.log('Successfully loaded real blockchain data');
           showToast('Using real blockchain data for wealth distribution', 'success');
         }
       } catch (error) {
         console.error('Error fetching data:', error);
-        // Fall back to mock data
         setTopHolders(MOCK_TOP_HOLDERS);
         setDistribution(MOCK_DISTRIBUTION);
         setTotalSupply(MOCK_TOTAL_SUPPLY);
@@ -155,208 +118,191 @@ const WealthDistribution = () => {
         showToast('Using simulated data for wealth distribution', 'info');
       }
     };
-    
-    // Start by trying to fetch real data
+
     fetchRealData();
 
-    // Fetch sync status
     const fetchSyncStatus = async () => {
       try {
         const response = await fetch(`${API_BASE_URL}/sync/status`);
         if (response.ok) {
           const status = await response.json();
           setSyncStatus(status);
-        } else {
-          console.error('Failed to fetch sync status');
         }
       } catch (error) {
         console.error('Error fetching sync status:', error);
       }
     };
     fetchSyncStatus();
-
   }, [showToast, dataVersion]);
 
-  // Determine if initial sync is likely ongoing
   const isInitialSync = syncStatus && syncStatus.currentHeight > 0 &&
     (syncStatus.lastSyncedBlock < 1000 || (syncStatus.currentHeight - syncStatus.lastSyncedBlock > 1000));
 
-  // Format number with commas
   const formatNumber = (num) => {
-    // Handle null or undefined inputs gracefully
-    if (num === null || num === undefined) {
-      return '0';
-    }
+    if (num === null || num === undefined) return '0';
     return Math.floor(num).toLocaleString();
   };
 
-  // Format percentage 
-  const formatPercentage = (percent) => {
-    // Handle null or undefined inputs gracefully
-    if (percent === null || percent === undefined || typeof percent !== 'number') {
-      return '0.00%';
-    }
-    // Format the number with 2 decimal places - scale down by 100 as backend provides percentages multiplied by 100
-    return (percent / 100).toFixed(2) + '%';
-  };
-
-  // Format large percentages without scaling down
   const formatLargePercentage = (percent) => {
-    if (percent === null || percent === undefined || typeof percent !== 'number') {
-      return '0.00%';
-    }
-    // For distribution table, we want to show actual percentages without scaling
+    if (percent === null || percent === undefined || typeof percent !== 'number') return '0.00%';
     return percent.toFixed(2) + '%';
   };
 
-  // Format address for display
   const formatAddress = (address) => {
     return `${address.substring(0, 10)}...${address.substring(address.length - 4)}`;
   };
 
-  // Prepare data for pie chart
-  const preparePieChartData = () => {
-    if (topHolders.length === 0) return [];
-    
-    // Take top 10 holders
-    const top10 = topHolders.slice(0, 10);
-    
-    // Calculate total balance of all holders
-    const totalBalance = topHolders.reduce((sum, holder) => sum + Number(holder.balance || 0), 0);
-    
-    // Calculate "Others" balance
-    const othersBalance = topHolders.slice(10).reduce((sum, holder) => sum + Number(holder.balance || 0), 0);
-    
-    // Map top 10 holders to data points with balance as value
-    const data = top10.map((holder, index) => ({
-      name: `Rank ${index + 1}`, // Use clear rank labels instead of t1X format
-      value: Number(holder.balance || 0),
-      fullAddress: holder.address,
-      shortAddress: formatAddress(holder.address),
-      percentage: holder.percentageOfSupply,
-      rank: index + 1
-    }));
-    
-    // Add "Others" if there are more than 10 holders
-    if (othersBalance > 0) {
-      data.push({
-        name: 'Others',
-        value: othersBalance,
-        fullAddress: 'Combined smaller holders',
-        shortAddress: 'Others',
-        percentage: (othersBalance / totalSupply) * 100
-      });
-    }
-    
-    return data;
-  };
-
-  // Prepare data for bar chart
-  const prepareBarChartData = () => {
-    return distribution.map(item => {
-      // Format range for better display
-      let displayRange = item.range;
-      
-      // Replace infinity symbol with "+" for better readability
-      if (displayRange.includes('∞')) {
-        displayRange = displayRange.replace('∞', '+');
-      }
-      
-      // Add "K" for thousands and "M" for millions to make labels more compact
-      if (displayRange.includes('1000000')) {
-        displayRange = displayRange.replace('1000000', '1M');
-      } else if (displayRange.includes('100000')) {
-        displayRange = displayRange.replace('100000', '100K');
-      } else if (displayRange.includes('10000')) {
-        displayRange = displayRange.replace('10000', '10K');
-      } else if (displayRange.includes('1000')) {
-        displayRange = displayRange.replace('1000', '1K');
-      }
-      
-      return {
-        name: displayRange,
-        count: item.count,
-        percentage: (item.count / totalAddresses) * 100,
-        originalRange: item.range // Keep original range for tooltip
-      };
-    });
-  };
-
-  // Calculate top 10 and top 100 holder percentages
   const getTop10Percentage = () => {
     if (!topHolders.length) return 0;
-    
-    // Simply sum the first 10 holders' percentages
-    // The backend provides percentages that need to be scaled down by 100
-    return topHolders.slice(0, 10).reduce((sum, h) => {
-      // Ensure we're working with a valid number - do not scale down here
-      const percentage = Number(h.percentageOfSupply || 0);
-      return sum + percentage;
-    }, 0);
+    return topHolders.slice(0, 10).reduce((sum, h) => sum + Number(h.percentageOfSupply || 0), 0);
   };
 
   const getTop100Percentage = () => {
     if (!topHolders.length) return 0;
-    
-    // Simply sum up to 100 holders' percentages
-    const holdersToSum = topHolders.slice(0, Math.min(100, topHolders.length));
-    return holdersToSum.reduce((sum, h) => {
-      // Ensure we're working with a valid number - do not scale down here
-      const percentage = Number(h.percentageOfSupply || 0);
-      return sum + percentage;
-    }, 0);
+    return topHolders.slice(0, Math.min(100, topHolders.length))
+      .reduce((sum, h) => sum + Number(h.percentageOfSupply || 0), 0);
   };
 
-  // Custom tooltip for pie chart
-  const CustomTooltip = ({ active, payload }) => {
-    if (active && payload && payload.length) {
-      const data = payload[0].payload;
-      return (
-        <div className="bg-white p-3 border rounded shadow-md">
-          <p className="font-semibold">{data.name}</p>
-          <p className="text-sm text-gray-600 break-all">
-            {data.name === 'Others' ? 'Combined smaller holders' : data.fullAddress}
-          </p>
-          <p className="text-sm mt-1">Balance: {formatNumber(payload[0].value)} BTCZ</p>
-          <p className="text-sm">Percentage: {Number(data.percentage).toFixed(2)}%</p>
-        </div>
-      );
+  // Pie chart data (chart.js format)
+  const preparePieChartData = () => {
+    if (topHolders.length === 0) return { labels: [], datasets: [] };
+
+    const top10 = topHolders.slice(0, 10);
+    const othersBalance = topHolders.slice(10).reduce((sum, h) => sum + Number(h.balance || 0), 0);
+
+    const labels = top10.map((h, i) => `Rank ${i + 1}`);
+    const data = top10.map(h => Number(h.balance || 0));
+    const bgColors = top10.map((_, i) => COLORS[i % COLORS.length]);
+
+    if (othersBalance > 0) {
+      labels.push('Others');
+      data.push(othersBalance);
+      bgColors.push('#cccccc');
     }
-    return null;
+
+    return {
+      labels,
+      datasets: [{
+        data,
+        backgroundColor: bgColors,
+        borderColor: '#ffffff',
+        borderWidth: 2,
+        hoverOffset: 10
+      }]
+    };
   };
 
-  // Custom legend for pie chart
-  const CustomLegend = (props) => {
-    const { payload } = props;
-    
-    return (
-      <ul className="recharts-default-legend" style={{ padding: 0, margin: 0, textAlign: 'left' }}>
-        {payload.map((entry, index) => {
-          const item = entry.payload;
-          return (
-          <li 
-            key={`item-${index}`} 
-            className="recharts-legend-item" 
-            style={{ display: 'block', marginBottom: '8px', cursor: 'pointer' }}
-            onClick={() => {
-              if (item.name !== 'Others' && item.fullAddress) { // Ensure fullAddress exists and not 'Others'
-                // For same-tab navigation:
-                navigate(`/address/${item.fullAddress}`);
-                // If new tab is strictly required:
-                // window.open(`/#/address/${item.fullAddress}`, '_blank');
-              }
-            }}
-          >
-            <svg className="recharts-surface" width="10" height="10" viewBox="0 0 32 32" style={{ display: 'inline-block', verticalAlign: 'middle', marginRight: '6px' }}>
-              <path stroke="none" fill={entry.color} d="M0,4h32v24h-32z" className="recharts-legend-icon" />
-            </svg>
-            <span className="recharts-legend-item-text font-mono text-xs" style={{ color: entry.color }}>
-              {item.name === 'Others' ? `Others (${Number(item.percentage).toFixed(1)}%)` : `${item.rank}. ${item.shortAddress} (${Number(item.percentage).toFixed(1)}%)`}
-            </span>
-          </li>
-        )})}
-      </ul>
-    );
+  const pieOptions = {
+    responsive: true,
+    maintainAspectRatio: false,
+    cutout: '30%',
+    plugins: {
+      tooltip: {
+        callbacks: {
+          label: (ctx) => {
+            const idx = ctx.dataIndex;
+            const top10 = topHolders.slice(0, 10);
+            const holder = top10[idx];
+            const value = ctx.parsed;
+            if (holder) {
+              return [
+                `${formatAddress(holder.address)}`,
+                `Balance: ${formatNumber(value)} BTCZ`,
+                `${Number(holder.percentageOfSupply).toFixed(2)}% of supply`
+              ];
+            }
+            return `Others: ${formatNumber(value)} BTCZ`;
+          }
+        }
+      },
+      legend: {
+        position: 'right',
+        labels: {
+          font: { size: 11, family: 'monospace' },
+          generateLabels: (chart) => {
+            const data = chart.data;
+            if (!data.labels.length) return [];
+            const top10 = topHolders.slice(0, 10);
+            return data.labels.map((label, i) => {
+              const holder = top10[i];
+              const pct = holder ? Number(holder.percentageOfSupply).toFixed(1) : '';
+              const shortAddr = holder ? formatAddress(holder.address) : 'Others';
+              return {
+                text: holder ? `${i + 1}. ${shortAddr} (${pct}%)` : `Others`,
+                fillStyle: data.datasets[0].backgroundColor[i],
+                strokeStyle: '#ffffff',
+                lineWidth: 1,
+                index: i
+              };
+            });
+          }
+        },
+        onClick: (e, legendItem, legend) => {
+          const idx = legendItem.index;
+          const top10 = topHolders.slice(0, 10);
+          const holder = top10[idx];
+          if (holder) {
+            navigate(`/address/${holder.address}`);
+          }
+        }
+      }
+    }
+  };
+
+  // Bar chart data (chart.js format)
+  const prepareBarChartData = () => {
+    const labels = distribution.map(item => {
+      let r = item.range;
+      if (r.includes('\u221E')) r = r.replace('\u221E', '+');
+      if (r.includes('1000000')) r = r.replace('1000000', '1M');
+      else if (r.includes('100000')) r = r.replace('100000', '100K');
+      else if (r.includes('10000')) r = r.replace('10000', '10K');
+      else if (r.includes('1000')) r = r.replace('1000', '1K');
+      return r;
+    });
+
+    return {
+      labels,
+      datasets: [{
+        label: 'Number of Addresses',
+        data: distribution.map(item => item.count),
+        backgroundColor: '#0088FE',
+        borderRadius: 4
+      }]
+    };
+  };
+
+  const barOptions = {
+    responsive: true,
+    maintainAspectRatio: false,
+    plugins: {
+      tooltip: {
+        callbacks: {
+          title: (items) => {
+            if (items.length && distribution[items[0].dataIndex]) {
+              return `Balance Range: ${distribution[items[0].dataIndex].range} BTCZ`;
+            }
+            return '';
+          },
+          label: (ctx) => `Addresses: ${formatNumber(ctx.parsed.y)}`
+        }
+      },
+      legend: { display: true }
+    },
+    scales: {
+      x: {
+        ticks: { maxRotation: 35, font: { size: 12, weight: 500 } }
+      },
+      y: {
+        ticks: {
+          callback: (value) => {
+            if (value >= 1000000) return `${(value / 1000000).toFixed(1)}M`;
+            if (value >= 1000) return `${(value / 1000).toFixed(0)}K`;
+            return value;
+          }
+        }
+      }
+    }
   };
 
   return (
@@ -371,7 +317,7 @@ const WealthDistribution = () => {
         <p className="text-gray-600 mb-4 text-sm">
           Explore the distribution of BitcoinZ across addresses and analyze the top holders.
         </p>
-        
+
         {usingMockData && (
           <div className="bg-blue-50 border-l-4 border-blue-500 p-4 mb-6">
             <div className="flex">
@@ -388,7 +334,6 @@ const WealthDistribution = () => {
           </div>
         )}
 
-        {/* Sync Status Message */}
         {isInitialSync && syncStatus && (
           <div className="bg-yellow-50 border-l-4 border-yellow-500 p-4 mb-6">
             <div className="flex">
@@ -396,9 +341,7 @@ const WealthDistribution = () => {
                 <FaInfoCircle className="h-5 w-5 text-yellow-500" />
               </div>
               <div className="ml-3">
-                <p className="text-sm text-yellow-700 font-semibold">
-                  Database Sync in Progress
-                </p>
+                <p className="text-sm text-yellow-700 font-semibold">Database Sync in Progress</p>
                 <p className="text-sm text-yellow-600 mt-1">
                   The explorer is currently indexing the blockchain (Synced block {formatNumber(syncStatus.lastSyncedBlock)} of {formatNumber(syncStatus.currentHeight)}).
                   This process takes time during the initial setup. Data accuracy will improve as the sync progresses.
@@ -412,9 +355,7 @@ const WealthDistribution = () => {
         <div className="flex border-b mb-6">
           <button
             className={`py-2 px-4 font-medium flex items-center ${
-              activeTab === 'topHolders' 
-                ? 'text-blue-600 border-b-2 border-blue-600' 
-                : 'text-gray-500 hover:text-blue-500'
+              activeTab === 'topHolders' ? 'text-blue-600 border-b-2 border-blue-600' : 'text-gray-500 hover:text-blue-500'
             }`}
             onClick={() => setActiveTab('topHolders')}
           >
@@ -422,16 +363,14 @@ const WealthDistribution = () => {
           </button>
           <button
             className={`py-2 px-4 font-medium flex items-center ${
-              activeTab === 'distribution' 
-                ? 'text-blue-600 border-b-2 border-blue-600' 
-                : 'text-gray-500 hover:text-blue-500'
+              activeTab === 'distribution' ? 'text-blue-600 border-b-2 border-blue-600' : 'text-gray-500 hover:text-blue-500'
             }`}
             onClick={() => setActiveTab('distribution')}
           >
             <FaChartPie className="mr-2" /> Distribution by Balance
           </button>
         </div>
-        
+
         {loading ? (
           <div className="flex justify-center items-center h-64">
             <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-blue-500"></div>
@@ -441,91 +380,15 @@ const WealthDistribution = () => {
             {activeTab === 'topHolders' && (
               <div>
                 <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 mb-6">
-                  {/* Pie Chart - Adjusted size */}
+                  {/* Pie Chart */}
                   <div className="bg-gray-50 p-3 rounded-lg shadow-sm lg:col-span-2">
                     <h3 className="text-md font-semibold mb-2">Top Holders Distribution</h3>
-                    <div className="h-96"> {/* Increased height from h-80 to h-96 */}
-                      <ResponsiveContainer width="100%" height="100%">
-                        <PieChart>
-                          <Pie
-                            data={preparePieChartData()}
-                            cx="50%"
-                            cy="50%"
-                            labelLine={false}
-                            outerRadius={120} /* Increased size from 100 to 120 */
-                            innerRadius={40} /* Increased inner radius from 30 to 40 */
-                            fill="#8884d8"
-                            dataKey="value"
-                            nameKey="name"
-                            paddingAngle={2}
-                            label={({ name, percent }) => {
-                              // Don't show labels on the pie segments to avoid duplication
-                              return null;
-                            }}
-                            activeIndex={activeIndex}
-                            activeShape={(props) => {
-                              const RADIAN = Math.PI / 180;
-                              const { cx, cy, midAngle, innerRadius, outerRadius, startAngle, endAngle, fill, value, name, fullAddress, percentage } = props;
-                              const sin = Math.sin(-RADIAN * midAngle);
-                              const cos = Math.cos(-RADIAN * midAngle);
-                              const mx = cx + (outerRadius + 30) * cos;
-                              const my = cy + (outerRadius + 30) * sin;
-                              
-                              return (
-                                <g>
-                                  <text x={cx} y={cy} dy={8} textAnchor="middle" fill={fill}>
-                                    {name}
-                                  </text>
-                                  <Sector
-                                    cx={cx}
-                                    cy={cy}
-                                    innerRadius={innerRadius}
-                                    outerRadius={outerRadius + 10}
-                                    startAngle={startAngle}
-                                    endAngle={endAngle}
-                                    fill={fill}
-                                  />
-                                  <Sector
-                                    cx={cx}
-                                    cy={cy}
-                                    startAngle={startAngle}
-                                    endAngle={endAngle}
-                                    innerRadius={outerRadius + 10}
-                                    outerRadius={outerRadius + 12}
-                                    fill={fill}
-                                  />
-                                </g>
-                              );
-                            }}
-                            onMouseEnter={(data, index) => {
-                              setActiveIndex(index);
-                            }}
-                            onMouseLeave={() => {
-                              setActiveIndex(-1);
-                            }}
-                          >
-                            {preparePieChartData().map((entry, index) => (
-                              <Cell 
-                                key={`cell-${index}`} 
-                                fill={COLORS[index % COLORS.length]} 
-                                stroke="#ffffff"
-                                strokeWidth={2}
-                              />
-                            ))}
-                          </Pie>
-                          <Tooltip content={<CustomTooltip />} />
-                          <Legend 
-                            content={<CustomLegend />}
-                            layout="vertical" 
-                            verticalAlign="middle" 
-                            align="right"
-                          />
-                        </PieChart>
-                      </ResponsiveContainer>
+                    <div className="h-96">
+                      <Pie ref={pieRef} data={preparePieChartData()} options={pieOptions} />
                     </div>
                   </div>
-                  
-                  {/* Summary Stats - More compact layout */}
+
+                  {/* Summary Stats */}
                   <div className="bg-gray-50 p-3 rounded-lg shadow-sm">
                     <h3 className="text-md font-semibold mb-2">Wealth Summary</h3>
                     <div className="grid grid-cols-2 gap-2">
@@ -542,15 +405,11 @@ const WealthDistribution = () => {
                       </div>
                       <div className="p-2 bg-white rounded-md shadow-sm">
                         <p className="text-xs text-gray-500">Top 10 Holders</p>
-                        <p className="text-sm font-bold">
-                          {getTop10Percentage().toFixed(2)}%
-                        </p>
+                        <p className="text-sm font-bold">{getTop10Percentage().toFixed(2)}%</p>
                       </div>
                       <div className="p-2 bg-white rounded-md shadow-sm">
                         <p className="text-xs text-gray-500">Top 100 Holders</p>
-                        <p className="text-sm font-bold">
-                          {getTop100Percentage().toFixed(2)}%
-                        </p>
+                        <p className="text-sm font-bold">{getTop100Percentage().toFixed(2)}%</p>
                       </div>
                       <div className="p-2 bg-white rounded-md shadow-sm col-span-2">
                         <p className="text-xs text-gray-500">Total Addresses Analyzed</p>
@@ -559,8 +418,8 @@ const WealthDistribution = () => {
                     </div>
                   </div>
                 </div>
-                
-                {/* Top Holders Table - With search and full addresses */}
+
+                {/* Search & page size */}
                 <div className="mb-4">
                   <div className="flex items-center justify-between bg-white rounded-lg shadow-sm p-3">
                     <div className="relative w-full mr-4">
@@ -579,13 +438,10 @@ const WealthDistribution = () => {
                     </div>
                     <div className="flex items-center">
                       <span className="text-sm text-gray-600 mr-2">Show:</span>
-                      <select 
+                      <select
                         className="py-2 px-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
                         value={pageSize}
-                        onChange={(e) => {
-                          setPageSize(parseInt(e.target.value));
-                          setCurrentPage(1); // Reset to first page when changing page size
-                        }}
+                        onChange={(e) => { setPageSize(parseInt(e.target.value)); setCurrentPage(1); }}
                       >
                         <option value={15}>15 rows</option>
                         <option value={25}>25 rows</option>
@@ -596,7 +452,8 @@ const WealthDistribution = () => {
                     </div>
                   </div>
                 </div>
-                
+
+                {/* Top Holders Table */}
                 <div className="overflow-x-auto bg-white rounded-lg shadow-sm">
                   <table className="w-full table-fixed">
                     <thead className="bg-gray-100 sticky top-0">
@@ -611,30 +468,25 @@ const WealthDistribution = () => {
                     </thead>
                     <tbody className="divide-y divide-gray-200">
                       {topHolders
-                        .filter(holder => 
-                          holder.address.toLowerCase().includes(searchTerm.toLowerCase())
-                        )
-                        .slice(0, pageSize) // Only show the number of rows specified by pageSize
+                        .filter(holder => holder.address.toLowerCase().includes(searchTerm.toLowerCase()))
+                        .slice(0, pageSize)
                         .map((holder, index) => {
-                          // Calculate total balance of top 100 holders
                           const top100Balance = topHolders.slice(0, Math.min(100, topHolders.length))
                             .reduce((sum, h) => sum + Number(h.balance || 0), 0);
-                          
-                          // Calculate percentage of top 100
-                          const percentOfTop100 = top100Balance > 0 ? 
+                          const percentOfTop100 = top100Balance > 0 ?
                             (Number(holder.balance) / top100Balance) * 100 : 0;
-                            
+
                           return (
                             <tr key={holder.address} className={`${index % 2 === 0 ? 'bg-white' : 'bg-gray-50'} hover:bg-blue-50 text-xs sm:text-sm`}>
                               <td className="py-1.5 px-2 font-medium text-gray-900">{index + 1}</td>
                               <td className="py-1.5 px-2">
-                                <Link 
+                                <Link
                                   to={`/address/${holder.address}`}
-                                  className="text-blue-600 hover:text-blue-800 font-mono" // text-xs removed, will inherit from tr
+                                  className="text-blue-600 hover:text-blue-800 font-mono"
                                   title={holder.address}
                                 >
                                   <span className="hidden sm:inline">{holder.address}</span>
-                                  <span className="sm:hidden">{formatAddress(holder.address)}</span> {/* Use formatAddress for mobile */}
+                                  <span className="sm:hidden">{formatAddress(holder.address)}</span>
                                 </Link>
                               </td>
                               <td className="py-1.5 px-2 text-gray-900 font-medium text-right">{formatNumber(holder.balance)}</td>
@@ -646,94 +498,42 @@ const WealthDistribution = () => {
                         })}
                     </tbody>
                   </table>
-                  
-                  {/* Display counter showing how many entries */}
                   <div className="px-4 py-3 bg-gray-50 border-t text-xs text-gray-500">
                     Showing {Math.min(pageSize, topHolders.length)} of {topHolders.length} addresses
                   </div>
                 </div>
               </div>
             )}
-            
+
             {activeTab === 'distribution' && (
               <div>
-                {/* Explanatory text */}
                 <div className="bg-blue-50 border-l-4 border-blue-500 p-4 mb-6">
                   <div className="flex">
                     <div className="flex-shrink-0">
                       <FaInfoCircle className="h-5 w-5 text-blue-500" />
                     </div>
                     <div className="ml-3">
-                      <p className="text-sm text-blue-700 font-semibold">
-                        What am I looking at?
-                      </p>
+                      <p className="text-sm text-blue-700 font-semibold">What am I looking at?</p>
                       <p className="text-sm text-blue-600 mt-1">
-                        This chart shows how BitcoinZ is distributed across different wallet balance ranges. Each bar represents the number of addresses holding a specific range of BTCZ.
+                        This chart shows how BitcoinZ is distributed across different wallet balance ranges.
                       </p>
-                      <p className="text-sm text-blue-600 mt-2">
-                        <strong>Key insights:</strong>
-                      </p>
-                      <ul className="list-disc list-inside text-sm text-blue-600 ml-2">
+                      <ul className="list-disc list-inside text-sm text-blue-600 ml-2 mt-2">
                         <li>The leftmost bar (0-1 BTCZ) shows addresses with very small balances, often dust amounts</li>
                         <li>Most addresses hold small amounts (under 10 BTCZ)</li>
                         <li>Very few addresses hold large amounts (over 100K BTCZ)</li>
-                        <li>The table below shows the exact numbers and percentages for each range</li>
                       </ul>
                     </div>
                   </div>
                 </div>
-                
+
                 {/* Bar Chart */}
                 <div className="bg-gray-50 p-4 rounded-lg shadow-sm mb-8">
                   <h3 className="text-lg font-semibold mb-4">Address Distribution by Balance Range</h3>
                   <div className="h-96">
-                    <ResponsiveContainer width="100%" height="100%">
-                      <BarChart
-                        data={prepareBarChartData()}
-                        margin={{ top: 20, right: 30, left: 20, bottom: 60 }}
-                      >
-                        <CartesianGrid strokeDasharray="3 3" />
-                        <XAxis 
-                          dataKey="name" 
-                          angle={-35} 
-                          textAnchor="end" 
-                          height={70} 
-                          tick={{ fontSize: 12, fontWeight: 500 }}
-                          tickMargin={10}
-                        />
-                        <YAxis 
-                          tickFormatter={(value) => {
-                            // Format Y-axis values with K for thousands and M for millions
-                            if (value >= 1000000) {
-                              return `${(value / 1000000).toFixed(1)}M`;
-                            } else if (value >= 1000) {
-                              return `${(value / 1000).toFixed(0)}K`;
-                            }
-                            return value;
-                          }}
-                        />
-                        <Tooltip 
-                          formatter={(value, name) => [formatNumber(value), name === 'count' ? 'Addresses' : name]}
-                          labelFormatter={(label, payload) => {
-                            if (payload && payload.length) {
-                              return `Balance Range: ${payload[0].payload.originalRange} BTCZ`;
-                            }
-                            return `Balance Range: ${label}`;
-                          }}
-                          contentStyle={{ backgroundColor: 'white', border: '1px solid #ddd', borderRadius: '4px', padding: '10px' }}
-                        />
-                        <Legend />
-                        <Bar 
-                          name="Number of Addresses" 
-                          dataKey="count" 
-                          fill="#0088FE" 
-                          radius={[4, 4, 0, 0]} 
-                        />
-                      </BarChart>
-                    </ResponsiveContainer>
+                    <Bar data={prepareBarChartData()} options={barOptions} />
                   </div>
                 </div>
-                
+
                 {/* Distribution Table */}
                 <div className="overflow-x-auto">
                   <div className="mb-4">

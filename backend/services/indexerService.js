@@ -105,7 +105,7 @@ const runIndexingJob = async () => {
     
     // Calculate how many blocks to process in this run
     // Limit the number to prevent long-running jobs
-    const blocksToProcess = Math.min(50, currentHeight - lastIndexedBlock);
+    const blocksToProcess = Math.min(500, currentHeight - lastIndexedBlock);
     
     if (blocksToProcess <= 0) {
       logger.info('Blockchain index is up to date');

@@ -3,7 +3,11 @@ import { useParams, Link } from 'react-router-dom';
 import { FaWallet, FaArrowUp, FaArrowDown, FaCopy, FaExchangeAlt, FaHistory, FaCalendarAlt } from 'react-icons/fa';
 import { Line } from 'react-chartjs-2';
 import { Chart, CategoryScale, LinearScale, PointElement, LineElement, Title, Tooltip, Legend, Filler } from 'chart.js';
-import moment from 'moment';
+import dayjs from 'dayjs';
+import relativeTime from 'dayjs/plugin/relativeTime';
+import weekOfYear from 'dayjs/plugin/weekOfYear';
+dayjs.extend(relativeTime);
+dayjs.extend(weekOfYear);
 import { addressService } from '../services/api';
 import apiInstance from '../services/api';
 import { formatBTCZ, formatNumber } from '../utils/formatting';
@@ -175,7 +179,7 @@ const Address = () => {
     const days = 90; // Create 90 days of history to support all time ranges
     
     for (let i = 0; i < days; i++) {
-      const date = moment().subtract(days - i - 1, 'days').format('YYYY-MM-DD');
+      const date = dayjs().subtract(days - i - 1, 'days').format('YYYY-MM-DD');
       // Use actual balance only for the last day, zero for historical days
       // This creates a simple chart showing when balance was received
       const balance = i === days - 1 ? currentBalance : 0;
@@ -205,7 +209,7 @@ const Address = () => {
     // For very long histories (5+ years), we need to reduce data points to avoid performance issues
     const oldestTx = sortedTxs[0];
     const newestTx = sortedTxs[sortedTxs.length - 1];
-    const daysDiff = moment.unix(newestTx.time).diff(moment.unix(oldestTx.time), 'days');
+    const daysDiff = dayjs.unix(newestTx.time).diff(dayjs.unix(oldestTx.time), 'days');
     
     // If we have more than 2 years of data, we'll group by weeks or months
     const groupByMonth = daysDiff > 730; // 2 years
@@ -217,7 +221,7 @@ const Address = () => {
       runningBalance += Number(tx.value || 0);
       
       // Create an appropriate date key based on the history length
-      const txMoment = moment.unix(tx.time);
+      const txMoment = dayjs.unix(tx.time);
       let dateKey;
       
       if (groupByMonth) {
@@ -259,7 +263,7 @@ const Address = () => {
     });
     
     // Add today's point if not already there
-    const todayMoment = moment();
+    const todayMoment = dayjs();
     const todayKey = groupByMonth ? todayMoment.format('YYYY-MM') : 
                     (groupByWeek ? `${todayMoment.format('YYYY')}-W${todayMoment.week()}` : 
                      todayMoment.format('YYYY-MM-DD'));
@@ -307,12 +311,12 @@ const Address = () => {
     // Now create time points based on the selected range
     if (timeRange === TIME_RANGES.DAY) {
       const points = [];
-      const now = moment();
-      const dayStart = moment().subtract(24, 'hours');
+      const now = dayjs();
+      const dayStart = dayjs().subtract(24, 'hours');
       
       // Create points for each 2 hours in the last 24 hours
       for (let i = 12; i >= 0; i--) {
-        const pointTime = moment().subtract(i * 2, 'hours');
+        const pointTime = dayjs().subtract(i * 2, 'hours');
         const pointTimestamp = pointTime.unix();
         
         // Find the last balance before this point
@@ -347,7 +351,7 @@ const Address = () => {
       
       // Create a point for each day in the last week
       for (let i = 6; i >= 0; i--) {
-        const pointTime = moment().subtract(i, 'days');
+        const pointTime = dayjs().subtract(i, 'days');
         const pointTimestamp = pointTime.unix();
         
         // Find the last balance before this point
@@ -382,7 +386,7 @@ const Address = () => {
       
       // Create points at 6-day intervals for the month
       for (let i = 5; i >= 0; i--) {
-        const pointTime = moment().subtract(i * 6, 'days');
+        const pointTime = dayjs().subtract(i * 6, 'days');
         const pointTimestamp = pointTime.unix();
         
         // Find the last balance before this point
@@ -422,10 +426,10 @@ const Address = () => {
     // If we have no transactions at all, return a simple point with current balance
     if (allTransactions.length === 0 && transactions.length === 0) {
       return [{
-        date: moment().format('YYYY-MM-DD'),
-        dateKey: moment().format('YYYY-MM-DD'),
+        date: dayjs().format('YYYY-MM-DD'),
+        dateKey: dayjs().format('YYYY-MM-DD'),
         balance: addressInfo?.balance || 0,
-        timestamp: moment().unix(),
+        timestamp: dayjs().unix(),
         isCurrent: true
       }];
     }
@@ -443,10 +447,10 @@ const Address = () => {
     if (historyData.length === 0) {
       // If building history failed, return current balance as single point
       return [{
-        date: moment().format('YYYY-MM-DD'),
-        dateKey: moment().format('YYYY-MM-DD'),
+        date: dayjs().format('YYYY-MM-DD'),
+        dateKey: dayjs().format('YYYY-MM-DD'),
         balance: addressInfo?.balance || 0,
-        timestamp: moment().unix(),
+        timestamp: dayjs().unix(),
         isCurrent: true
       }];
     }
@@ -595,7 +599,7 @@ const Address = () => {
     }
     
     // Use timestamp if available, otherwise parse date string
-    const date = item.timestamp ? moment.unix(item.timestamp) : moment(item.date);
+    const date = item.timestamp ? dayjs.unix(item.timestamp) : dayjs(item.date);
     
     switch (timeRange) {
       case TIME_RANGES.DAY:
@@ -614,11 +618,11 @@ const Address = () => {
       default:
         // For all time, use month/year or just month depending on range
         const firstDate = filteredHistory.length > 0 ? 
-          (filteredHistory[0].timestamp ? moment.unix(filteredHistory[0].timestamp) : moment(filteredHistory[0].date)) : 
-          moment();
+          (filteredHistory[0].timestamp ? dayjs.unix(filteredHistory[0].timestamp) : dayjs(filteredHistory[0].date)) : 
+          dayjs();
         const lastDate = filteredHistory.length > 0 ? 
-          (filteredHistory[filteredHistory.length-1].timestamp ? moment.unix(filteredHistory[filteredHistory.length-1].timestamp) : moment(filteredHistory[filteredHistory.length-1].date)) : 
-          moment();
+          (filteredHistory[filteredHistory.length-1].timestamp ? dayjs.unix(filteredHistory[filteredHistory.length-1].timestamp) : dayjs(filteredHistory[filteredHistory.length-1].date)) : 
+          dayjs();
         
         // If the range spans more than a year, show month/year
         if (lastDate.diff(firstDate, 'months') > 12) {
@@ -677,11 +681,11 @@ const Address = () => {
       default:
         // For all-time view, adjust tick count based on data span
         const firstDate = filteredHistory.length > 0 ? 
-          (filteredHistory[0].timestamp ? moment.unix(filteredHistory[0].timestamp) : moment(filteredHistory[0].date)) : 
-          moment();
+          (filteredHistory[0].timestamp ? dayjs.unix(filteredHistory[0].timestamp) : dayjs(filteredHistory[0].date)) : 
+          dayjs();
         const lastDate = filteredHistory.length > 0 ? 
-          (filteredHistory[filteredHistory.length-1].timestamp ? moment.unix(filteredHistory[filteredHistory.length-1].timestamp) : moment(filteredHistory[filteredHistory.length-1].date)) : 
-          moment();
+          (filteredHistory[filteredHistory.length-1].timestamp ? dayjs.unix(filteredHistory[filteredHistory.length-1].timestamp) : dayjs(filteredHistory[filteredHistory.length-1].date)) : 
+          dayjs();
         
         // Adjust tick count based on date range
         const monthsDiff = lastDate.diff(firstDate, 'months');
@@ -727,7 +731,7 @@ const Address = () => {
               if (itemIndex < historyData.length) {
                 const item = historyData[itemIndex];
                 // Use the timestamp for precise date/time in tooltip title
-                return moment.unix(item.timestamp).format('YYYY-MM-DD HH:mm:ss');
+                return dayjs.unix(item.timestamp).format('YYYY-MM-DD HH:mm:ss');
               }
             }
             return 'Date'; // Fallback title
@@ -994,7 +998,7 @@ const Address = () => {
                             {tx.txid}
                           </div>
                           <div className="text-xs text-gray-500">
-                            {moment.unix(tx.time).format('MMM D, YYYY h:mm A')} ({moment.unix(tx.time).fromNow()})
+                            {dayjs.unix(tx.time).format('MMM D, YYYY h:mm A')} ({dayjs.unix(tx.time).fromNow()})
                           </div>
                         </div>
                       </div>

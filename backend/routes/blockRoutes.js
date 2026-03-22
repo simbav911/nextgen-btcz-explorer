@@ -1,33 +1,79 @@
 const express = require('express');
 const router = express.Router();
-const bitcoinzService = require('../services/bitcoinzService'); // Keep bitcoinzService for fallbacks
-const models = require('../models'); // Import the models module
+const bitcoinzService = require('../services/bitcoinzService');
+const models = require('../models');
 const logger = require('../utils/logger');
-const { Op } = require('sequelize'); // Import Op for queries if needed
+const cache = require('../utils/cache');
+const { Op } = require('sequelize');
 
-// Get latest blocks (Fetch in parallel batches for faster loading)
+// Get latest blocks — DB-first with RPC fallback (eliminates 101 RPC calls per page)
 router.get('/', async (req, res, next) => {
   try {
     const limit = parseInt(req.query.limit) || 10;
     const offset = parseInt(req.query.offset) || 0;
 
-    // Get current blockchain info to know the latest block height
+    // Check server-side response cache first (10s TTL)
+    const cacheKey = `blocklist:${limit}:${offset}`;
+    const cached = cache.get(cacheKey);
+    if (cached) return res.json(cached);
+
+    // Try DB first
+    let Block;
+    try {
+      Block = await models.getBlock();
+    } catch (e) {
+      Block = null;
+    }
+
+    if (Block) {
+      const dbBlocks = await Block.findAll({
+        order: [['height', 'DESC']],
+        limit,
+        offset,
+        raw: true
+      });
+
+      if (dbBlocks && dbBlocks.length > 0) {
+        // For the first page (offset === 0), verify DB data is fresh
+        const STALE_BLOCK_THRESHOLD = 10;
+        let dbIsStale = false;
+        if (offset === 0) {
+          try {
+            const info = await bitcoinzService.getBlockchainInfo();
+            const chainTip = info.blocks;
+            const dbTip = dbBlocks[0].height;
+            if (chainTip - dbTip > STALE_BLOCK_THRESHOLD) {
+              logger.warn(`DB blocks are stale: DB tip ${dbTip}, chain tip ${chainTip} (gap: ${chainTip - dbTip}). Falling back to RPC.`);
+              dbIsStale = true;
+            }
+          } catch (infoError) {
+            logger.warn(`Could not check block freshness: ${infoError.message}. Serving DB data.`);
+          }
+        }
+
+        if (!dbIsStale) {
+          logger.info(`Served ${dbBlocks.length} blocks from DB (offset ${offset})`);
+          const result = { blocks: dbBlocks, count: dbBlocks.length, offset };
+          cache.set(cacheKey, result, 10000);
+          return res.json(result);
+        }
+      }
+    }
+
+    // Fallback to RPC if DB is empty
     const info = await bitcoinzService.getBlockchainInfo();
     const bestHeight = info.blocks;
 
-    logger.info(`Fetching latest blocks directly from node (height ${bestHeight}, offset ${offset}, limit ${limit})`);
+    logger.info(`DB empty, fetching blocks from RPC (height ${bestHeight}, offset ${offset}, limit ${limit})`);
 
-    // Prepare array of heights to fetch
     const heightsToFetch = [];
     for (let i = 0; i < limit && (bestHeight - i - offset) >= 0; i++) {
       heightsToFetch.push(bestHeight - i - offset);
     }
 
-    // Fetch blocks in parallel batches to improve performance
-    const batchSize = 4; // Process 4 blocks at a time to avoid overwhelming the node
+    const batchSize = 4;
     const fetchedBlocks = [];
-    
-    // Process blocks in batches
+
     for (let i = 0; i < heightsToFetch.length; i += batchSize) {
       const batch = heightsToFetch.slice(i, i + batchSize);
       const batchPromises = batch.map(async height => {
@@ -36,20 +82,18 @@ router.get('/', async (req, res, next) => {
           if (block && block.tx && block.tx.length > 0) {
             const coinbaseTxid = block.tx[0];
             try {
-              const coinbaseTx = await bitcoinzService.getRawTransaction(coinbaseTxid, 1); // verbose = 1
+              const coinbaseTx = await bitcoinzService.getRawTransaction(coinbaseTxid, 1);
               if (coinbaseTx && coinbaseTx.vin && coinbaseTx.vin.length > 0 && coinbaseTx.vin[0].coinbase) {
                 block.coinbaseHex = coinbaseTx.vin[0].coinbase;
               } else {
-                block.coinbaseHex = null; // Or some indicator that it couldn't be fetched
-                logger.warn(`Could not retrieve coinbase hex for block ${height}, txid ${coinbaseTxid}`);
+                block.coinbaseHex = null;
               }
             } catch (txError) {
-              logger.error(`Error fetching coinbase transaction ${coinbaseTxid} for block ${height}: ${txError.message}`);
+              logger.error(`Error fetching coinbase tx for block ${height}: ${txError.message}`);
               block.coinbaseHex = null;
             }
           } else {
             if (block) block.coinbaseHex = null;
-            logger.warn(`Block ${height} has no transactions or tx array is missing.`);
           }
           return block;
         } catch (err) {
@@ -57,22 +101,16 @@ router.get('/', async (req, res, next) => {
           return null;
         }
       });
-      
+
       const batchResults = await Promise.all(batchPromises);
       fetchedBlocks.push(...batchResults.filter(block => block !== null));
     }
 
-    logger.info(`Fetched ${fetchedBlocks.length} blocks via RPC (parallel batches), with coinbase hex`);
-
-    res.json({
-      blocks: fetchedBlocks,
-      // Note: 'count' here reflects the number fetched, not total blocks in chain
-      // The frontend uses a separate call for total block count
-      count: fetchedBlocks.length,
-      offset
-    });
+    const result = { blocks: fetchedBlocks, count: fetchedBlocks.length, offset };
+    cache.set(cacheKey, result, 10000);
+    res.json(result);
   } catch (error) {
-    logger.error('Error fetching latest blocks via RPC:', error);
+    logger.error('Error fetching latest blocks:', error);
     next(error);
   }
 });

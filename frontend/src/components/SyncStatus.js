@@ -50,12 +50,7 @@ const SyncStatus = () => {
     };
     
     checkSyncStatus();
-    
-    // Set up interval to check status every 30 seconds
-    const interval = setInterval(checkSyncStatus, 30000);
-    
-    // Clean up on unmount
-    return () => clearInterval(interval);
+    // WebSocket already provides real-time sync updates, no polling needed
   }, []);
   
   // Listen for socket updates

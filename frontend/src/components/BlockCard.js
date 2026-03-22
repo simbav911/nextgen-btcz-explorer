@@ -259,4 +259,4 @@ const BlockCard = ({ block }) => {
   );
 };
 
-export default BlockCard;
+export default React.memo(BlockCard);

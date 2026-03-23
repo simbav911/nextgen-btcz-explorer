@@ -22,10 +22,13 @@ router.get('/top-holders', async (req, res, next) => {
     
     logger.info(`Returning ${topHolders.length} top holders to client`);
     
+    const shieldedPool = await wealthService.getShieldedPoolInfo();
+
     res.json({
       topHolders,
       totalAddressesAnalyzed: distributionData.totalAddresses,
-      totalSupply
+      totalSupply,
+      shieldedPool
     });
   } catch (error) {
     logger.error(`Error fetching top holders:`, error);

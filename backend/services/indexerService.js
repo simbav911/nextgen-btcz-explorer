@@ -4,19 +4,65 @@ const { executeRpcCommand } = require('./bitcoinzService');
 const { getSequelize } = require('../db');
 const { getTransaction, getBlock, getAddress } = require('../models');
 
+// Performance tuning constants
+const CONCURRENT_BLOCKS = 8;           // Process 8 blocks in parallel
+const BLOCKS_PER_RUN = 5000;           // Process up to 5000 blocks per run
+const BULK_SYNC_THRESHOLD = 1000;      // Skip vin resolution when this far behind
+const CAUGHT_UP_INTERVAL = 5000;       // 5s between runs when caught up
+const BEHIND_INTERVAL = 1000;          // 1s between runs when behind
+const TX_CACHE_MAX_SIZE = 50000;       // Max entries in vin resolution cache
+
 // Flag to prevent multiple indexing processes running simultaneously
 let isIndexing = false;
 let lastIndexedBlock = 0;
+let isFullyCaughtUp = false;
+
+// In-memory cache for transaction vout data (for vin address resolution)
+const txVoutCache = new Map();
+
+const cacheTransactionVout = (txid, voutData) => {
+  if (txVoutCache.size >= TX_CACHE_MAX_SIZE) {
+    const firstKey = txVoutCache.keys().next().value;
+    txVoutCache.delete(firstKey);
+  }
+  txVoutCache.set(txid, voutData);
+};
+
+const getCachedTransactionVout = (txid) => txVoutCache.get(txid) || null;
 
 // Import the address monitor service
 const addressMonitorService = require('./addressMonitorService');
+
+// --- Extracted helper functions (module-level for reuse) ---
+const processVin = (vinArray) => {
+  if (!vinArray || !Array.isArray(vinArray)) return [];
+  return vinArray.map(input => ({
+    txid: input?.txid,
+    vout: input?.vout,
+    sequence: input?.sequence,
+    coinbase: input?.coinbase,
+    address: input?.address || input?.prevout?.scriptPubKey?.addresses?.[0],
+    value: input?.value || input?.prevout?.value,
+  }));
+};
+
+const processVout = (voutArray) => {
+  if (!voutArray || !Array.isArray(voutArray)) return [];
+  return voutArray.map(output => ({
+    value: output?.value,
+    n: output?.n,
+    scriptPubKey: {
+      addresses: output?.scriptPubKey?.addresses || [],
+    },
+  }));
+};
 
 /**
  * Initialize the indexer service
  */
 const initializeIndexer = async () => {
   logger.info('Initializing blockchain indexer service');
-  
+
   // Load the last indexed block from the database first
   try {
     const db = getSequelize();
@@ -25,7 +71,7 @@ const initializeIndexer = async () => {
       const lastBlock = await BlockModel.findOne({
         order: [['height', 'DESC']]
       });
-      
+
       if (lastBlock) {
         lastIndexedBlock = lastBlock.height;
         logger.info(`Initializing indexer from last synced block: ${lastIndexedBlock}`);
@@ -34,40 +80,39 @@ const initializeIndexer = async () => {
   } catch (error) {
     logger.warn(`Failed to load last indexed block: ${error.message}`);
   }
-  
+
   // Start the indexing process
   scheduleIndexing();
-  
+
   // Start the address monitor service to maintain address balances
   addressMonitorService.startMonitoring();
   logger.info('Address balance monitor service started');
-  
+
   return true;
 };
 
 /**
- * Schedule periodic indexing
+ * Schedule indexing with self-scheduling loop (no fixed interval)
  */
 const scheduleIndexing = () => {
-  // Run initial indexing after a short delay
-  setTimeout(runIndexingJob, 10000);
-  
-  // Then schedule regular updates
-  setInterval(runIndexingJob, 2 * 60 * 1000); // Every 2 minutes
+  setTimeout(async () => {
+    await runIndexingJob();
+    // Self-schedule: short delay when behind, longer when caught up
+    scheduleIndexing();
+  }, isFullyCaughtUp ? CAUGHT_UP_INTERVAL : BEHIND_INTERVAL);
 };
 
 /**
- * Run the indexing job
+ * Run the indexing job - processes blocks in parallel batches
  */
 const runIndexingJob = async () => {
   if (isIndexing) {
     logger.debug('Indexing already in progress, skipping this run');
     return;
   }
-  
+
   isIndexing = true;
-  logger.info('Starting blockchain indexing job');
-  
+
   try {
     const db = getSequelize();
     if (!db) {
@@ -75,7 +120,7 @@ const runIndexingJob = async () => {
       isIndexing = false;
       return;
     }
-    
+
     // Get current blockchain height
     const blockchainInfo = await executeRpcCommand('getblockchaininfo', [], 30000);
     if (!blockchainInfo || typeof blockchainInfo.blocks !== 'number') {
@@ -83,48 +128,72 @@ const runIndexingJob = async () => {
       isIndexing = false;
       return;
     }
-    
+
     const currentHeight = blockchainInfo.blocks;
-    
+
     // If this is the first run, get the last indexed block from the database
     if (lastIndexedBlock === 0) {
       const BlockModel = await getBlock(db);
       const lastBlock = await BlockModel.findOne({
         order: [['height', 'DESC']]
       });
-      
+
       if (lastBlock) {
         lastIndexedBlock = lastBlock.height;
         logger.info(`Resuming indexing from block ${lastIndexedBlock}`);
       } else {
-        // If no blocks found, start from block 0 (so the loop starts with block 1)
         lastIndexedBlock = 0;
         logger.info(`No indexed blocks found. Starting initial sync from block 1.`);
       }
     }
-    
-    // Calculate how many blocks to process in this run
-    // Limit the number to prevent long-running jobs
-    const blocksToProcess = Math.min(500, currentHeight - lastIndexedBlock);
-    
-    if (blocksToProcess <= 0) {
-      logger.info('Blockchain index is up to date');
+
+    const blocksRemaining = currentHeight - lastIndexedBlock;
+
+    if (blocksRemaining <= 0) {
+      isFullyCaughtUp = true;
       isIndexing = false;
       return;
     }
-    
-    logger.info(`Indexing ${blocksToProcess} blocks from ${lastIndexedBlock + 1} to ${lastIndexedBlock + blocksToProcess}`);
-    
-    // Process blocks in batches for better performance
-    for (let i = 0; i < blocksToProcess; i++) {
-      const blockHeight = lastIndexedBlock + 1 + i;
-      await indexBlock(blockHeight);
+
+    isFullyCaughtUp = false;
+    const isBulkSync = blocksRemaining > BULK_SYNC_THRESHOLD;
+    const blocksToProcess = Math.min(BLOCKS_PER_RUN, blocksRemaining);
+
+    logger.info(`Indexing ${blocksToProcess} blocks from ${lastIndexedBlock + 1} to ${lastIndexedBlock + blocksToProcess} (bulk=${isBulkSync}, remaining=${blocksRemaining})`);
+
+    // Process blocks in parallel batches of CONCURRENT_BLOCKS
+    for (let i = 0; i < blocksToProcess; i += CONCURRENT_BLOCKS) {
+      const batchSize = Math.min(CONCURRENT_BLOCKS, blocksToProcess - i);
+      const batchPromises = [];
+
+      for (let j = 0; j < batchSize; j++) {
+        const blockHeight = lastIndexedBlock + 1 + i + j;
+        batchPromises.push(indexBlock(blockHeight, isBulkSync));
+      }
+
+      const results = await Promise.allSettled(batchPromises);
+
+      // Count successes
+      let successCount = 0;
+      for (const result of results) {
+        if (result.status === 'fulfilled' && result.value === true) {
+          successCount++;
+        } else if (result.status === 'rejected') {
+          logger.error(`Block indexing failed: ${result.reason?.message}`);
+        }
+      }
+
+      // Update lastIndexedBlock after each batch
+      lastIndexedBlock += batchSize;
+
+      // Log progress periodically
+      if ((i + batchSize) % 100 < CONCURRENT_BLOCKS || i + batchSize >= blocksToProcess) {
+        const pct = ((lastIndexedBlock / currentHeight) * 100).toFixed(2);
+        logger.info(`Progress: ${lastIndexedBlock}/${currentHeight} (${pct}%) - batch ${successCount}/${batchSize} OK`);
+      }
     }
-    
-    // Update the last indexed block
-    lastIndexedBlock += blocksToProcess;
-    
-    logger.info(`Indexing complete. Last indexed block: ${lastIndexedBlock}`);
+
+    logger.info(`Indexing run complete. Last indexed block: ${lastIndexedBlock}`);
   } catch (error) {
     logger.error('Error during blockchain indexing:', error);
   } finally {
@@ -134,33 +203,29 @@ const runIndexingJob = async () => {
 
 /**
  * Index a single block and its transactions
+ * @param {number} height - Block height to index
+ * @param {boolean} isBulkSync - If true, skip expensive vin address resolution
  */
-const indexBlock = async (height) => {
+const indexBlock = async (height, isBulkSync = false) => {
   try {
-    logger.info(`[IndexBlock ${height}] Starting...`);
     // Get block hash
-    logger.debug(`[IndexBlock ${height}] Getting block hash...`);
     const blockHash = await executeRpcCommand('getblockhash', [height], 20000);
     if (!blockHash) {
       logger.warn(`[IndexBlock ${height}] Failed to get block hash.`);
       return false;
     }
-    logger.debug(`[IndexBlock ${height}] Got block hash: ${blockHash}`);
 
-    // Get block details
-    logger.debug(`[IndexBlock ${height}] Getting block details...`);
+    // Get block details with full transaction data
     const blockDetails = await executeRpcCommand('getblock', [blockHash, 2], 30000);
     if (!blockDetails) {
       logger.warn(`[IndexBlock ${height}] Failed to get details for block hash ${blockHash}`);
       return false;
     }
-    logger.debug(`[IndexBlock ${height}] Got block details.`);
 
     // Save block to database
-    logger.debug(`[IndexBlock ${height}] Saving block to DB...`);
     const db = getSequelize();
     const BlockModel = await getBlock(db);
-    
+
     await BlockModel.upsert({
       hash: blockDetails.hash,
       height: blockDetails.height,
@@ -181,51 +246,24 @@ const indexBlock = async (height) => {
       previousblockhash: blockDetails.previousblockhash,
       nextblockhash: blockDetails.nextblockhash
     });
-    logger.debug(`[IndexBlock ${height}] Block saved.`);
 
-    // Index transactions
-    logger.debug(`[IndexBlock ${height}] Processing ${blockDetails.tx?.length || 0} transactions...`);
+    // Process transactions
     const TransactionModel = await getTransaction(db);
-    const AddressModel = await getAddress(db);
-    
-    // Track addresses that need updating
     const addressesMap = new Map();
-    
-    // Process each transaction
     const txDetails = Array.isArray(blockDetails.tx) ? blockDetails.tx : [];
+    const txRecords = [];
+
     for (const tx of txDetails) {
-      // Skip if we don't have full transaction details
       if (typeof tx !== 'object' || !tx.txid) continue;
-      
-      // --- Process vin/vout to store only essential fields ---
-      const processVin = (vinArray) => {
-        if (!vinArray || !Array.isArray(vinArray)) return [];
-        return vinArray.map(input => ({
-          txid: input?.txid,
-          vout: input?.vout,
-          sequence: input?.sequence,
-          coinbase: input?.coinbase,
-          // Include address and value if they exist in the original data (prevout might be nested)
-          address: input?.address || input?.prevout?.scriptPubKey?.addresses?.[0],
-          value: input?.value || input?.prevout?.value,
-        }));
-      };
-      const processVout = (voutArray) => {
-        if (!voutArray || !Array.isArray(voutArray)) return [];
-        return voutArray.map(output => ({
-          value: output?.value,
-          n: output?.n,
-          scriptPubKey: {
-            addresses: output?.scriptPubKey?.addresses || [],
-          },
-        }));
-      };
+
       const processedVin = processVin(tx.vin);
       const processedVout = processVout(tx.vout);
-      // --- End vin/vout processing ---
 
-      // Prepare transaction data with optimized vin/vout
-      const txData = {
+      // Cache this transaction's vout for future vin lookups
+      cacheTransactionVout(tx.txid, processedVout);
+
+      // Collect transaction record for bulk insert
+      txRecords.push({
         txid: tx.txid,
         hash: tx.hash,
         version: tx.version,
@@ -237,129 +275,70 @@ const indexBlock = async (height) => {
         confirmations: tx.confirmations || blockDetails.confirmations,
         time: tx.time || blockDetails.time,
         blocktime: tx.blocktime || blockDetails.time,
-        vin: processedVin, // Use processed vin
-        vout: processedVout, // Use processed vout
+        vin: processedVin,
+        vout: processedVout,
         is_coinbase: tx.vin && tx.vin.length > 0 && tx.vin[0].coinbase ? true : false,
-        // Ensure other relevant fields are included if needed (fee, valueIn, valueOut might need calculation here if not present in tx object)
-        // fee: calculateFee(tx), // Example: You might need to calculate/extract these
-        // value_in: calculateValueIn(tx),
-        // value_out: calculateValueOut(tx),
-        valueBalance: tx.valueBalance, // Keep existing fields if present
+        valueBalance: tx.valueBalance,
         fOverwintered: tx.fOverwintered,
         vShieldedSpend: tx.vShieldedSpend,
         vShieldedOutput: tx.vShieldedOutput,
         bindingSig: tx.bindingSig
-      };
+      });
 
-      // Save transaction with detailed error logging
-      // logger.debug(`[IndexBlock ${height}] Saving tx ${tx.txid}...`); // Can be too verbose
-      try {
-        await TransactionModel.upsert(txData);
-      } catch (error) {
-          // Log more details about the error
-          logger.error(`-----------------------------------------------------`);
-          logger.error(`[IndexBlock ${height}] Error during TransactionModel.upsert for txid ${tx.txid}`);
-          if (error.name === 'SequelizeDatabaseError' || error.original) {
-            logger.error(`DB Error Code: ${error.original?.code}`);
-            logger.error(`DB Error Message: ${error.original?.message || error.message}`);
-            logger.error(`SQL: ${error.sql}`);
-          } else {
-            logger.error(`Error Message: ${error.message}`);
-          }
-          // logger.error(`Attempted Data: ${JSON.stringify(txData)}`); // Be cautious logging potentially large data
-          logger.error(`Full Error Stack: ${error.stack}`);
-          logger.error(`-----------------------------------------------------`);
-          // Decide whether to continue indexing other transactions in the block or stop
-          // For now, we log and continue to the next transaction in the block
-          continue;
-      }
-      // logger.debug(`[IndexBlock ${height}] Tx ${tx.txid} saved.`);
-
-      // Extract addresses from outputs (using original tx object for full scriptPubKey)
-      // logger.debug(`[IndexBlock ${height}] Processing outputs for tx ${tx.txid}...`);
+      // Extract addresses from outputs (always do this)
       if (tx.vout) {
         for (const vout of tx.vout) {
           if (vout.scriptPubKey && vout.scriptPubKey.addresses) {
             for (const addr of vout.scriptPubKey.addresses) {
-              // Track this address and transaction
               if (!addressesMap.has(addr)) {
-                addressesMap.set(addr, {
-                  txids: new Set(),
-                  received: 0,
-                  sent: 0
-                });
+                addressesMap.set(addr, { txids: new Set(), received: 0, sent: 0 });
               }
-              
-              // Add to transaction set
               addressesMap.get(addr).txids.add(tx.txid);
-              
-              // Add to received amount
               addressesMap.get(addr).received += parseFloat(vout.value || 0);
             }
           }
         }
       }
-      // logger.debug(`[IndexBlock ${height}] Finished outputs for tx ${tx.txid}.`);
 
-      // Extract addresses from inputs
-      // logger.debug(`[IndexBlock ${height}] Processing inputs for tx ${tx.txid}...`);
-      if (tx.vin) {
+      // Extract addresses from inputs (skip during bulk sync for speed)
+      if (!isBulkSync && tx.vin) {
         for (const vin of tx.vin) {
-          // Skip coinbase transactions
           if (vin.coinbase) continue;
-          
-          // We need to find the previous transaction to get the addresses
+
           try {
-            // Get from our database first
-            let prevTx = await TransactionModel.findOne({
-              where: { txid: vin.txid }
-            });
-            
-            // If not in database, fetch from node
-            if (!prevTx) {
-              const rawPrevTx = await executeRpcCommand('getrawtransaction', [vin.txid, 1], 20000);
-              if (rawPrevTx) {
-                prevTx = rawPrevTx;
+            // 3-tier lookup: cache -> DB -> RPC
+            let voutData = getCachedTransactionVout(vin.txid);
+
+            if (!voutData) {
+              const prevTx = await TransactionModel.findOne({
+                where: { txid: vin.txid },
+                attributes: ['vout'],
+                raw: true
+              });
+              if (prevTx) {
+                voutData = typeof prevTx.vout === 'string' ? JSON.parse(prevTx.vout) : prevTx.vout;
+                cacheTransactionVout(vin.txid, voutData);
               }
             }
-            
-            // If we have the previous transaction, get the addresses from the referenced output
-            if (prevTx) {
-              let voutData = prevTx.vout;
-              
-              // Handle JSON if stored as string
-              if (typeof voutData === 'string') {
-                try {
-                  voutData = JSON.parse(voutData);
-                } catch (e) {
-                  logger.warn(`Error parsing vout JSON for tx ${vin.txid}: ${e.message}`);
-                  continue;
-                }
+
+            if (!voutData) {
+              const rawPrevTx = await executeRpcCommand('getrawtransaction', [vin.txid, 1], 20000);
+              if (rawPrevTx) {
+                voutData = processVout(rawPrevTx.vout);
+                cacheTransactionVout(vin.txid, voutData);
               }
-              
+            }
+
+            if (voutData) {
               const voutIndex = vin.vout;
-              if (voutData && voutData[voutIndex]) {
+              if (voutData[voutIndex]) {
                 const prevOut = voutData[voutIndex];
-                
-                let addresses = [];
-                if (prevOut.scriptPubKey && prevOut.scriptPubKey.addresses) {
-                  addresses = prevOut.scriptPubKey.addresses;
-                }
-                
+                const addresses = prevOut.scriptPubKey?.addresses || [];
                 for (const addr of addresses) {
-                  // Track this address and transaction
                   if (!addressesMap.has(addr)) {
-                    addressesMap.set(addr, {
-                      txids: new Set(),
-                      received: 0,
-                      sent: 0
-                    });
+                    addressesMap.set(addr, { txids: new Set(), received: 0, sent: 0 });
                   }
-                  
-                  // Add to transaction set
                   addressesMap.get(addr).txids.add(tx.txid);
-                  
-                  // Add to sent amount
                   addressesMap.get(addr).sent += parseFloat(prevOut.value || 0);
                 }
               }
@@ -369,81 +348,103 @@ const indexBlock = async (height) => {
           }
         }
       }
-      // logger.debug(`[IndexBlock ${height}] Finished inputs for tx ${tx.txid}.`);
     } // End transaction loop
-    logger.debug(`[IndexBlock ${height}] Finished processing transactions. Updating ${addressesMap.size} addresses...`);
 
-    // Update address records
-    let addrUpdateCounter = 0;
-    for (const [addr, data] of addressesMap.entries()) {
-      addrUpdateCounter++;
-      // logger.debug(`[IndexBlock ${height}] Updating address ${addr} (${addrUpdateCounter}/${addressesMap.size})...`);
+    // Bulk insert all transactions for this block
+    if (txRecords.length > 0) {
       try {
-        // Get existing address record
-        let addressRecord = await AddressModel.findOne({
-          where: { address: addr }
+        await TransactionModel.bulkCreate(txRecords, {
+          updateOnDuplicate: ['blockhash', 'confirmations', 'vin', 'vout', 'time', 'blocktime']
         });
-        
-        if (addressRecord) {
-          // Update existing record
-          const existingTxids = Array.isArray(addressRecord.transactions) 
-            ? addressRecord.transactions 
-            : [];
-          
-          // Combine existing and new transaction IDs
-          const combinedTxids = [...new Set([...existingTxids, ...data.txids])];
-          
-          // Calculate new values carefully
-          const newTotalReceived = Number(addressRecord.total_received || 0) + Number(data.received || 0);
-          const newTotalSent = Number(addressRecord.total_sent || 0) + Number(data.sent || 0);
-          const newBalance = newTotalReceived - newTotalSent;
-          
-          // Update the record with explicit calculation and type handling
-          await AddressModel.update({
-            total_received: newTotalReceived,
-            total_sent: newTotalSent,
-            balance: newBalance > 0 ? newBalance : 0, // Ensure no negative balances
-            txCount: combinedTxids.length,
-            transactions: combinedTxids,
-            updated_at: new Date()
-          }, {
-            where: { address: addr }
-          });
-          
-          // Log if this is one of the top addresses (by received amount)
-          if (data.received > 1000 || data.sent > 1000) {
-            logger.info(`Updated significant address ${addr}: Balance=${newBalance}, Received=${newTotalReceived}, Sent=${newTotalSent}`);
+      } catch (bulkError) {
+        logger.warn(`[IndexBlock ${height}] Bulk tx insert failed, falling back to individual: ${bulkError.message}`);
+        for (const txData of txRecords) {
+          try {
+            await TransactionModel.upsert(txData);
+          } catch (e) {
+            logger.error(`[IndexBlock ${height}] Failed to upsert tx ${txData.txid}: ${e.message}`);
           }
-        } else {
-          // Create new address record
-          const txidsArray = [...data.txids];
-          
-          await AddressModel.create({
-            address: addr,
-            balance: data.received - data.sent,
-            total_received: data.received,
-            total_sent: data.sent,
-            unconfirmed_balance: 0,
-            txCount: txidsArray.length,
-            transactions: txidsArray
-          });
         }
-      } catch (addrError) {
-        logger.error(`Error updating address ${addr}: ${addrError.message}`);
       }
-      // logger.debug(`[IndexBlock ${height}] Address ${addr} updated.`);
-    } // End address update loop
-    logger.info(`[IndexBlock ${height}] Finished updating addresses.`);
+    }
+
+    // Batch address upsert using raw SQL
+    if (addressesMap.size > 0) {
+      try {
+        const values = [];
+        const params = [];
+        let paramIndex = 1;
+
+        for (const [addr, data] of addressesMap.entries()) {
+          const txidsArray = [...data.txids];
+          values.push(`($${paramIndex}, $${paramIndex+1}, $${paramIndex+2}, $${paramIndex+3}, $${paramIndex+4}, $${paramIndex+5}::varchar[], NOW(), NOW())`);
+          params.push(
+            addr,
+            Math.max(0, data.received - data.sent),
+            data.received,
+            data.sent,
+            txidsArray.length,
+            txidsArray
+          );
+          paramIndex += 6;
+        }
+
+        const sql = `
+          INSERT INTO addresses (address, balance, total_received, total_sent, tx_count, transactions, created_at, updated_at)
+          VALUES ${values.join(', ')}
+          ON CONFLICT (address) DO UPDATE SET
+            balance = GREATEST(0, (addresses.total_received + EXCLUDED.total_received) - (addresses.total_sent + EXCLUDED.total_sent)),
+            total_received = addresses.total_received + EXCLUDED.total_received,
+            total_sent = addresses.total_sent + EXCLUDED.total_sent,
+            tx_count = addresses.tx_count + EXCLUDED.tx_count,
+            updated_at = NOW()
+        `;
+
+        await db.query(sql, { bind: params });
+      } catch (sqlError) {
+        logger.warn(`[IndexBlock ${height}] Batch address upsert failed: ${sqlError.message}`);
+        // Fallback to individual updates
+        const AddressModel = await getAddress(db);
+        for (const [addr, data] of addressesMap.entries()) {
+          try {
+            const existing = await AddressModel.findOne({ where: { address: addr } });
+            if (existing) {
+              const newReceived = Number(existing.total_received || 0) + Number(data.received || 0);
+              const newSent = Number(existing.total_sent || 0) + Number(data.sent || 0);
+              await AddressModel.update({
+                total_received: newReceived,
+                total_sent: newSent,
+                balance: Math.max(0, newReceived - newSent),
+                txCount: (existing.txCount || 0) + data.txids.size,
+                updated_at: new Date()
+              }, { where: { address: addr } });
+            } else {
+              await AddressModel.create({
+                address: addr,
+                balance: Math.max(0, data.received - data.sent),
+                total_received: data.received,
+                total_sent: data.sent,
+                unconfirmed_balance: 0,
+                txCount: data.txids.size,
+                transactions: [...data.txids]
+              });
+            }
+          } catch (addrError) {
+            logger.error(`[IndexBlock ${height}] Error updating address ${addr}: ${addrError.message}`);
+          }
+        }
+      }
+    }
 
     return true;
   } catch (error) {
-    logger.error(`[IndexBlock ${height}] Error during indexing: ${error.message}`, error); // Log full error
+    logger.error(`[IndexBlock ${height}] Error during indexing: ${error.message}`);
     return false;
   }
 };
 
 module.exports = {
   initializeIndexer,
-  runIndexingJob, // Export for manual triggering if needed
+  runIndexingJob,
   getLastIndexedBlock: () => lastIndexedBlock
 };

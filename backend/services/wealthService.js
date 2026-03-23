@@ -212,8 +212,29 @@ async function getDistribution() {
 
 // Fallback functions are no longer needed and have been removed.
 
+// Get shielded pool totals from blockchain info
+async function getShieldedPoolInfo() {
+  try {
+    const blockchainInfo = await getBlockchainInfo();
+    if (blockchainInfo && blockchainInfo.valuePools) {
+      const pools = blockchainInfo.valuePools;
+      const sprout = pools.find(p => p.id === 'sprout');
+      const sapling = pools.find(p => p.id === 'sapling');
+      return {
+        sprout: sprout ? sprout.chainValue : 0,
+        sapling: sapling ? sapling.chainValue : 0,
+        total: (sprout ? sprout.chainValue : 0) + (sapling ? sapling.chainValue : 0)
+      };
+    }
+  } catch (error) {
+    logger.warn('Error fetching shielded pool info:', error.message);
+  }
+  return null;
+}
+
 module.exports = {
   getTopHolders,
   getDistribution,
-  getTotalSupply
+  getTotalSupply,
+  getShieldedPoolInfo
 };

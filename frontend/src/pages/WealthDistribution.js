@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useContext, useRef } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
-import { FaCoins, FaChartPie, FaListOl, FaInfoCircle } from 'react-icons/fa';
+import { FaCoins, FaChartPie, FaListOl, FaInfoCircle, FaShieldAlt } from 'react-icons/fa';
 import { ToastContext } from '../contexts/ToastContext';
 import { Pie, Bar } from 'react-chartjs-2';
 import { Chart, ArcElement, BarElement, CategoryScale, LinearScale, Tooltip as ChartTooltip, Legend as ChartLegend } from 'chart.js';
@@ -63,6 +63,7 @@ const WealthDistribution = () => {
   const [syncStatus, setSyncStatus] = useState(null);
   const [pageSize, setPageSize] = useState(25);
   const [currentPage, setCurrentPage] = useState(1);
+  const [shieldedPool, setShieldedPool] = useState(null);
   const { showToast } = useContext(ToastContext);
   const navigate = useNavigate();
   const pieRef = useRef(null);
@@ -79,6 +80,9 @@ const WealthDistribution = () => {
           setTopHolders(holdersData.topHolders);
           setTotalSupply(holdersData.totalSupply || MOCK_TOTAL_SUPPLY);
           setTotalAddresses(holdersData.totalAddressesAnalyzed || MOCK_TOTAL_ADDRESSES);
+          if (holdersData.shieldedPool) {
+            setShieldedPool(holdersData.shieldedPool);
+          }
         } else {
           setTopHolders(MOCK_TOP_HOLDERS);
           setTotalSupply(MOCK_TOTAL_SUPPLY);
@@ -351,6 +355,23 @@ const WealthDistribution = () => {
           </div>
         )}
 
+        {/* Transparent-only disclaimer */}
+        <div className="bg-indigo-50 border-l-4 border-indigo-400 p-4 mb-6">
+          <div className="flex">
+            <div className="flex-shrink-0">
+              <FaInfoCircle className="h-5 w-5 text-indigo-500" />
+            </div>
+            <div className="ml-3">
+              <p className="text-sm text-indigo-700 font-semibold">Transparent Addresses Only</p>
+              <p className="text-sm text-indigo-600 mt-1">
+                This analysis reflects transparent (t-address) balances only. Shielded (z-address) balances are private
+                by design and cannot be attributed to individual addresses.
+                {shieldedPool && ` Approximately ${formatNumber(shieldedPool.total)} BTCZ (${((shieldedPool.total / totalSupply) * 100).toFixed(2)}% of circulating supply) is currently held in shielded pools.`}
+              </p>
+            </div>
+          </div>
+        </div>
+
         {/* Tabs */}
         <div className="flex border-b mb-6">
           <button
@@ -368,6 +389,14 @@ const WealthDistribution = () => {
             onClick={() => setActiveTab('distribution')}
           >
             <FaChartPie className="mr-2" /> Distribution by Balance
+          </button>
+          <button
+            className={`py-2 px-4 font-medium flex items-center ${
+              activeTab === 'shieldedPool' ? 'text-blue-600 border-b-2 border-blue-600' : 'text-gray-500 hover:text-blue-500'
+            }`}
+            onClick={() => setActiveTab('shieldedPool')}
+          >
+            <FaShieldAlt className="mr-2" /> Shielded Pool
           </button>
         </div>
 
@@ -411,10 +440,19 @@ const WealthDistribution = () => {
                         <p className="text-xs text-gray-500">Top 100 Holders</p>
                         <p className="text-sm font-bold">{getTop100Percentage().toFixed(2)}%</p>
                       </div>
-                      <div className="p-2 bg-white rounded-md shadow-sm col-span-2">
+                      <div className="p-2 bg-white rounded-md shadow-sm">
                         <p className="text-xs text-gray-500">Total Addresses Analyzed</p>
                         <p className="text-sm font-bold">{formatNumber(totalAddresses)}</p>
                       </div>
+                      {shieldedPool && (
+                        <div className="p-2 bg-white rounded-md shadow-sm">
+                          <p className="text-xs text-gray-500">Shielded Pool</p>
+                          <p className="text-sm font-bold">{formatNumber(shieldedPool.total)} BTCZ</p>
+                          <p className="text-xs text-gray-500 mt-0.5">
+                            {((shieldedPool.total / totalSupply) * 100).toFixed(2)}% of supply
+                          </p>
+                        </div>
+                      )}
                     </div>
                   </div>
                 </div>
@@ -455,15 +493,15 @@ const WealthDistribution = () => {
 
                 {/* Top Holders Table */}
                 <div className="overflow-x-auto bg-white rounded-lg shadow-sm">
-                  <table className="w-full table-fixed">
+                  <table className="w-full table-auto">
                     <thead className="bg-gray-100 sticky top-0">
                       <tr>
-                        <th className="py-2 px-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider w-10">Rank</th>
-                        <th className="py-2 px-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Address</th>
-                        <th className="py-2 px-2 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">Balance</th>
-                        <th className="py-2 px-2 text-right text-xs font-medium text-gray-500 uppercase tracking-wider hidden sm:table-cell">% of Supply</th>
-                        <th className="py-2 px-2 text-right text-xs font-medium text-gray-500 uppercase tracking-wider hidden md:table-cell">% of Top 100</th>
-                        <th className="py-2 px-2 text-right text-xs font-medium text-gray-500 uppercase tracking-wider hidden md:table-cell">Txs</th>
+                        <th className="py-2.5 px-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider w-12">Rank</th>
+                        <th className="py-2.5 px-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Address</th>
+                        <th className="py-2.5 px-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider w-40">Balance</th>
+                        <th className="py-2.5 px-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider w-28 hidden sm:table-cell">% of Supply</th>
+                        <th className="py-2.5 px-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider w-28 hidden md:table-cell">% of Top 100</th>
+                        <th className="py-2.5 px-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider w-20 hidden md:table-cell">Txs</th>
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-gray-200">
@@ -478,8 +516,8 @@ const WealthDistribution = () => {
 
                           return (
                             <tr key={holder.address} className={`${index % 2 === 0 ? 'bg-white' : 'bg-gray-50'} hover:bg-blue-50 text-xs sm:text-sm`}>
-                              <td className="py-1.5 px-2 font-medium text-gray-900">{index + 1}</td>
-                              <td className="py-1.5 px-2">
+                              <td className="py-2 px-3 font-medium text-gray-900">{index + 1}</td>
+                              <td className="py-2 px-3">
                                 <Link
                                   to={`/address/${holder.address}`}
                                   className="text-blue-600 hover:text-blue-800 font-mono"
@@ -489,10 +527,10 @@ const WealthDistribution = () => {
                                   <span className="sm:hidden">{formatAddress(holder.address)}</span>
                                 </Link>
                               </td>
-                              <td className="py-1.5 px-2 text-gray-900 font-medium text-right">{formatNumber(holder.balance)}</td>
-                              <td className="py-1.5 px-2 text-gray-900 text-right hidden sm:table-cell">{Number(holder.percentageOfSupply).toFixed(2)}%</td>
-                              <td className="py-1.5 px-2 text-gray-900 text-right hidden md:table-cell">{percentOfTop100.toFixed(2)}%</td>
-                              <td className="py-1.5 px-2 text-gray-900 text-right hidden md:table-cell">{formatNumber(holder.txCount)}</td>
+                              <td className="py-2 px-3 text-gray-900 font-medium text-right whitespace-nowrap">{formatNumber(holder.balance)} BTCZ</td>
+                              <td className="py-2 px-3 text-gray-900 text-right hidden sm:table-cell">{Number(holder.percentageOfSupply).toFixed(2)}%</td>
+                              <td className="py-2 px-3 text-gray-900 text-right hidden md:table-cell">{percentOfTop100.toFixed(2)}%</td>
+                              <td className="py-2 px-3 text-gray-900 text-right hidden md:table-cell">{formatNumber(holder.txCount)}</td>
                             </tr>
                           );
                         })}
@@ -563,6 +601,135 @@ const WealthDistribution = () => {
                     </tbody>
                   </table>
                 </div>
+              </div>
+            )}
+
+            {activeTab === 'shieldedPool' && (
+              <div>
+                {shieldedPool ? (
+                  <>
+                    {/* Pie Chart: Transparent vs Shielded */}
+                    <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 mb-6">
+                      <div className="bg-gray-50 p-3 rounded-lg shadow-sm lg:col-span-2">
+                        <h3 className="text-md font-semibold mb-2">Transparent vs Shielded Supply</h3>
+                        <div className="h-96">
+                          <Pie
+                            data={{
+                              labels: ['Transparent', 'Shielded (Sapling)', 'Shielded (Sprout)'],
+                              datasets: [{
+                                data: [
+                                  totalSupply - shieldedPool.total,
+                                  shieldedPool.sapling,
+                                  shieldedPool.sprout
+                                ],
+                                backgroundColor: ['#3b82f6', '#8b5cf6', '#a78bfa'],
+                                borderColor: '#ffffff',
+                                borderWidth: 2,
+                                hoverOffset: 10
+                              }]
+                            }}
+                            options={{
+                              responsive: true,
+                              maintainAspectRatio: false,
+                              cutout: '30%',
+                              plugins: {
+                                tooltip: {
+                                  callbacks: {
+                                    label: (ctx) => {
+                                      const value = ctx.parsed;
+                                      const pct = ((value / totalSupply) * 100).toFixed(2);
+                                      return `${formatNumber(value)} BTCZ (${pct}%)`;
+                                    }
+                                  }
+                                },
+                                legend: {
+                                  position: 'right',
+                                  labels: {
+                                    font: { size: 12 },
+                                    generateLabels: (chart) => {
+                                      const data = chart.data;
+                                      const values = data.datasets[0].data;
+                                      return data.labels.map((label, i) => ({
+                                        text: `${label}: ${((values[i] / totalSupply) * 100).toFixed(2)}%`,
+                                        fillStyle: data.datasets[0].backgroundColor[i],
+                                        strokeStyle: '#ffffff',
+                                        lineWidth: 1,
+                                        index: i
+                                      }));
+                                    }
+                                  }
+                                }
+                              }
+                            }}
+                          />
+                        </div>
+                      </div>
+
+                      {/* Shielded Pool Stats */}
+                      <div className="bg-gray-50 p-3 rounded-lg shadow-sm">
+                        <h3 className="text-md font-semibold mb-2">Shielded Pool Summary</h3>
+                        <div className="grid grid-cols-1 gap-2">
+                          <div className="p-3 bg-white rounded-md shadow-sm">
+                            <p className="text-xs text-gray-500">Total Shielded</p>
+                            <p className="text-sm font-bold text-purple-700">{formatNumber(shieldedPool.total)} BTCZ</p>
+                            <p className="text-xs text-gray-500 mt-0.5">
+                              {((shieldedPool.total / totalSupply) * 100).toFixed(2)}% of circulating supply
+                            </p>
+                          </div>
+                          <div className="p-3 bg-white rounded-md shadow-sm">
+                            <p className="text-xs text-gray-500">Sapling Pool</p>
+                            <p className="text-sm font-bold">{formatNumber(shieldedPool.sapling)} BTCZ</p>
+                            <p className="text-xs text-gray-500 mt-0.5">
+                              {((shieldedPool.sapling / totalSupply) * 100).toFixed(2)}% of supply
+                            </p>
+                          </div>
+                          <div className="p-3 bg-white rounded-md shadow-sm">
+                            <p className="text-xs text-gray-500">Sprout Pool (Legacy)</p>
+                            <p className="text-sm font-bold">{formatNumber(shieldedPool.sprout)} BTCZ</p>
+                            <p className="text-xs text-gray-500 mt-0.5">
+                              {((shieldedPool.sprout / totalSupply) * 100).toFixed(2)}% of supply
+                            </p>
+                          </div>
+                          <div className="p-3 bg-white rounded-md shadow-sm">
+                            <p className="text-xs text-gray-500">Transparent Supply</p>
+                            <p className="text-sm font-bold text-blue-700">{formatNumber(totalSupply - shieldedPool.total)} BTCZ</p>
+                            <p className="text-xs text-gray-500 mt-0.5">
+                              {(((totalSupply - shieldedPool.total) / totalSupply) * 100).toFixed(2)}% of supply
+                            </p>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Explanation */}
+                    <div className="bg-purple-50 border-l-4 border-purple-400 p-4">
+                      <div className="flex">
+                        <div className="flex-shrink-0">
+                          <FaShieldAlt className="h-5 w-5 text-purple-500" />
+                        </div>
+                        <div className="ml-3">
+                          <p className="text-sm text-purple-700 font-semibold">About Shielded Pools</p>
+                          <p className="text-sm text-purple-600 mt-1">
+                            BitcoinZ supports two types of addresses: transparent (t-addresses) and shielded (z-addresses).
+                            Shielded addresses use zero-knowledge proofs to keep transaction amounts and balances private on the blockchain.
+                          </p>
+                          <ul className="list-disc list-inside text-sm text-purple-600 ml-2 mt-2">
+                            <li><strong>Sapling Pool</strong> — The current shielded protocol, offering efficient private transactions with improved performance</li>
+                            <li><strong>Sprout Pool (Legacy)</strong> — The original shielded protocol, retained for backward compatibility</li>
+                            <li>Individual z-address balances cannot be viewed by design — only the total pool values are publicly known</li>
+                            <li>Users can freely move funds between transparent and shielded addresses</li>
+                          </ul>
+                        </div>
+                      </div>
+                    </div>
+                  </>
+                ) : (
+                  <div className="text-center py-12 text-gray-500">
+                    <FaShieldAlt className="mx-auto mb-3 text-gray-300" size={48} />
+                    <p className="text-lg font-medium">Shielded pool data is not available</p>
+                    <p className="text-sm mt-1">The blockchain node may not support value pool queries.</p>
+                  </div>
+                )}
               </div>
             )}
           </>

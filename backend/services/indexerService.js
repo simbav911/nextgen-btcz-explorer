@@ -11,11 +11,14 @@ const BULK_SYNC_THRESHOLD = 1000;      // Skip vin resolution when this far behi
 const CAUGHT_UP_INTERVAL = 5000;       // 5s between runs when caught up
 const BEHIND_INTERVAL = 1000;          // 1s between runs when behind
 const TX_CACHE_MAX_SIZE = 50000;       // Max entries in vin resolution cache
+const MAX_REORG_DEPTH = 2000;          // Refuse to auto-rollback deeper than this
 
 // Flag to prevent multiple indexing processes running simultaneously
 let isIndexing = false;
 let lastIndexedBlock = 0;
 let isFullyCaughtUp = false;
+// Heights that failed to index; retried individually so they aren't skipped forever
+const failedHeights = new Set();
 
 // In-memory cache for transaction vout data (for vin address resolution)
 const txVoutCache = new Map();
@@ -147,6 +150,23 @@ const runIndexingJob = async () => {
       }
     }
 
+    // Detect chain reorgs / forks (e.g. node upgrade that abandons the old chain):
+    // if our stored block at the common height differs from the node's, roll back.
+    if (lastIndexedBlock > 0) {
+      const reorgOk = await handleReorgIfNeeded(db, currentHeight);
+      if (!reorgOk) {
+        isIndexing = false;
+        return;
+      }
+    }
+
+    for (const height of [...failedHeights].sort((a, b) => a - b)) {
+      if (await indexBlock(height, false)) {
+        failedHeights.delete(height);
+        logger.info(`Re-indexed previously failed block ${height}`);
+      }
+    }
+
     const blocksRemaining = currentHeight - lastIndexedBlock;
 
     if (blocksRemaining <= 0) {
@@ -175,13 +195,16 @@ const runIndexingJob = async () => {
 
       // Count successes
       let successCount = 0;
-      for (const result of results) {
+      results.forEach((result, j) => {
         if (result.status === 'fulfilled' && result.value === true) {
           successCount++;
-        } else if (result.status === 'rejected') {
+          return;
+        }
+        if (result.status === 'rejected') {
           logger.error(`Block indexing failed: ${result.reason?.message}`);
         }
-      }
+        failedHeights.add(lastIndexedBlock + 1 + i + j);
+      });
 
       // Update lastIndexedBlock after each batch
       lastIndexedBlock += batchSize;
@@ -199,6 +222,174 @@ const runIndexingJob = async () => {
   } finally {
     isIndexing = false;
   }
+};
+
+/**
+ * Compare the stored block at min(lastIndexedBlock, nodeHeight) with the node.
+ * On mismatch, find the fork point and roll the DB back to it.
+ * Returns false if indexing should be skipped this run.
+ */
+const handleReorgIfNeeded = async (db, currentHeight) => {
+  const BlockModel = await getBlock(db);
+  const checkHeight = Math.min(lastIndexedBlock, currentHeight);
+  if (checkHeight <= 0) return true;
+
+  const dbBlock = await BlockModel.findOne({ where: { height: checkHeight }, attributes: ['hash'], raw: true });
+  const nodeHash = await executeRpcCommand('getblockhash', [checkHeight], 20000);
+  if (!dbBlock || !nodeHash) return true;
+
+  if (dbBlock.hash === nodeHash) {
+    // Same chain; node may simply be behind us (restart/reindex) - wait for it
+    if (lastIndexedBlock > currentHeight) {
+      logger.warn(`Node height ${currentHeight} is below indexed height ${lastIndexedBlock}, waiting for node`);
+      return false;
+    }
+    return true;
+  }
+
+  logger.warn(`Reorg detected at height ${checkHeight}: DB ${dbBlock.hash} != node ${nodeHash}`);
+
+  // Walk back to the last block both chains agree on
+  let forkHeight = null;
+  for (let h = checkHeight - 1; h > 0 && checkHeight - h <= MAX_REORG_DEPTH; h--) {
+    const stored = await BlockModel.findOne({ where: { height: h }, attributes: ['hash'], raw: true });
+    if (!stored) continue;
+    const hash = await executeRpcCommand('getblockhash', [h], 20000);
+    if (stored.hash === hash) {
+      forkHeight = h;
+      break;
+    }
+  }
+
+  if (forkHeight === null) {
+    logger.error(`Reorg deeper than ${MAX_REORG_DEPTH} blocks below ${checkHeight}, manual intervention required`);
+    return false;
+  }
+
+  await rollbackToHeight(db, forkHeight);
+  lastIndexedBlock = forkHeight;
+  for (const height of failedHeights) {
+    if (height > forkHeight) failedHeights.delete(height);
+  }
+  return true;
+};
+
+/**
+ * Remove the given blocks and undo their address balance contributions
+ * (mirrors the accounting done in indexBlock). Works from each block's own
+ * tx list: a tx that was later re-mined (row now points at another block) was
+ * counted twice, so it is un-counted once but its row is kept.
+ */
+const removeBlocks = async (db, orphanHashes, t) => {
+    const [orphanBlocks] = await db.query(
+      'SELECT tx FROM blocks WHERE hash = ANY($1::varchar[])',
+      { bind: [orphanHashes], transaction: t }
+    );
+    const blockTxids = [...new Set(orphanBlocks.flatMap(b => b.tx || []))];
+
+    const [orphanTxs] = await db.query(
+      'SELECT txid, vin, vout, blockhash FROM transactions WHERE txid = ANY($1::varchar[])',
+      { bind: [blockTxids], transaction: t }
+    );
+    const orphanTxids = orphanTxs.filter(tx => orphanHashes.includes(tx.blockhash)).map(tx => tx.txid);
+    const orphanVouts = new Map(orphanTxs.map(tx => [tx.txid, tx.vout]));
+
+    const deltas = new Map();
+    const delta = (addr) => {
+      if (!deltas.has(addr)) deltas.set(addr, { txids: new Set(), received: 0, sent: 0 });
+      return deltas.get(addr);
+    };
+
+    for (const tx of orphanTxs) {
+      for (const vout of tx.vout || []) {
+        for (const addr of vout?.scriptPubKey?.addresses || []) {
+          delta(addr).txids.add(tx.txid);
+          delta(addr).received += parseFloat(vout.value || 0);
+        }
+      }
+
+      for (const vin of tx.vin || []) {
+        if (vin.coinbase || !vin.txid) continue;
+        let voutData = orphanVouts.get(vin.txid);
+        if (!voutData) {
+          const [prev] = await db.query(
+            'SELECT vout FROM transactions WHERE txid = $1',
+            { bind: [vin.txid], transaction: t }
+          );
+          voutData = prev[0]?.vout;
+        }
+        const prevOut = voutData?.[vin.vout];
+        for (const addr of prevOut?.scriptPubKey?.addresses || []) {
+          delta(addr).txids.add(tx.txid);
+          delta(addr).sent += parseFloat(prevOut.value || 0);
+        }
+      }
+    }
+
+    for (const [addr, d] of deltas.entries()) {
+      await db.query(`
+        UPDATE addresses SET
+          total_received = GREATEST(0, total_received - $2),
+          total_sent = GREATEST(0, total_sent - $3),
+          balance = GREATEST(0, GREATEST(0, total_received - $2) - GREATEST(0, total_sent - $3)),
+          tx_count = GREATEST(0, tx_count - $4),
+          transactions = ARRAY(SELECT x FROM unnest(transactions) x WHERE x <> ALL($5::text[])),
+          updated_at = NOW()
+        WHERE address = $1
+      `, { bind: [addr, d.received, d.sent, d.txids.size, orphanTxids], transaction: t });
+    }
+
+    // Addresses that only ever appeared in the orphaned blocks
+    await db.query(
+      'DELETE FROM addresses WHERE address = ANY($1::varchar[]) AND tx_count = 0',
+      { bind: [[...deltas.keys()]], transaction: t }
+    );
+
+    await db.query('DELETE FROM transactions WHERE blockhash = ANY($1::varchar[])', { bind: [orphanHashes], transaction: t });
+    await db.query('DELETE FROM blocks WHERE hash = ANY($1::varchar[])', { bind: [orphanHashes], transaction: t });
+
+    return { txs: orphanTxids.length, addresses: deltas.size };
+};
+
+/**
+ * Remove all blocks above forkHeight (see removeBlocks).
+ */
+const rollbackToHeight = async (db, forkHeight) => {
+  await db.transaction(async (t) => {
+    const [orphanBlocks] = await db.query(
+      'SELECT hash FROM blocks WHERE height > $1',
+      { bind: [forkHeight], transaction: t }
+    );
+    const orphanHashes = orphanBlocks.map(b => b.hash);
+    if (orphanHashes.length === 0) return;
+
+    const stats = await removeBlocks(db, orphanHashes, t);
+    await db.query('UPDATE blocks SET nextblockhash = NULL WHERE height = $1', { bind: [forkHeight], transaction: t });
+
+    logger.warn(`Rolled back to height ${forkHeight}: removed ${orphanHashes.length} blocks, ${stats.txs} txs, adjusted ${stats.addresses} addresses`);
+  });
+
+  // Cached vouts may belong to orphaned transactions
+  txVoutCache.clear();
+};
+
+/**
+ * Replace a single stale block stored at `height` (left over from an old
+ * one-block fork) with the node's main-chain block.
+ */
+const replaceStaleBlock = async (height) => {
+  const db = getSequelize();
+  const BlockModel = await getBlock(db);
+  const stored = await BlockModel.findOne({ where: { height }, attributes: ['hash'], raw: true });
+  const nodeHash = await executeRpcCommand('getblockhash', [height], 20000);
+  if (!stored || !nodeHash || stored.hash === nodeHash) return false;
+
+  await db.transaction(async (t) => {
+    const stats = await removeBlocks(db, [stored.hash], t);
+    logger.warn(`Removed stale block ${height} ${stored.hash}: ${stats.txs} txs, adjusted ${stats.addresses} addresses`);
+  });
+  txVoutCache.clear();
+  return indexBlock(height, false);
 };
 
 /**
@@ -446,5 +637,7 @@ const indexBlock = async (height, isBulkSync = false) => {
 module.exports = {
   initializeIndexer,
   runIndexingJob,
+  indexBlock,
+  replaceStaleBlock,
   getLastIndexedBlock: () => lastIndexedBlock
 };

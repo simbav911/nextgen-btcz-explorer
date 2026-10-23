@@ -468,7 +468,7 @@ const indexBlock = async (height, isBulkSync = false) => {
         blocktime: tx.blocktime || blockDetails.time,
         vin: processedVin,
         vout: processedVout,
-        is_coinbase: tx.vin && tx.vin.length > 0 && tx.vin[0].coinbase ? true : false,
+        isCoinbase: tx.vin && tx.vin.length > 0 && tx.vin[0].coinbase ? true : false,
         valueBalance: tx.valueBalance,
         fOverwintered: tx.fOverwintered,
         vShieldedSpend: tx.vShieldedSpend,

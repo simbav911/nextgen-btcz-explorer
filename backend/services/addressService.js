@@ -457,7 +457,7 @@ const saveTransactionToDb = async (db, tx, address) => {
         blocktime: tx.blocktime,
         vin: tx.vin,
         vout: tx.vout,
-        is_coinbase: tx.vin && tx.vin.length > 0 && tx.vin[0].coinbase ? true : false
+        isCoinbase: tx.vin && tx.vin.length > 0 && tx.vin[0].coinbase ? true : false
       });
     } catch (error) {
       // Just log and continue, don't throw

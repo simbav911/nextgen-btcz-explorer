@@ -123,7 +123,7 @@ const TransactionInfoCard = ({ txType, transaction }) => {
 
         {/* Transaction Flow Visualization */}
         <div className="flex justify-between items-center mb-6">
-          <div className={`w-5/12 ${txType === 'coinbase' ? 'bg-yellow-100' : 'bg-gray-100'} rounded-lg p-4 text-center`}>
+          <div className={`w-5/12 ${txType === 'coinbase' ? 'bg-yellow-100' : 'bg-gray-100'} rounded-lg p-3 sm:p-4 text-center`}>
             <h5 className="font-medium text-sm mb-1">
               {info.fromType}
             </h5>
@@ -136,7 +136,7 @@ const TransactionInfoCard = ({ txType, transaction }) => {
             <FaArrowRight className="text-gray-400" size={20} />
           </div>
 
-          <div className={`w-5/12 ${txType === 'coinbase' ? 'bg-gray-100' : (txType === 't2z' ? 'bg-blue-100' : (txType === 't2t' ? 'bg-orange-100' : 'bg-gray-100'))} rounded-lg p-4 text-center`}>
+          <div className={`w-5/12 ${txType === 'coinbase' ? 'bg-gray-100' : (txType === 't2z' ? 'bg-blue-100' : (txType === 't2t' ? 'bg-orange-100' : 'bg-gray-100'))} rounded-lg p-3 sm:p-4 text-center`}>
             <h5 className="font-medium text-sm mb-1">
               {info.toType}
             </h5>
@@ -152,7 +152,7 @@ const TransactionInfoCard = ({ txType, transaction }) => {
             <h4 className="font-medium text-sm mb-2">
               {txType === 'coinbase' ? 'Block Reward:' : 'Value Balance:'}
             </h4>
-            <p className={`text-xl font-bold ${info.valueColor}`}>
+            <p className={`text-lg sm:text-xl font-bold break-words ${info.valueColor}`}>
               {info.valuePrefix}{valueToDisplay} BTCZ
             </p>
             <p className="text-xs text-gray-500 mt-1">

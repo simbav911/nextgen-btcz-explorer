@@ -396,3 +396,96 @@
   color: #2563eb;
   font-style: italic;
 }
+
+/* ------------------------------------------------------------------
+ * Phones: the 200px label column left ~100px for the bars and the
+ * ruler labels overlapped each other.
+ * ------------------------------------------------------------------ */
+@media (max-width: 576px) {
+  .horizontal-bar-chart-container {
+    padding: 8px 4px;
+  }
+
+  .chart-date-badge {
+    position: static;
+    margin-bottom: 10px;
+  }
+
+  .date-pill {
+    font-size: 13px;
+    padding: 4px 10px;
+  }
+
+  .horizontal-bars {
+    margin-right: 8px;
+    min-width: 0;
+  }
+
+  .bar-labels {
+    width: 150px;
+    flex-shrink: 0;
+  }
+
+  .bar-label,
+  .pool-name {
+    font-size: 12px;
+  }
+
+  .block-count {
+    margin-left: 4px;
+    min-width: 24px;
+  }
+
+  .toggle-addresses {
+    display: none;
+  }
+
+  .horizontal-bar-chart {
+    margin-bottom: 16px;
+  }
+
+  .x-axis-ruler {
+    height: auto;
+    padding-left: 0;
+  }
+
+  .ruler-container {
+    width: calc(100% - 158px);
+  }
+
+  /* show only 0 / 200 / 400 / 600 */
+  .ruler-tick .tick-label {
+    display: none;
+  }
+  .ruler-tick:nth-child(4n + 2) .tick-label {
+    display: block;
+  }
+
+  .ruler-label {
+    position: static;
+    margin-top: 22px;
+    text-align: right;
+    font-size: 13px;
+  }
+
+  .addresses-header h3 {
+    font-size: 14px;
+  }
+
+  .address-item {
+    padding: 8px 10px;
+  }
+
+  .address-text {
+    font-size: 12px;
+  }
+
+  .tooltip {
+    min-width: 0;
+    max-width: calc(100vw - 24px);
+  }
+
+  .tooltip-pool {
+    max-width: 60vw;
+  }
+}

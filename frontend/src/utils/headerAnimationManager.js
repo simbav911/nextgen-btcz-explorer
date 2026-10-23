@@ -78,8 +78,9 @@ class HeaderAnimationManager {
     
     if (setIndex >= 0 && setIndex < this.colorSets.length) {
       const colors = this.colorSets[setIndex].join(', ');
-      this.gradientElement.style.background = `linear-gradient(45deg, ${colors})`;
-      this.gradientElement.style.backgroundSize = '600% 600%';
+      // The gradient is painted by the element's ::before (see animatedHeader.css),
+      // which is sized 600% x 600% and moved with a transform.
+      this.gradientElement.style.setProperty('--header-gradient', `linear-gradient(45deg, ${colors})`);
       this.currentColorSet = setIndex;
     }
     
@@ -102,7 +103,7 @@ class HeaderAnimationManager {
     if (!this.gradientElement) return this;
     
     this.animationSpeed = seconds;
-    this.gradientElement.style.animationDuration = `${seconds}s`;
+    this.gradientElement.style.setProperty('--header-gradient-duration', `${seconds}s`);
     
     return this;
   }
@@ -112,7 +113,7 @@ class HeaderAnimationManager {
    */
   stop() {
     if (this.gradientElement) {
-      this.gradientElement.style.animation = 'none';
+      this.gradientElement.style.setProperty('--header-gradient-state', 'paused');
       this.animationActive = false;
     }
     
@@ -124,7 +125,8 @@ class HeaderAnimationManager {
    */
   resume() {
     if (this.gradientElement) {
-      this.gradientElement.style.animation = `gradientAnimation ${this.animationSpeed}s ease infinite`;
+      this.gradientElement.style.setProperty('--header-gradient-duration', `${this.animationSpeed}s`);
+      this.gradientElement.style.setProperty('--header-gradient-state', 'running');
       this.animationActive = true;
     }
     

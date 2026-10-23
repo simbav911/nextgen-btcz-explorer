@@ -4,13 +4,20 @@
  */
 
 import primaryAnimation from './backgroundAnimation';
-import alternativeAnimation from './backgroundAnimationAlt';
+
+// The alternative style is not used by default, so it is loaded on demand
+// instead of being shipped in the main bundle.
+const loadAlternativeAnimation = () =>
+  import('./backgroundAnimationAlt').then(mod => mod.default);
 
 class BackgroundManager {
   constructor() {
     this.animations = {
       primary: primaryAnimation,
-      alternative: alternativeAnimation
+      alternative: null
+    };
+    this.loaders = {
+      alternative: loadAlternativeAnimation
     };
     this.activeAnimation = null;
     this.activeStyle = 'primary';
@@ -27,6 +34,21 @@ class BackgroundManager {
     
     // Set the active style
     this.activeStyle = style in this.animations ? style : 'primary';
+
+    if (!this.animations[this.activeStyle] && this.loaders[this.activeStyle]) {
+      const requested = this.activeStyle;
+      this.loaders[requested]().then(animation => {
+        this.animations[requested] = animation;
+        // Only start it if nothing else was selected in the meantime
+        if (this.activeStyle === requested) {
+          this.activeAnimation = animation;
+          animation.init();
+          this.initialized = true;
+        }
+      });
+      return this;
+    }
+
     this.activeAnimation = this.animations[this.activeStyle];
     
     // Initialize the animation

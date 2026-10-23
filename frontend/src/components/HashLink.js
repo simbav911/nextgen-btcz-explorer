@@ -11,8 +11,9 @@ import { formatHash } from '../utils/formatting';
  * @param {number} length - Number of characters to show before truncation
  * @param {boolean} showCopy - Whether to show copy button
  * @param {string} className - Optional custom className for link styling
+ * @param {boolean} wrap - Show the full hash and let it wrap (break-all) instead of truncating
  */
-const HashLink = ({ hash, type = 'tx', length = 10, showCopy = true, className = '' }) => {
+const HashLink = ({ hash, type = 'tx', length = 10, showCopy = true, className = '', wrap = false }) => {
   if (!hash) return null;
   
   const getUrl = () => {
@@ -37,7 +38,7 @@ const HashLink = ({ hash, type = 'tx', length = 10, showCopy = true, className =
   };
 
   // Determine default class based on type
-  let defaultClass = "font-mono hover:underline mr-1 overflow-hidden flex-1";
+  let defaultClass = "font-mono hover:underline mr-1 overflow-hidden flex-1 min-w-0";
   
   // Add type-specific styling
   switch (type) {
@@ -55,13 +56,15 @@ const HashLink = ({ hash, type = 'tx', length = 10, showCopy = true, className =
   }
   
   return (
-    <div className="flex items-center w-full overflow-hidden group">
+    <div className="flex items-center w-full min-w-0 overflow-hidden group">
       <Link 
         to={getUrl()} 
         className={`${defaultClass} ${className}`}
         title={hash}
       >
-        <span style={truncateStyle}>{formatHash(hash, length)}</span>
+        {wrap
+          ? <span className="hash-wrap">{hash}</span>
+          : <span style={truncateStyle}>{formatHash(hash, length)}</span>}
       </Link>
       
       {showCopy && (

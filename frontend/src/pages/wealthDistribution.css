@@ -93,9 +93,10 @@
     width: 95% !important;
   }
   
-  /* Make table more mobile-friendly */
+  /* Make table more mobile-friendly (auto layout: a fixed layout made the
+     address and balance columns overlap on phones) */
   .wealth-distribution-container table {
-    table-layout: fixed;
+    table-layout: auto;
   }
   
   .wealth-distribution-container th,
@@ -104,4 +105,20 @@
     font-size: 0.75rem;
   }
   
+}
+
+@media (max-width: 640px) {
+  #root .min-h-screen .content-container .wealth-distribution-container .shadow-md {
+    width: 100% !important;
+  }
+
+  .wealth-distribution-container {
+    padding-left: 0.5rem !important;
+    padding-right: 0.5rem !important;
+  }
+
+  /* Hover lift on every table row is just extra paint work on touch screens */
+  .wealth-distribution-container tbody tr:hover {
+    transform: none;
+  }
 }

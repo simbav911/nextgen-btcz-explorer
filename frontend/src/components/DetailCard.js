@@ -1,7 +1,6 @@
 import React from 'react';
 import { FaCopy } from 'react-icons/fa';
 import { CopyToClipboard } from 'react-copy-to-clipboard';
-import { motion } from 'framer-motion';
 
 const DetailCard = ({ title, items, copyable = [] }) => {
   // Function to extract text value for copying
@@ -11,26 +10,6 @@ const DetailCard = ({ title, items, copyable = [] }) => {
       return value.props.hash || value.props.children || '';
     }
     return value;
-  };
-  
-  // Animation variants for list items
-  const listVariants = {
-    hidden: { opacity: 0 },
-    visible: {
-      opacity: 1,
-      transition: {
-        staggerChildren: 0.05
-      }
-    }
-  };
-  
-  const itemVariants = {
-    hidden: { opacity: 0, x: -10 },
-    visible: { 
-      opacity: 1, 
-      x: 0,
-      transition: { duration: 0.3 }
-    }
   };
   
   // Group items into two columns for better organization
@@ -54,12 +33,7 @@ const DetailCard = ({ title, items, copyable = [] }) => {
   const { basicInfo, technicalDetails } = groupItems();
   
   return (
-    <motion.div 
-      className="card p-3 sm:p-6 border border-gray-200 hover:shadow-lg transition-shadow duration-300"
-      initial={{ opacity: 0, y: 20 }}
-      animate={{ opacity: 1, y: 0 }}
-      transition={{ duration: 0.4 }}
-    >
+    <div className="card anim-fade-up p-3 sm:p-6 border border-gray-200 hover:shadow-lg transition-shadow duration-300">
       {title && (
         <div className="mb-3 sm:mb-6">
           {typeof title === 'string' ? (
@@ -72,85 +46,68 @@ const DetailCard = ({ title, items, copyable = [] }) => {
       
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 sm:gap-6">
         {/* Basic Info Column */}
-        <motion.div 
-          className="space-y-3 sm:space-y-4"
-          variants={listVariants}
-          initial="hidden"
-          animate="visible"
-        >
+        <div className="space-y-3 sm:space-y-4 min-w-0">
           <h4 className="font-medium text-gray-700 border-b pb-2">Basic Information</h4>
           {basicInfo.map((item, index) => (
-            <motion.div 
+            <div 
               key={index} 
-              variants={itemVariants}
-              className="flex flex-col sm:flex-row border-b border-gray-100 pb-3 last:pb-0 last:border-b-0"
+              style={{ animationDelay: `${index * 0.05}s` }}
+              className="anim-fade-left flex flex-col sm:flex-row border-b border-gray-100 pb-3 last:pb-0 last:border-b-0"
             >
               <div className="w-full sm:w-2/5 text-gray-500 font-medium mb-1 sm:mb-0">
                 {item.label}
               </div>
-              <div className="w-full sm:w-3/5 break-words flex items-center">
-                <div className="flex-grow overflow-hidden font-mono text-xs sm:text-sm bg-gray-50 p-2 rounded">
+              <div className="w-full sm:w-3/5 min-w-0 break-words flex items-center">
+                <div className="flex-grow min-w-0 break-words font-mono text-xs sm:text-sm bg-gray-50 p-2 rounded">
                   {item.value}
                 </div>
                 {copyable.includes(item.label) && !React.isValidElement(item.value) && (
                   <CopyToClipboard text={getTextValue(item.value)}>
-                    <motion.button 
-                      className="ml-2 text-gray-400 hover:text-gray-600 focus:outline-none p-2" 
+                    <button 
+                      className="ml-2 text-gray-400 hover:text-gray-600 focus:outline-none p-2 flex-shrink-0 transition-transform hover:scale-125 active:scale-90" 
                       title="Copy to clipboard"
-                      whileHover={{ scale: 1.2 }}
-                      whileTap={{ scale: 0.9 }}
                     >
                       <FaCopy size={14} />
-                    </motion.button>
+                    </button>
                   </CopyToClipboard>
                 )}
               </div>
-            </motion.div>
+            </div>
           ))}
-        </motion.div>
+        </div>
         
         {/* Technical Details Column */}
-        <motion.div 
-          className="space-y-3 sm:space-y-4"
-          variants={listVariants}
-          initial="hidden"
-          animate="visible"
-        >
+        <div className="space-y-3 sm:space-y-4 min-w-0">
           <h4 className="font-medium text-gray-700 border-b pb-2">Technical Details</h4>
           {technicalDetails.map((item, index) => (
-            <motion.div 
+            <div 
               key={index} 
-              variants={itemVariants}
-              className="flex flex-col sm:flex-row border-b border-gray-100 pb-3 last:pb-0 last:border-b-0"
+              style={{ animationDelay: `${index * 0.05}s` }}
+              className="anim-fade-left flex flex-col sm:flex-row border-b border-gray-100 pb-3 last:pb-0 last:border-b-0"
             >
               <div className="w-full sm:w-1/4 text-gray-500 font-medium mb-1 sm:mb-0">
                 {item.label}
               </div>
-              <div className="w-full sm:w-3/4 break-words flex items-center">
-                <div className="flex-grow overflow-hidden font-mono text-xs sm:text-sm bg-gray-50 p-2 rounded">
-                  {typeof item.value === 'string' && item.value.length > 50
-                    ? <div className="overflow-x-auto whitespace-nowrap">{item.value}</div>
-                    : item.value
-                  }
+              <div className="w-full sm:w-3/4 min-w-0 break-words flex items-center">
+                <div className="flex-grow min-w-0 break-all font-mono text-xs sm:text-sm bg-gray-50 p-2 rounded">
+                  {item.value}
                 </div>
                 {copyable.includes(item.label) && !React.isValidElement(item.value) && (
                   <CopyToClipboard text={getTextValue(item.value)}>
-                    <motion.button 
-                      className="ml-2 text-gray-400 hover:text-gray-600 focus:outline-none p-2" 
+                    <button 
+                      className="ml-2 text-gray-400 hover:text-gray-600 focus:outline-none p-2 flex-shrink-0 transition-transform hover:scale-125 active:scale-90" 
                       title="Copy to clipboard"
-                      whileHover={{ scale: 1.2 }}
-                      whileTap={{ scale: 0.9 }}
                     >
                       <FaCopy size={14} />
-                    </motion.button>
+                    </button>
                   </CopyToClipboard>
                 )}
               </div>
-            </motion.div>
+            </div>
           ))}
-        </motion.div>
+        </div>
       </div>
-    </motion.div>
+    </div>
   );
 };
 

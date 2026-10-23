@@ -1,6 +1,5 @@
 import React, { useState, useEffect, useRef, useCallback, useMemo, Suspense } from 'react';
-import { Routes, Route, createRoutesFromElements } from 'react-router-dom';
-import { io } from 'socket.io-client';
+import { Routes, Route } from 'react-router-dom';
 
 // Import background styles
 import './styles/background.css';
@@ -13,6 +12,13 @@ import Spinner from './components/Spinner';
 
 // Import configuration
 import config from './config';
+
+// Context
+import { SocketContext } from './contexts/SocketContext';
+import { ToastContext } from './contexts/ToastContext';
+
+// Import background manager
+import backgroundManager from './utils/backgroundManager';
 
 // Lazy-loaded pages (code splitting — only loads JS when route is visited)
 const Home = React.lazy(() => import('./pages/Home'));
@@ -29,17 +35,12 @@ const WealthDistribution = React.lazy(() => import('./pages/WealthDistribution')
 const Developers = React.lazy(() => import('./pages/Developers'));
 const PoolOperators = React.lazy(() => import('./pages/PoolOperators'));
 
-// Context
-import { SocketContext } from './contexts/SocketContext';
-import { ToastContext } from './contexts/ToastContext';
-
-// Import background manager
-import backgroundManager from './utils/backgroundManager';
-
 function App({ skipHeader = false }) {
   // Initialize state and refs
   const socketRef = useRef(null);
   const [isConnected, setIsConnected] = useState(false);
+  // The socket is kept in state so consumers receive it as soon as it exists
+  const [socket, setSocket] = useState(null);
   const [toast, setToast] = useState(null);
 
   // Define showToast callback
@@ -68,89 +69,105 @@ function App({ skipHeader = false }) {
   }, []);
 
   // Initialize socket connection with better error handling and reconnection logic
+  // socket.io-client is loaded on demand so it is not part of the main bundle
+  // (the connection is only opened after the first render anyway).
   useEffect(() => {
     if (socketRef.current) return;
 
-    // Create socket with improved options from config
-    socketRef.current = io(config.socket.url, {
-      ...config.socket.options,
-      forceNew: true
-    });
+    let cancelled = false;
+    let currentSocket = null;
 
-    const currentSocket = socketRef.current;
+    const setupSocket = (io) => {
+      if (cancelled || socketRef.current) return;
 
-    // Connection established
-    currentSocket.on('connect', () => {
-      console.log('Connected to WebSocket server');
-      setIsConnected(true);
+      // Create socket with improved options from config
+      socketRef.current = io(config.socket.url, {
+        ...config.socket.options,
+        forceNew: true
+      });
 
-      // Subscribe to channels
-      currentSocket.emit('subscribe', 'blocks');
-      currentSocket.emit('subscribe', 'transactions');
-      currentSocket.emit('subscribe', 'general');
-    });
+      currentSocket = socketRef.current;
+      setSocket(currentSocket);
 
-    // Connection error
-    currentSocket.on('connect_error', (error) => {
-      console.error('WebSocket connection error:', error);
-      setIsConnected(false);
-    });
+      // Connection established
+      currentSocket.on('connect', () => {
+        console.log('Connected to WebSocket server');
+        setIsConnected(true);
 
-    // Connection closed
-    currentSocket.on('disconnect', (reason) => {
-      console.log(`Disconnected from WebSocket server: ${reason}`);
-      setIsConnected(false);
+        // Subscribe to channels
+        currentSocket.emit('subscribe', 'blocks');
+        currentSocket.emit('subscribe', 'transactions');
+        currentSocket.emit('subscribe', 'general');
+      });
 
-      // If the server closed the connection, try to reconnect immediately
-      if (reason === 'io server disconnect') {
-        currentSocket.connect();
-      }
-    });
+      // Connection error
+      currentSocket.on('connect_error', (error) => {
+        console.error('WebSocket connection error:', error);
+        setIsConnected(false);
+      });
 
-    // Receive heartbeat to confirm connection is alive
-    currentSocket.on('heartbeat', (data) => {
-      const latency = Date.now() - data.timestamp;
-      if (latency > 5000) {
-        console.warn(`High socket latency detected: ${latency}ms`);
-      }
-    });
+      // Connection closed
+      currentSocket.on('disconnect', (reason) => {
+        console.log(`Disconnected from WebSocket server: ${reason}`);
+        setIsConnected(false);
 
-    // Notification handling
-    currentSocket.on('notification', (notification) => {
-      if (notification.type === 'block') {
-        showToast(`New block #${notification.data.height} mined`, 'info');
-      }
-    });
+        // If the server closed the connection, try to reconnect immediately
+        if (reason === 'io server disconnect') {
+          currentSocket.connect();
+        }
+      });
 
-    // Reconnect success
-    currentSocket.on('reconnect', (attemptNumber) => {
-      console.log(`Reconnected to WebSocket server after ${attemptNumber} attempts`);
-      setIsConnected(true);
+      // Receive heartbeat to confirm connection is alive
+      currentSocket.on('heartbeat', (data) => {
+        const latency = Date.now() - data.timestamp;
+        if (latency > 5000) {
+          console.warn(`High socket latency detected: ${latency}ms`);
+        }
+      });
 
-      // Re-subscribe to channels
-      currentSocket.emit('subscribe', 'blocks');
-      currentSocket.emit('subscribe', 'transactions');
-      currentSocket.emit('subscribe', 'general');
-    });
+      // Notification handling
+      currentSocket.on('notification', (notification) => {
+        if (notification.type === 'block') {
+          showToast(`New block #${notification.data.height} mined`, 'info');
+        }
+      });
 
-    // Reconnection attempt
-    currentSocket.on('reconnect_attempt', (attemptNumber) => {
-      console.log(`Attempting to reconnect to WebSocket server (attempt ${attemptNumber})`);
-    });
+      // Reconnect success
+      currentSocket.on('reconnect', (attemptNumber) => {
+        console.log(`Reconnected to WebSocket server after ${attemptNumber} attempts`);
+        setIsConnected(true);
 
-    // Reconnection error
-    currentSocket.on('reconnect_error', (error) => {
-      console.error('WebSocket reconnection error:', error);
-    });
+        // Re-subscribe to channels
+        currentSocket.emit('subscribe', 'blocks');
+        currentSocket.emit('subscribe', 'transactions');
+        currentSocket.emit('subscribe', 'general');
+      });
 
-    // Reconnection failed
-    currentSocket.on('reconnect_failed', () => {
-      console.error('WebSocket reconnection failed, giving up');
-      showToast('Real-time updates unavailable. Please refresh the page.', 'error', 10000);
-    });
+      // Reconnection attempt
+      currentSocket.on('reconnect_attempt', (attemptNumber) => {
+        console.log(`Attempting to reconnect to WebSocket server (attempt ${attemptNumber})`);
+      });
+
+      // Reconnection error
+      currentSocket.on('reconnect_error', (error) => {
+        console.error('WebSocket reconnection error:', error);
+      });
+
+      // Reconnection failed
+      currentSocket.on('reconnect_failed', () => {
+        console.error('WebSocket reconnection failed, giving up');
+        showToast('Real-time updates unavailable. Please refresh the page.', 'error', 10000);
+      });
+
+    };
+
+    import('socket.io-client')
+      .then(({ io }) => setupSocket(io))
+      .catch(error => console.error('Failed to load real-time client:', error));
 
     // Cleanup on unmount
     return () => {
+      cancelled = true;
       if (currentSocket) {
         // Unsubscribe from all channels first
         currentSocket.emit('unsubscribe', 'blocks');
@@ -160,6 +177,7 @@ function App({ skipHeader = false }) {
         // Then disconnect
         currentSocket.disconnect();
         socketRef.current = null;
+        setSocket(null);
       }
     };
   }, [showToast]);
@@ -173,7 +191,7 @@ function App({ skipHeader = false }) {
       {!skipHeader && <ModernHeader />}
 
       {/* Main content with WebSocket context */}
-      <SocketContext.Provider value={socketRef.current}>
+      <SocketContext.Provider value={socket}>
         <ToastContext.Provider value={toastContextValue}>
           <main className="flex-grow py-4 sm:py-6 md:py-8 content-container">
             <Suspense fallback={<Spinner />}>

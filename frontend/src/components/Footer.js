@@ -9,9 +9,9 @@ const Footer = () => {
   const currentYear = new Date().getFullYear();
 
   return (
-    <footer className="relative text-black py-8 z-10 mt-32">
+    <footer className="relative text-black py-6 sm:py-8 z-10 mt-12 sm:mt-32">
       {/* Content container */}
-      <div className="container-custom relative z-10 pt-12">
+      <div className="container-custom relative z-10 pt-6 sm:pt-12">
         <div className="grid grid-cols-1 md:grid-cols-4 gap-8">
           {/* About */}
           <div>
@@ -87,7 +87,7 @@ const Footer = () => {
           {/* Connect */}
           <div>
             <h3 className="text-lg font-bold mb-4 header-text">Connect</h3>
-            <div className="flex space-x-4">
+            <div className="flex flex-wrap gap-x-4 gap-y-2">
               <a 
                 href="https://github.com/btcz" 
                 target="_blank" 

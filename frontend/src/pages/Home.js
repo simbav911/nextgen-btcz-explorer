@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useContext, useRef, useMemo } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import {
   FaCube,
   FaExchangeAlt,
@@ -15,7 +15,6 @@ import {
 // Components
 import SearchBox from '../components/SearchBox';
 import BlockCard from '../components/BlockCard';
-import TransactionCard from '../components/TransactionCard';
 import StatCard from '../components/StatCard';
 
 // Contexts
@@ -49,6 +48,7 @@ const Home = () => {
 
   const socket = useContext(SocketContext);
   const { showToast } = useContext(ToastContext);
+  const navigate = useNavigate();
   const notifiedBlockHeights = useRef(new Set()); // Track notified block heights
 
   // Loading effects CSS is now imported globally in index.js
@@ -588,7 +588,7 @@ const Home = () => {
               icon={latestBlockIcon}
               color="blue"
               isLoading={loading || !stats}
-              onClick={() => window.location.href = '/blocks'}
+              onClick={() => navigate('/blocks')}
             />
           </div>
         </div>
@@ -601,7 +601,7 @@ const Home = () => {
               icon={difficultyIcon}
               color="purple"
               isLoading={loading || !stats}
-              onClick={() => window.location.href = '/stats'}
+              onClick={() => navigate('/stats')}
             />
           </div>
         </div>
@@ -614,7 +614,7 @@ const Home = () => {
               icon={hashrateIcon}
               color="orange"
               isLoading={loading || !stats}
-              onClick={() => window.location.href = '/stats'}
+              onClick={() => navigate('/stats')}
             />
           </div>
         </div>
@@ -632,7 +632,7 @@ const Home = () => {
                 positive: btczPrice.usd_24h_change >= 0,
                 period: '24h'
               } : null}
-              onClick={() => window.location.href = '/charts'}
+              onClick={() => navigate('/charts')}
             />
           </div>
         </div>
@@ -797,7 +797,7 @@ const Home = () => {
                             <button
                               type="button"
                               className="text-blue-600 hover:underline cursor-pointer bg-transparent border-none p-0 font-inherit text-left"
-                              onClick={() => window.location.href = `/blocks/${tx.blockhash}`}
+                              onClick={(e) => { e.preventDefault(); navigate(`/blocks/${tx.blockhash}`); }}
                             >
                               {tx.height || tx.blockhash.substring(0, 6) + '...'}
                             </button>

@@ -3,7 +3,6 @@ import { useParams, Link, useNavigate } from 'react-router-dom';
 import { FaCube, FaArrowLeft, FaArrowRight } from 'react-icons/fa';
 import dayjs from 'dayjs';
 import relativeTime from 'dayjs/plugin/relativeTime';
-dayjs.extend(relativeTime);
 import axios from 'axios';
 
 // Components
@@ -18,6 +17,8 @@ import { blockService, transactionService } from '../services/api';
 // Utils
 import { formatNumber, formatTimestamp, formatBTCZ } from '../utils/formatting';
 import api from '../services/api';
+
+dayjs.extend(relativeTime);
 
 const Block = () => {
   const { hash } = useParams();

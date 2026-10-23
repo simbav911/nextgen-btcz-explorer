@@ -11,12 +11,14 @@ import {
   isToday
 } from './chartUtils';
 import './chartConfig'; // Import chart configuration to ensure all elements are registered
+import { useIsMobile } from '../../hooks/useMediaQuery';
 
 /**
  * LineChartDisplay component for rendering line charts
  */
 const LineChartDisplay = ({ chartData, activeChart }) => {
   const chartRef = useRef(null);
+  const isMobile = useIsMobile();
   const { gradientColors, poolColors } = getChartColors();
 
   useEffect(() => {
@@ -167,10 +169,10 @@ const LineChartDisplay = ({ chartData, activeChart }) => {
                 labels: {
                   font: {
                     family: "'Inter', 'Segoe UI', Roboto, sans-serif",
-                    size: 14,
+                    size: isMobile ? 12 : 14,
                     weight: 'bold'
                   },
-                  padding: 20,
+                  padding: isMobile ? 10 : 20,
                   usePointStyle: true,
                   pointStyle: 'circle',
                   filter: function(legendItem, chartData) {
@@ -238,7 +240,7 @@ const LineChartDisplay = ({ chartData, activeChart }) => {
               y: {
                 beginAtZero: true,
                 title: {
-                  display: true,
+                  display: !isMobile,
                   text: getYAxisTitle(activeChart),
                   font: {
                     family: "'Inter', 'Segoe UI', Roboto, sans-serif",
@@ -255,10 +257,10 @@ const LineChartDisplay = ({ chartData, activeChart }) => {
                   drawBorder: false
                 },
                 ticks: {
-                  padding: 10,
+                  padding: isMobile ? 4 : 10,
                   font: {
                     family: "'Inter', 'Segoe UI', Roboto, sans-serif",
-                    size: 12
+                    size: isMobile ? 10 : 12
                   },
                   callback: function(value) {
                     if (value >= 1000000) {
@@ -276,7 +278,7 @@ const LineChartDisplay = ({ chartData, activeChart }) => {
                   text: 'Block Height',
                   font: {
                     family: "'Inter', 'Segoe UI', Roboto, sans-serif",
-                    size: 14,
+                    size: isMobile ? 12 : 14,
                     weight: 'bold'
                   },
                   padding: {
@@ -289,11 +291,11 @@ const LineChartDisplay = ({ chartData, activeChart }) => {
                   drawBorder: false
                 },
                 ticks: {
-                  maxTicksLimit: 8,
-                  padding: 10,
+                  maxTicksLimit: isMobile ? 5 : 8,
+                  padding: isMobile ? 4 : 10,
                   font: {
                     family: "'Inter', 'Segoe UI', Roboto, sans-serif",
-                    size: 12
+                    size: isMobile ? 10 : 12
                   },
                   callback: function(val, index) {
                     // Show fewer x-axis labels for better readability

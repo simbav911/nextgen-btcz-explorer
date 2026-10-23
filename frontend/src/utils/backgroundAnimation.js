@@ -1,12 +1,25 @@
 /**
  * BitcoinZ Explorer Background Animation
  * A colorful, animated background with gradient waves and particles
+ *
+ * Performance notes (visual output is unchanged):
+ *  - the static hexagon grid is rendered once per resize into an offscreen
+ *    canvas and blitted each frame instead of stroking hundreds of paths
+ *  - the frame rate is capped (30fps desktop / 24fps mobile) and motion is
+ *    time-based, so the animation runs at the same speed with less work
+ *  - the loop stops while the tab is hidden
+ *  - with `prefers-reduced-motion: reduce` a single static frame is drawn
+ *  - resize handling is debounced and ignores height-only changes on phones
+ *    (the URL bar showing/hiding), so particles don't jump around
  */
+
+const BASE_FRAME_MS = 1000 / 60; // original animation speeds were per 60fps frame
 
 class BackgroundAnimation {
   constructor() {
     this.canvas = null;
     this.ctx = null;
+    this.hexCanvas = null;
     this.width = window.innerWidth;
     this.height = window.innerHeight;
     this.particles = [];
@@ -28,6 +41,25 @@ class BackgroundAnimation {
     this.gradientAngle = 0;
     this.gradientSpeed = 0.001;
     this.isMobile = window.innerWidth < 768;
+    this.lastFrameTime = 0;
+    this.running = false;
+    this.resizeTimer = null;
+    this.reducedMotionQuery = null;
+
+    // Bind once so listeners can be removed again
+    this.animate = this.animate.bind(this);
+    this.handleResize = this.handleResize.bind(this);
+    this.onResize = this.onResize.bind(this);
+    this.onVisibilityChange = this.onVisibilityChange.bind(this);
+    this.onReducedMotionChange = this.onReducedMotionChange.bind(this);
+  }
+
+  get frameInterval() {
+    return 1000 / (this.isMobile ? 24 : 30);
+  }
+
+  prefersReducedMotion() {
+    return !!(this.reducedMotionQuery && this.reducedMotionQuery.matches);
   }
 
   init() {
@@ -35,7 +67,7 @@ class BackgroundAnimation {
     if (!this.canvas) {
       this.canvas = document.createElement('canvas');
       this.canvas.id = 'bg-canvas';
-      
+
       // Find or create container
       let container = document.getElementById('bg-animation-container');
       if (!container) {
@@ -44,195 +76,254 @@ class BackgroundAnimation {
         container.className = 'bg-animation-container';
         document.body.prepend(container);
       }
-      
+
       container.appendChild(this.canvas);
       this.ctx = this.canvas.getContext('2d');
-      
-      // Handle resize
-      window.addEventListener('resize', this.handleResize.bind(this));
+
+      if (typeof window.matchMedia === 'function') {
+        this.reducedMotionQuery = window.matchMedia('(prefers-reduced-motion: reduce)');
+        if (this.reducedMotionQuery.addEventListener) {
+          this.reducedMotionQuery.addEventListener('change', this.onReducedMotionChange);
+        } else if (this.reducedMotionQuery.addListener) {
+          this.reducedMotionQuery.addListener(this.onReducedMotionChange);
+        }
+      }
+
+      window.addEventListener('resize', this.onResize, { passive: true });
+      document.addEventListener('visibilitychange', this.onVisibilityChange);
       this.handleResize();
-      
-      // Create initial particles
-      this.initParticles();
-      
-      // Start the animation
-      this.animate();
+    }
+
+    this.start();
+  }
+
+  start() {
+    if (!this.ctx) return;
+    if (this.prefersReducedMotion()) {
+      this.stop();
+      this.drawFrame(0);
+      return;
+    }
+    if (this.running || document.hidden) return;
+    this.running = true;
+    this.lastFrameTime = 0;
+    this.animationFrameId = requestAnimationFrame(this.animate);
+  }
+
+  onResize() {
+    clearTimeout(this.resizeTimer);
+    this.resizeTimer = setTimeout(this.handleResize, 150);
+  }
+
+  onVisibilityChange() {
+    if (document.hidden) {
+      this.stop();
+    } else {
+      this.start();
     }
   }
-  
+
+  onReducedMotionChange() {
+    this.stop();
+    this.start();
+  }
+
   handleResize() {
-    this.width = window.innerWidth;
-    this.height = window.innerHeight;
+    if (!this.canvas) return;
+    const newWidth = window.innerWidth;
+    const newHeight = window.innerHeight;
+    const widthChanged = newWidth !== this.width || !this.particles.length;
+    const wasMobile = this.isMobile;
+
+    this.width = newWidth;
+    this.height = newHeight;
     this.canvas.width = this.width;
     this.canvas.height = this.height;
     this.isMobile = window.innerWidth < 768;
-    
+
     // Adjust particle count based on screen size
     this.particleCount = this.isMobile ? 30 : 50;
-    
-    // Reinitialize particles
-    this.initParticles();
+
+    // Reinitialize particles (skip for height-only changes, e.g. mobile URL bar)
+    if (widthChanged || wasMobile !== this.isMobile) {
+      this.initParticles();
+    }
+
+    this.buildHexGrid();
+
+    // Repaint immediately (resizing a canvas clears it)
+    if (!this.running) this.drawFrame(0);
   }
-  
+
   initParticles() {
     this.particles = [];
     for (let i = 0; i < this.particleCount; i++) {
+      const color = this.colors[Math.floor(Math.random() * this.colors.length)];
+      const alpha = Math.random() * 0.5 + 0.1;
       this.particles.push({
         x: Math.random() * this.width,
         y: Math.random() * this.height,
         radius: Math.random() * 3 + 1,
-        color: this.colors[Math.floor(Math.random() * this.colors.length)],
+        color,
         speed: Math.random() * 0.5 + 0.1,
         direction: Math.random() * Math.PI * 2,
-        alpha: Math.random() * 0.5 + 0.1
+        alpha,
+        // Same string the original per-frame replace() produced (hex colors are unchanged by it)
+        fillStyle: color.replace(')', `, ${alpha})`).replace('rgb', 'rgba')
       });
     }
   }
-  
-  drawGradientBackground() {
-    const gradient = this.ctx.createLinearGradient(0, 0, this.width, this.height);
-    
+
+  drawGradientBackground(step) {
     // Animate gradient angle
-    this.gradientAngle += this.gradientSpeed;
+    this.gradientAngle += this.gradientSpeed * step;
     const x1 = Math.cos(this.gradientAngle) * this.width * 0.5 + this.width * 0.5;
     const y1 = Math.sin(this.gradientAngle) * this.height * 0.5 + this.height * 0.5;
     const x2 = Math.cos(this.gradientAngle + Math.PI) * this.width * 0.5 + this.width * 0.5;
     const y2 = Math.sin(this.gradientAngle + Math.PI) * this.height * 0.5 + this.height * 0.5;
-    
+
     const gradient2 = this.ctx.createLinearGradient(x1, y1, x2, y2);
-    
+
     gradient2.addColorStop(0, this.gradientColors.start);
     gradient2.addColorStop(0.33, this.gradientColors.middle1);
     gradient2.addColorStop(0.66, this.gradientColors.middle2);
     gradient2.addColorStop(1, this.gradientColors.end);
-    
+
     this.ctx.fillStyle = gradient2;
     this.ctx.fillRect(0, 0, this.width, this.height);
   }
-  
-  drawWaves() {
-    this.ctx.beginPath();
-    this.wave.angle += this.wave.speed;
-    
-    // Draw first wave
-    this.ctx.beginPath();
+
+  drawWave(frequencyMul, angleMul, amplitudeMul, yRatio, color) {
+    const ctx = this.ctx;
+    ctx.beginPath();
     for (let x = 0; x < this.width; x += 10) {
-      const y = Math.sin(x * this.wave.frequency + this.wave.angle) * this.wave.amplitude + this.height * 0.3;
+      const y = Math.sin(x * this.wave.frequency * frequencyMul + this.wave.angle * angleMul) *
+        this.wave.amplitude * amplitudeMul + this.height * yRatio;
       if (x === 0) {
-        this.ctx.moveTo(x, y);
+        ctx.moveTo(x, y);
       } else {
-        this.ctx.lineTo(x, y);
+        ctx.lineTo(x, y);
       }
     }
-    this.ctx.strokeStyle = 'rgba(59, 130, 246, 0.2)'; // Blue wave
-    this.ctx.lineWidth = 2;
-    this.ctx.stroke();
-    
-    // Draw second wave
-    this.ctx.beginPath();
-    for (let x = 0; x < this.width; x += 10) {
-      const y = Math.sin(x * this.wave.frequency * 0.8 + this.wave.angle * 1.3) * this.wave.amplitude * 1.5 + this.height * 0.5;
-      if (x === 0) {
-        this.ctx.moveTo(x, y);
-      } else {
-        this.ctx.lineTo(x, y);
-      }
-    }
-    this.ctx.strokeStyle = 'rgba(139, 92, 246, 0.2)'; // Purple wave
-    this.ctx.lineWidth = 2;
-    this.ctx.stroke();
-    
-    // Draw third wave
-    this.ctx.beginPath();
-    for (let x = 0; x < this.width; x += 10) {
-      const y = Math.sin(x * this.wave.frequency * 1.2 + this.wave.angle * 0.7) * this.wave.amplitude * 1.2 + this.height * 0.7;
-      if (x === 0) {
-        this.ctx.moveTo(x, y);
-      } else {
-        this.ctx.lineTo(x, y);
-      }
-    }
-    this.ctx.strokeStyle = 'rgba(16, 185, 129, 0.2)'; // Green wave
-    this.ctx.lineWidth = 2;
-    this.ctx.stroke();
+    ctx.strokeStyle = color;
+    ctx.lineWidth = 2;
+    ctx.stroke();
   }
-  
-  drawParticles() {
-    this.particles.forEach(particle => {
+
+  drawWaves(step) {
+    this.wave.angle += this.wave.speed * step;
+    this.drawWave(1, 1, 1, 0.3, 'rgba(59, 130, 246, 0.2)'); // Blue wave
+    this.drawWave(0.8, 1.3, 1.5, 0.5, 'rgba(139, 92, 246, 0.2)'); // Purple wave
+    this.drawWave(1.2, 0.7, 1.2, 0.7, 'rgba(16, 185, 129, 0.2)'); // Green wave
+  }
+
+  drawParticles(step) {
+    const ctx = this.ctx;
+    const twoPi = Math.PI * 2;
+    for (let i = 0; i < this.particles.length; i++) {
+      const particle = this.particles[i];
       // Update particle position
-      particle.x += Math.cos(particle.direction) * particle.speed;
-      particle.y += Math.sin(particle.direction) * particle.speed;
-      
+      particle.x += Math.cos(particle.direction) * particle.speed * step;
+      particle.y += Math.sin(particle.direction) * particle.speed * step;
+
       // Wrap particles around the screen
       if (particle.x < 0) particle.x = this.width;
       if (particle.x > this.width) particle.x = 0;
       if (particle.y < 0) particle.y = this.height;
       if (particle.y > this.height) particle.y = 0;
-      
+
       // Draw particle
-      this.ctx.beginPath();
-      this.ctx.arc(particle.x, particle.y, particle.radius, 0, Math.PI * 2);
-      this.ctx.fillStyle = particle.color.replace(')', `, ${particle.alpha})`).replace('rgb', 'rgba');
-      this.ctx.fill();
-    });
+      ctx.beginPath();
+      ctx.arc(particle.x, particle.y, particle.radius, 0, twoPi);
+      ctx.fillStyle = particle.fillStyle;
+      ctx.fill();
+    }
   }
-  
-  drawHexagonGrid() {
-    // Skip on mobile for performance
-    if (this.isMobile) return;
-    
+
+  /**
+   * Render the (static) hexagon grid once into an offscreen canvas.
+   * Skipped on mobile, as before.
+   */
+  buildHexGrid() {
+    if (this.isMobile) {
+      this.hexCanvas = null;
+      return;
+    }
+    if (!this.hexCanvas) this.hexCanvas = document.createElement('canvas');
+    this.hexCanvas.width = this.width;
+    this.hexCanvas.height = this.height;
+    const ctx = this.hexCanvas.getContext('2d');
+
     const hexSize = 30;
     const hexHeight = hexSize * Math.sqrt(3);
     const hexWidth = hexSize * 2;
-    
-    this.ctx.strokeStyle = 'rgba(226, 232, 240, 0.5)'; // Light blue-gray
-    this.ctx.lineWidth = 0.5;
-    
+
+    ctx.strokeStyle = 'rgba(226, 232, 240, 0.5)'; // Light blue-gray
+    ctx.lineWidth = 0.5;
+
     // Calculate grid dimensions
     const cols = Math.ceil(this.width / (hexWidth * 0.75)) + 1;
     const rows = Math.ceil(this.height / hexHeight) + 1;
-    
+
     for (let row = -1; row < rows; row++) {
       for (let col = -1; col < cols; col++) {
         const x = col * hexWidth * 0.75;
         const y = row * hexHeight + (col % 2 === 0 ? 0 : hexHeight / 2);
-        
-        this.drawHexagon(x, y, hexSize);
+        ctx.beginPath();
+        for (let i = 0; i < 6; i++) {
+          const angle = (i * Math.PI) / 3;
+          const xPos = x + hexSize * Math.cos(angle);
+          const yPos = y + hexSize * Math.sin(angle);
+          if (i === 0) {
+            ctx.moveTo(xPos, yPos);
+          } else {
+            ctx.lineTo(xPos, yPos);
+          }
+        }
+        ctx.closePath();
+        ctx.stroke();
       }
     }
   }
-  
-  drawHexagon(x, y, size) {
-    this.ctx.beginPath();
-    for (let i = 0; i < 6; i++) {
-      const angle = (i * Math.PI) / 3;
-      const xPos = x + size * Math.cos(angle);
-      const yPos = y + size * Math.sin(angle);
-      
-      if (i === 0) {
-        this.ctx.moveTo(xPos, yPos);
-      } else {
-        this.ctx.lineTo(xPos, yPos);
-      }
-    }
-    this.ctx.closePath();
-    this.ctx.stroke();
+
+  drawHexagonGrid() {
+    // Skip on mobile for performance
+    if (this.isMobile || !this.hexCanvas) return;
+    this.ctx.drawImage(this.hexCanvas, 0, 0);
   }
-  
-  animate() {
+
+  drawFrame(step) {
+    if (!this.ctx) return;
     this.ctx.clearRect(0, 0, this.width, this.height);
-    
+
     // Draw background elements
-    this.drawGradientBackground();
+    this.drawGradientBackground(step);
     this.drawHexagonGrid();
-    this.drawWaves();
-    this.drawParticles();
-    
-    // Continue animation loop
-    this.animationFrameId = requestAnimationFrame(this.animate.bind(this));
+    this.drawWaves(step);
+    this.drawParticles(step);
   }
-  
+
+  animate(now) {
+    if (!this.running) return;
+    this.animationFrameId = requestAnimationFrame(this.animate);
+
+    if (!this.lastFrameTime) {
+      this.lastFrameTime = now;
+      this.drawFrame(1);
+      return;
+    }
+
+    const elapsed = now - this.lastFrameTime;
+    if (elapsed < this.frameInterval - 1) return;
+
+    // Clamp so a long pause doesn't make everything jump
+    const step = Math.min(elapsed, 100) / BASE_FRAME_MS;
+    this.lastFrameTime = now;
+    this.drawFrame(step);
+  }
+
   stop() {
+    this.running = false;
     if (this.animationFrameId) {
       cancelAnimationFrame(this.animationFrameId);
       this.animationFrameId = null;

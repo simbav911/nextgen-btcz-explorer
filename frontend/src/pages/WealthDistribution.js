@@ -5,6 +5,7 @@ import { ToastContext } from '../contexts/ToastContext';
 import { Pie, Bar } from 'react-chartjs-2';
 import { Chart, ArcElement, BarElement, CategoryScale, LinearScale, Tooltip as ChartTooltip, Legend as ChartLegend } from 'chart.js';
 import './wealthDistribution.css';
+import { useIsMobile } from '../hooks/useMediaQuery';
 
 // Register Chart.js components
 Chart.register(ArcElement, BarElement, CategoryScale, LinearScale, ChartTooltip, ChartLegend);
@@ -66,6 +67,7 @@ const WealthDistribution = () => {
   const [shieldedPool, setShieldedPool] = useState(null);
   const { showToast } = useContext(ToastContext);
   const navigate = useNavigate();
+  const isMobile = useIsMobile();
   const pieRef = useRef(null);
 
   useEffect(() => {
@@ -220,9 +222,10 @@ const WealthDistribution = () => {
         }
       },
       legend: {
-        position: 'right',
+        position: isMobile ? 'bottom' : 'right',
         labels: {
-          font: { size: 11, family: 'monospace' },
+          font: { size: isMobile ? 10 : 11, family: 'monospace' },
+          boxWidth: isMobile ? 12 : 40,
           generateLabels: (chart) => {
             const data = chart.data;
             if (!data.labels.length) return [];
@@ -295,7 +298,7 @@ const WealthDistribution = () => {
     },
     scales: {
       x: {
-        ticks: { maxRotation: 35, font: { size: 12, weight: 500 } }
+        ticks: { maxRotation: isMobile ? 60 : 35, font: { size: isMobile ? 10 : 12, weight: 500 } }
       },
       y: {
         ticks: {
@@ -311,9 +314,9 @@ const WealthDistribution = () => {
 
   return (
     <div className="wealth-distribution-container">
-      <div className="bg-white rounded-lg shadow-md p-4 mb-6">
+      <div className="bg-white rounded-lg shadow-md p-3 sm:p-4 mb-6">
         <div className="flex justify-between items-center mb-3">
-          <h1 className="text-2xl font-bold text-gray-800 flex items-center">
+          <h1 className="text-xl sm:text-2xl font-bold text-gray-800 flex items-center">
             <FaCoins className="inline-block mr-2 text-yellow-500" />
             BitcoinZ Wealth Distribution
           </h1>
@@ -373,9 +376,9 @@ const WealthDistribution = () => {
         </div>
 
         {/* Tabs */}
-        <div className="flex border-b mb-6">
+        <div className="flex border-b mb-6 overflow-x-auto overflow-y-hidden -mx-1 px-1">
           <button
-            className={`py-2 px-4 font-medium flex items-center ${
+            className={`py-2 px-3 sm:px-4 font-medium flex items-center whitespace-nowrap flex-shrink-0 text-sm sm:text-base ${
               activeTab === 'topHolders' ? 'text-blue-600 border-b-2 border-blue-600' : 'text-gray-500 hover:text-blue-500'
             }`}
             onClick={() => setActiveTab('topHolders')}
@@ -383,7 +386,7 @@ const WealthDistribution = () => {
             <FaListOl className="mr-2" /> Top Holders
           </button>
           <button
-            className={`py-2 px-4 font-medium flex items-center ${
+            className={`py-2 px-3 sm:px-4 font-medium flex items-center whitespace-nowrap flex-shrink-0 text-sm sm:text-base ${
               activeTab === 'distribution' ? 'text-blue-600 border-b-2 border-blue-600' : 'text-gray-500 hover:text-blue-500'
             }`}
             onClick={() => setActiveTab('distribution')}
@@ -391,7 +394,7 @@ const WealthDistribution = () => {
             <FaChartPie className="mr-2" /> Distribution by Balance
           </button>
           <button
-            className={`py-2 px-4 font-medium flex items-center ${
+            className={`py-2 px-3 sm:px-4 font-medium flex items-center whitespace-nowrap flex-shrink-0 text-sm sm:text-base ${
               activeTab === 'shieldedPool' ? 'text-blue-600 border-b-2 border-blue-600' : 'text-gray-500 hover:text-blue-500'
             }`}
             onClick={() => setActiveTab('shieldedPool')}
@@ -412,7 +415,7 @@ const WealthDistribution = () => {
                   {/* Pie Chart */}
                   <div className="bg-gray-50 p-3 rounded-lg shadow-sm lg:col-span-2">
                     <h3 className="text-md font-semibold mb-2">Top Holders Distribution</h3>
-                    <div className="h-96">
+                    <div className="h-[30rem] sm:h-96">
                       <Pie ref={pieRef} data={preparePieChartData()} options={pieOptions} />
                     </div>
                   </div>
@@ -459,8 +462,8 @@ const WealthDistribution = () => {
 
                 {/* Search & page size */}
                 <div className="mb-4">
-                  <div className="flex items-center justify-between bg-white rounded-lg shadow-sm p-3">
-                    <div className="relative w-full mr-4">
+                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 sm:gap-4 bg-white rounded-lg shadow-sm p-3">
+                    <div className="relative w-full">
                       <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
                         <svg className="h-5 w-5 text-gray-400" fill="currentColor" viewBox="0 0 20 20">
                           <path fillRule="evenodd" d="M8 4a4 4 0 100 8 4 4 0 000-8zM2 8a6 6 0 1110.89 3.476l4.817 4.817a1 1 0 01-1.414 1.414l-4.816-4.816A6 6 0 012 8z" clipRule="evenodd" />
@@ -474,7 +477,7 @@ const WealthDistribution = () => {
                         onChange={(e) => setSearchTerm(e.target.value)}
                       />
                     </div>
-                    <div className="flex items-center">
+                    <div className="flex items-center flex-shrink-0">
                       <span className="text-sm text-gray-600 mr-2">Show:</span>
                       <select
                         className="py-2 px-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
@@ -496,9 +499,9 @@ const WealthDistribution = () => {
                   <table className="w-full table-auto">
                     <thead className="bg-gray-100 sticky top-0">
                       <tr>
-                        <th className="py-2.5 px-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider w-12">Rank</th>
-                        <th className="py-2.5 px-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Address</th>
-                        <th className="py-2.5 px-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider w-40">Balance</th>
+                        <th className="py-2.5 px-2 sm:px-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider w-10 sm:w-12">#</th>
+                        <th className="py-2.5 px-2 sm:px-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Address</th>
+                        <th className="py-2.5 px-2 sm:px-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider sm:w-40">Balance<span className="sm:hidden"> (BTCZ)</span></th>
                         <th className="py-2.5 px-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider w-28 hidden sm:table-cell">% of Supply</th>
                         <th className="py-2.5 px-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider w-28 hidden md:table-cell">% of Top 100</th>
                         <th className="py-2.5 px-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider w-20 hidden md:table-cell">Txs</th>
@@ -516,8 +519,8 @@ const WealthDistribution = () => {
 
                           return (
                             <tr key={holder.address} className={`${index % 2 === 0 ? 'bg-white' : 'bg-gray-50'} hover:bg-blue-50 text-xs sm:text-sm`}>
-                              <td className="py-2 px-3 font-medium text-gray-900">{index + 1}</td>
-                              <td className="py-2 px-3">
+                              <td className="py-2 px-2 sm:px-3 font-medium text-gray-900">{index + 1}</td>
+                              <td className="py-2 px-2 sm:px-3">
                                 <Link
                                   to={`/address/${holder.address}`}
                                   className="text-blue-600 hover:text-blue-800 font-mono"
@@ -527,7 +530,7 @@ const WealthDistribution = () => {
                                   <span className="sm:hidden">{formatAddress(holder.address)}</span>
                                 </Link>
                               </td>
-                              <td className="py-2 px-3 text-gray-900 font-medium text-right whitespace-nowrap">{formatNumber(holder.balance)} BTCZ</td>
+                              <td className="py-2 px-2 sm:px-3 text-gray-900 font-medium text-right whitespace-nowrap">{formatNumber(holder.balance)}<span className="hidden sm:inline"> BTCZ</span></td>
                               <td className="py-2 px-3 text-gray-900 text-right hidden sm:table-cell">{Number(holder.percentageOfSupply).toFixed(2)}%</td>
                               <td className="py-2 px-3 text-gray-900 text-right hidden md:table-cell">{percentOfTop100.toFixed(2)}%</td>
                               <td className="py-2 px-3 text-gray-900 text-right hidden md:table-cell">{formatNumber(holder.txCount)}</td>
@@ -567,7 +570,7 @@ const WealthDistribution = () => {
                 {/* Bar Chart */}
                 <div className="bg-gray-50 p-4 rounded-lg shadow-sm mb-8">
                   <h3 className="text-lg font-semibold mb-4">Address Distribution by Balance Range</h3>
-                  <div className="h-96">
+                  <div className="h-72 sm:h-96">
                     <Bar data={prepareBarChartData()} options={barOptions} />
                   </div>
                 </div>
@@ -612,7 +615,7 @@ const WealthDistribution = () => {
                     <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 mb-6">
                       <div className="bg-gray-50 p-3 rounded-lg shadow-sm lg:col-span-2">
                         <h3 className="text-md font-semibold mb-2">Transparent vs Shielded Supply</h3>
-                        <div className="h-96">
+                        <div className="h-80 sm:h-96">
                           <Pie
                             data={{
                               labels: ['Transparent', 'Shielded (Sapling)', 'Shielded (Sprout)'],
@@ -643,9 +646,10 @@ const WealthDistribution = () => {
                                   }
                                 },
                                 legend: {
-                                  position: 'right',
+                                  position: isMobile ? 'bottom' : 'right',
                                   labels: {
-                                    font: { size: 12 },
+                                    font: { size: isMobile ? 11 : 12 },
+                                    boxWidth: isMobile ? 12 : 40,
                                     generateLabels: (chart) => {
                                       const data = chart.data;
                                       const values = data.datasets[0].data;

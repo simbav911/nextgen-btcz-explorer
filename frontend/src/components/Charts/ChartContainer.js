@@ -58,7 +58,11 @@ const ChartContainer = ({
   }
 
   return (
-    <div className="chart-display">
+    <div className={`chart-display ${
+      activeChart === chartTypes.POOL_STAT ? 'chart-display--pie'
+        : activeChart === chartTypes.MINED_BLOCK ? 'chart-display--bars'
+        : 'chart-display--line'
+    }`}>
       {activeChart === chartTypes.POOL_STAT ? (
         <PieChartDisplay chartData={chartData} />
       ) : activeChart === chartTypes.MINED_BLOCK ? (

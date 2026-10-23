@@ -88,7 +88,8 @@
   padding: 36px;
   position: relative;
   overflow: visible; /* Changed from hidden to allow dropdowns to show */
-  transform: translateZ(5px); /* 3D effect */
+  /* No translateZ here: combined with the parent's perspective it rescaled the
+     whole panel (incl. the chart canvas) and made it render blurry. */
 }
 
 .chart-content::before {
@@ -1274,4 +1275,124 @@ canvas + .chartjs-legend {
 .calendar-button.apply:disabled {
   background-color: #93c5fd;
   cursor: not-allowed;
+}
+
+/* ------------------------------------------------------------------
+ * Phone layout
+ * ------------------------------------------------------------------ */
+.charts-container {
+  /* the decorative glow pseudo-elements must never widen the page */
+  overflow-x: clip;
+}
+
+@media (max-width: 768px) {
+  .chart-content::before,
+  .chart-content::after {
+    width: 240px;
+    height: 240px;
+    top: 0;
+    right: 0;
+    bottom: auto;
+    left: auto;
+  }
+  .chart-content::after {
+    top: auto;
+    right: auto;
+    bottom: 0;
+    left: 0;
+  }
+  .chart-content {
+    min-width: 0;
+  }
+}
+
+@media (max-width: 576px) {
+  .charts-container {
+    padding: 8px 10px;
+    gap: 12px;
+    perspective: none;
+  }
+
+  .charts-sidebar {
+    padding: 0;
+  }
+
+  .chart-buttons {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    padding: 4px 0;
+    gap: 8px;
+  }
+
+  .chart-buttons button {
+    padding: 10px 10px;
+    font-size: 13px;
+    min-width: 0;
+  }
+
+  .button-icon {
+    margin-right: 6px;
+    flex-shrink: 0;
+  }
+
+  .chart-content {
+    padding: 14px 10px;
+    border-radius: 16px;
+    /* expensive over the animated background on phones */
+    -webkit-backdrop-filter: none;
+    backdrop-filter: none;
+    background: rgba(255, 255, 255, 0.92);
+  }
+
+  .chart-header {
+    padding: 4px 0 12px;
+  }
+
+  .chart-header h1 {
+    font-size: 22px;
+  }
+
+  .chart-display {
+    height: 340px;
+    padding: 6px;
+    border-radius: 12px;
+    -webkit-backdrop-filter: none;
+    backdrop-filter: none;
+  }
+
+  /* pie: legend moves below the pie on phones, so it needs more room */
+  .chart-display.chart-display--pie {
+    height: 500px;
+  }
+
+  /* mined blocks: plain HTML bars, let it grow with its content */
+  .chart-display.chart-display--bars {
+    height: auto;
+    min-height: 300px;
+  }
+
+  .chart-3d-inner,
+  .chart-3d-inner:hover {
+    width: 100%;
+    padding: 6px;
+    transform: none;
+    border-radius: 10px;
+  }
+
+  .chart-3d-shadow {
+    display: none;
+  }
+
+  .pie-chart-container {
+    height: 100%;
+    margin: 0;
+  }
+
+  .pool-stat-summary {
+    padding: 14px;
+    margin-top: 20px;
+  }
+
+  .chart-loading {
+    min-height: 260px;
+  }
 }

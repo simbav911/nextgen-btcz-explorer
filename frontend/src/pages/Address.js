@@ -6,14 +6,14 @@ import { Chart, CategoryScale, LinearScale, PointElement, LineElement, Title, To
 import dayjs from 'dayjs';
 import relativeTime from 'dayjs/plugin/relativeTime';
 import weekOfYear from 'dayjs/plugin/weekOfYear';
-dayjs.extend(relativeTime);
-dayjs.extend(weekOfYear);
 import { addressService } from '../services/api';
 import apiInstance from '../services/api';
 import { formatBTCZ, formatNumber } from '../utils/formatting';
 import Spinner from '../components/Spinner';
-import TransactionCard from '../components/TransactionCard';
 import Pagination from '../components/Pagination';
+
+dayjs.extend(relativeTime);
+dayjs.extend(weekOfYear);
 
 // Register Chart.js components
 Chart.register(CategoryScale, LinearScale, PointElement, LineElement, Title, Tooltip, Legend, Filler);
@@ -809,23 +809,23 @@ const Address = () => {
   };
   
   return (
-    <div className="max-w-7xl mx-auto px-4 sm:px-6 py-8">
+    <div className="max-w-7xl mx-auto px-3 sm:px-6 py-4 sm:py-8">
       {/* Address Header */}
-      <div className="bg-white rounded-xl shadow-lg p-6 mb-8">
+      <div className="bg-white rounded-xl shadow-lg p-4 sm:p-6 mb-6 sm:mb-8">
         <div className="flex flex-col md:flex-row justify-between items-start md:items-center">
           <h1 className="page-title mb-4 md:mb-0">
             <FaWallet />
             Address Details
           </h1>
           
-          <div className="flex items-center space-x-2 bg-gray-100 rounded-lg p-2 w-full md:w-auto">
-            <span className="text-gray-500 text-sm mr-2">Address:</span>
-            <div className="font-mono text-sm text-gray-800 truncate max-w-xs">
+          <div className="flex items-center gap-2 bg-gray-100 rounded-lg p-2 w-full md:w-auto min-w-0">
+            <span className="text-gray-500 text-sm hidden sm:inline flex-shrink-0">Address:</span>
+            <div className="font-mono text-xs sm:text-sm text-gray-800 break-all min-w-0 flex-1 md:max-w-xl">
               {address}
             </div>
             <button 
               onClick={copyToClipboard}
-              className="p-2 hover:bg-gray-200 rounded-full transition-colors"
+              className="p-2 hover:bg-gray-200 rounded-full transition-colors flex-shrink-0"
               title="Copy address"
             >
               <FaCopy className={copied ? "text-green-500" : "text-gray-500"} />
@@ -835,11 +835,11 @@ const Address = () => {
       </div>
       
       {/* Balance Stats */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
-        <div className="bg-white rounded-xl shadow-lg p-6 relative overflow-hidden">
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-4 sm:gap-6 mb-6 sm:mb-8">
+        <div className="bg-white rounded-xl shadow-lg p-4 sm:p-6 relative overflow-hidden">
           <div className="absolute top-0 right-0 w-24 h-24 bg-blue-100 rounded-bl-full opacity-50"></div>
           <h3 className="text-lg font-semibold text-gray-600 mb-2">Current Balance</h3>
-          <div className="text-3xl font-bold text-blue-600">
+          <div className="text-2xl sm:text-3xl font-bold text-blue-600 relative break-words">
             {formatBTCZ(addressInfo.balance)}
           </div>
           {addressInfo.unconfirmedBalance > 0 && (
@@ -849,31 +849,31 @@ const Address = () => {
           )}
         </div>
         
-        <div className="bg-white rounded-xl shadow-lg p-6 relative overflow-hidden">
+        <div className="bg-white rounded-xl shadow-lg p-4 sm:p-6 relative overflow-hidden">
           <div className="absolute top-0 right-0 w-24 h-24 bg-green-100 rounded-bl-full opacity-50"></div>
           <h3 className="text-lg font-semibold text-gray-600 mb-2 flex items-center">
             <FaArrowDown className="text-green-500 mr-2" />
             Total Received
           </h3>
-          <div className="text-3xl font-bold text-green-600">
+          <div className="text-2xl sm:text-3xl font-bold text-green-600 relative break-words">
             {formatBTCZ(addressInfo.totalReceived)}
           </div>
         </div>
         
-        <div className="bg-white rounded-xl shadow-lg p-6 relative overflow-hidden">
+        <div className="bg-white rounded-xl shadow-lg p-4 sm:p-6 relative overflow-hidden">
           <div className="absolute top-0 right-0 w-24 h-24 bg-red-100 rounded-bl-full opacity-50"></div>
           <h3 className="text-lg font-semibold text-gray-600 mb-2 flex items-center">
             <FaArrowUp className="text-red-500 mr-2" />
             Total Sent
           </h3>
-          <div className="text-3xl font-bold text-red-600">
+          <div className="text-2xl sm:text-3xl font-bold text-red-600 relative break-words">
             {formatBTCZ(addressInfo.totalSent)}
           </div>
         </div>
       </div>
       
       {/* Balance History Chart */}
-      <div className="bg-white rounded-xl shadow-lg p-6 mb-8">
+      <div className="bg-white rounded-xl shadow-lg p-4 sm:p-6 mb-6 sm:mb-8">
         <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-4">
           <h2 className="text-xl font-bold text-gray-800 flex items-center">
             <FaHistory className="text-blue-500 mr-2" />
@@ -926,7 +926,7 @@ const Address = () => {
           </div>
         </div>
         
-        <div className="h-72">
+        <div className="h-60 sm:h-72">
           {addressInfo && addressInfo.txCount > TX_THRESHOLD ? (
             <div className="flex items-center justify-center h-full bg-gray-50 rounded-lg">
               <div className="text-center">
@@ -964,8 +964,8 @@ const Address = () => {
       </div>
       
       {/* Transactions */}
-      <div id="transactions-list" className="bg-white rounded-xl shadow-lg p-6">
-        <h2 className="text-xl font-bold text-gray-800 mb-6 flex items-center">
+      <div id="transactions-list" className="bg-white rounded-xl shadow-lg p-4 sm:p-6">
+        <h2 className="text-xl font-bold text-gray-800 mb-4 sm:mb-6 flex items-center flex-wrap">
           <FaExchangeAlt className="text-blue-500 mr-2" />
           Transactions <span className="ml-2 text-gray-500">({formatNumber(addressInfo.txCount)})</span>
         </h2>
@@ -974,14 +974,14 @@ const Address = () => {
           <Spinner message="Loading transactions..." />
         ) : transactions.length > 0 ? (
           <>
-            <div className="space-y-4 mb-6">
+            <div className="space-y-3 sm:space-y-4 mb-6">
               {transactions.map(tx => (
                 <div key={tx.txid} className="border border-gray-200 rounded-lg hover:shadow-md transition-shadow">
-                  <Link to={`/tx/${tx.txid}`} className="block p-4">
-                    <div className="flex flex-col md:flex-row justify-between">
-                      <div className="flex items-center mb-3 md:mb-0">
+                  <Link to={`/tx/${tx.txid}`} className="block p-3 sm:p-4">
+                    <div className="flex flex-col md:flex-row justify-between gap-2 md:gap-4">
+                      <div className="flex items-center mb-1 md:mb-0 min-w-0">
                         {/* Transaction type icon */}
-                        <div className={`p-3 rounded-full mr-4 ${
+                        <div className={`p-2 sm:p-3 rounded-full mr-3 sm:mr-4 flex-shrink-0 ${
                           tx.value >= 0
                             ? 'bg-green-100 text-green-600'
                             : 'bg-red-100 text-red-600'
@@ -993,8 +993,8 @@ const Address = () => {
                         </div>
                         
                         {/* Transaction details */}
-                        <div>
-                          <div className="font-mono text-sm text-gray-600 mb-1 truncate">
+                        <div className="min-w-0 flex-1">
+                          <div className="font-mono text-xs sm:text-sm text-gray-600 mb-1 truncate">
                             {tx.txid}
                           </div>
                           <div className="text-xs text-gray-500">
@@ -1004,10 +1004,10 @@ const Address = () => {
                       </div>
                       
                       {/* Transaction amount */}
-                      <div className={`text-right ${
+                      <div className={`text-right flex-shrink-0 ${
                         tx.value > 0 ? 'text-green-600' : 'text-red-600'
                       }`}>
-                        <div className="text-lg font-bold">
+                        <div className="text-base sm:text-lg font-bold break-words">
                           {tx.value > 0 ? '+' : ''}
                           {formatBTCZ(Math.abs(tx.value || 0))}
                         </div>

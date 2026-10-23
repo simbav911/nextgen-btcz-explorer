@@ -1,7 +1,6 @@
 import React, { useState, useEffect, useContext } from 'react';
 import { SocketContext } from '../contexts/SocketContext';
 import { statsService } from '../services/api';
-import { motion } from 'framer-motion';
 import { 
   FaChartLine, 
   FaCube, 
@@ -20,6 +19,36 @@ import {
   FaBalanceScale,
   FaGlobe
 } from 'react-icons/fa';
+
+// Stat card component for reuse (defined at module level so it is not
+// re-created - and re-mounted - on every render / socket update)
+const StatCard = ({ title, value, icon, color, subtitle, index = 0 }) => (
+  <div
+    style={{ animationDelay: `${index * 0.1}s` }}
+    className={`anim-fade-up bg-white rounded-lg shadow-md p-4 sm:p-6 border-t-4 border-${color}-500 hover:shadow-lg hover:-translate-y-1 transition-all duration-300 shadow-${color}-100`}
+  >
+    <div className="flex items-center justify-between mb-3 sm:mb-4 gap-2">
+      <h3 className="text-base sm:text-lg font-semibold text-gray-700">{title}</h3>
+      <div className={`bg-${color}-100 p-3 rounded-full text-${color}-600 flex-shrink-0`}>
+        {icon}
+      </div>
+    </div>
+    <div className={`text-2xl font-bold text-${color}-600 mb-1 break-words`}>{value}</div>
+    {subtitle && <p className="text-gray-500 text-sm">{subtitle}</p>}
+  </div>
+);
+
+// Detail item component for reuse
+const DetailItem = ({ label, value }) => (
+  <div className="anim-fade-up flex flex-col md:flex-row py-3 border-b border-gray-100 last:border-b-0">
+    <div className="w-full md:w-1/3 text-gray-600 font-medium mb-1 md:mb-0">
+      {label}
+    </div>
+    <div className="w-full md:w-2/3 font-mono text-xs sm:text-sm bg-gray-50 p-2 rounded break-all">
+      {value}
+    </div>
+  </div>
+);
 
 const Status = () => {
   const [stats, setStats] = useState({
@@ -95,72 +124,10 @@ const Status = () => {
     return date.toLocaleString();
   };
 
-  // Animation variants
-  const containerVariants = {
-    hidden: { opacity: 0 },
-    visible: {
-      opacity: 1,
-      transition: {
-        staggerChildren: 0.1
-      }
-    }
-  };
-  
-  const itemVariants = {
-    hidden: { y: 20, opacity: 0 },
-    visible: {
-      y: 0,
-      opacity: 1,
-      transition: {
-        duration: 0.5,
-        ease: "easeOut"
-      }
-    }
-  };
-
-  // Stat card component for reuse
-  const StatCard = ({ title, value, icon, color, subtitle }) => (
-    <motion.div 
-      variants={itemVariants}
-      whileHover={{ y: -5 }}
-      transition={{ type: "spring", stiffness: 300 }}
-      className={`bg-white rounded-lg shadow-md p-6 border-t-4 border-${color}-500 hover:shadow-lg transition-all duration-300 shadow-${color}-100`}
-    >
-      <div className="flex items-center justify-between mb-4">
-        <h3 className="text-lg font-semibold text-gray-700">{title}</h3>
-        <div className={`bg-${color}-100 p-3 rounded-full text-${color}-600`}>
-          {icon}
-        </div>
-      </div>
-      <div className={`text-2xl font-bold text-${color}-600 mb-1`}>{value}</div>
-      {subtitle && <p className="text-gray-500 text-sm">{subtitle}</p>}
-    </motion.div>
-  );
-
-  // Detail item component for reuse
-  const DetailItem = ({ label, value, copyable }) => (
-    <motion.div 
-      variants={itemVariants}
-      className="flex flex-col md:flex-row py-3 border-b border-gray-100 last:border-b-0"
-    >
-      <div className="w-full md:w-1/3 text-gray-600 font-medium mb-1 md:mb-0">
-        {label}
-      </div>
-      <div className="w-full md:w-2/3 font-mono text-sm bg-gray-50 p-2 rounded break-all">
-        {value}
-      </div>
-    </motion.div>
-  );
-
   return (
-    <div className="max-w-7xl mx-auto px-4 py-6">
-      <motion.div 
-        initial={{ opacity: 0, y: -20 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ duration: 0.5 }}
-        className="flex flex-col md:flex-row justify-between items-start md:items-center mb-8"
-      >
-        <h1 className="text-3xl font-bold flex items-center mb-4 md:mb-0">
+    <div className="max-w-7xl mx-auto px-3 sm:px-4 py-4 sm:py-6">
+      <div className="anim-fade-down flex flex-col md:flex-row justify-between items-start md:items-center mb-6 sm:mb-8">
+        <h1 className="text-2xl sm:text-3xl font-bold flex items-center mb-4 md:mb-0">
           <div className="text-bitcoinz-600 mr-3 bg-blue-50 p-2 rounded-lg border border-blue-200 shadow-sm">
             <FaGlobe size={24} className="text-blue-600" />
           </div>
@@ -169,7 +136,7 @@ const Status = () => {
           </span>
         </h1>
         
-        <div className="flex space-x-1 bg-gray-100 p-1 rounded-lg">
+        <div className="flex space-x-1 bg-gray-100 p-1 rounded-lg max-w-full overflow-x-auto">
           <button
             onClick={() => setActiveTab('overview')}
             className={`px-4 py-2 rounded-md text-sm font-medium transition-all ${
@@ -201,7 +168,7 @@ const Status = () => {
             Network
           </button>
         </div>
-      </motion.div>
+      </div>
       
       {stats.loading ? (
         <div className="flex justify-center items-center h-64">
@@ -213,14 +180,11 @@ const Status = () => {
       ) : (
         <>
           {activeTab === 'overview' && (
-            <motion.div
-              variants={containerVariants}
-              initial="hidden"
-              animate="visible"
-            >
+            <div>
               {/* Stats Cards */}
-              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-6 mb-6 sm:mb-8">
                 <StatCard 
+                  index={0}
                   title="Block Height" 
                   value={stats.blockchainInfo.blocks.toLocaleString()} 
                   icon={<FaLayerGroup size={22} />}
@@ -228,6 +192,7 @@ const Status = () => {
                   subtitle="Current blockchain height"
                 />
                 <StatCard 
+                  index={1}
                   title="Network Hashrate" 
                   value={formatHashrate(stats.miningInfo.networkhashps)} 
                   icon={<FaMountain size={22} />}
@@ -235,6 +200,7 @@ const Status = () => {
                   subtitle="Estimated hashing power"
                 />
                 <StatCard 
+                  index={2}
                   title="Connections" 
                   value={stats.networkInfo.connections} 
                   icon={<FaUsers size={22} />}
@@ -242,6 +208,7 @@ const Status = () => {
                   subtitle="Active peer connections"
                 />
                 <StatCard 
+                  index={3}
                   title="Difficulty" 
                   value={stats.miningInfo.difficulty.toLocaleString(undefined, { maximumFractionDigits: 2 })} 
                   icon={<FaBalanceScale size={22} />}
@@ -251,9 +218,9 @@ const Status = () => {
               </div>
               
               {/* Summary Card */}
-              <motion.div
-                variants={itemVariants}
-                className="bg-white rounded-lg shadow-md p-6 mb-8 border border-gray-200"
+              <div
+                style={{ animationDelay: '0.4s' }}
+                className="anim-fade-up bg-white rounded-lg shadow-md p-4 sm:p-6 mb-6 sm:mb-8 border border-gray-200"
               >
                 <h2 className="text-xl font-bold mb-4 flex items-center">
                   <FaInfoCircle className="text-bitcoinz-600 mr-2" />
@@ -283,15 +250,15 @@ const Status = () => {
                   </div>
                   <div className="bg-gray-50 p-4 rounded-lg">
                     <div className="text-sm text-gray-500 mb-1">User Agent</div>
-                    <div className="font-medium truncate">{stats.networkInfo.subversion}</div>
+                    <div className="font-medium break-all">{stats.networkInfo.subversion}</div>
                   </div>
                 </div>
-              </motion.div>
+              </div>
               
               {/* Progress Card */}
-              <motion.div
-                variants={itemVariants}
-                className="bg-white rounded-lg shadow-md p-6 mb-8 border border-gray-200"
+              <div
+                style={{ animationDelay: '0.5s' }}
+                className="anim-fade-up bg-white rounded-lg shadow-md p-4 sm:p-6 mb-6 sm:mb-8 border border-gray-200"
               >
                 <h2 className="text-xl font-bold mb-4 flex items-center">
                   <FaNetworkWired className="text-green-600 mr-2" />
@@ -321,27 +288,22 @@ const Status = () => {
                     </div>
                   </div>
                   <div>
-                    <div className="mb-2 flex justify-between text-sm">
-                      <span>Median Time</span>
-                      <span className="font-medium">{formatTime(stats.blockchainInfo.mediantime)}</span>
+                    <div className="mb-2 flex justify-between text-sm gap-2">
+                      <span className="flex-shrink-0">Median Time</span>
+                      <span className="font-medium text-right">{formatTime(stats.blockchainInfo.mediantime)}</span>
                     </div>
-                    <div className="mb-2 flex justify-between text-sm">
-                      <span>Best Block Hash</span>
-                      <span className="font-mono text-xs truncate">{stats.blockchainInfo.bestblockhash}</span>
+                    <div className="mb-2 flex justify-between text-sm gap-2">
+                      <span className="flex-shrink-0">Best Block Hash</span>
+                      <span className="font-mono text-xs truncate min-w-0">{stats.blockchainInfo.bestblockhash}</span>
                     </div>
                   </div>
                 </div>
-              </motion.div>
-            </motion.div>
+              </div>
+            </div>
           )}
           
           {activeTab === 'blockchain' && (
-            <motion.div
-              className="bg-white rounded-lg shadow-md p-6"
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              transition={{ duration: 0.5 }}
-            >
+            <div className="anim-fade-in bg-white rounded-lg shadow-md p-4 sm:p-6">
               <h2 className="text-xl font-bold mb-6 flex items-center">
                 <FaCube className="text-blue-600 mr-2" />
                 Blockchain Information
@@ -381,29 +343,24 @@ const Status = () => {
                 </h3>
                 
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                  <div className="bg-purple-50 p-6 rounded-lg border border-purple-100">
+                  <div className="bg-purple-50 p-4 sm:p-6 rounded-lg border border-purple-100">
                     <h4 className="text-sm text-purple-700 font-medium mb-2">Network Hashrate</h4>
                     <div className="text-2xl font-bold text-purple-800">{formatHashrate(stats.miningInfo.networkhashps)}</div>
                     <p className="text-purple-600 text-sm mt-2">Estimated network hashing power</p>
                   </div>
                   
-                  <div className="bg-blue-50 p-6 rounded-lg border border-blue-100">
+                  <div className="bg-blue-50 p-4 sm:p-6 rounded-lg border border-blue-100">
                     <h4 className="text-sm text-blue-700 font-medium mb-2">Mining Difficulty</h4>
                     <div className="text-2xl font-bold text-blue-800">{stats.miningInfo.difficulty.toLocaleString(undefined, { maximumFractionDigits: 2 })}</div>
                     <p className="text-blue-600 text-sm mt-2">Current mining difficulty target</p>
                   </div>
                 </div>
               </div>
-            </motion.div>
+            </div>
           )}
           
           {activeTab === 'network' && (
-            <motion.div
-              className="bg-white rounded-lg shadow-md p-6"
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              transition={{ duration: 0.5 }}
-            >
+            <div className="anim-fade-in bg-white rounded-lg shadow-md p-4 sm:p-6">
               <h2 className="text-xl font-bold mb-6 flex items-center">
                 <FaNetworkWired className="text-green-600 mr-2" />
                 Network Information
@@ -428,7 +385,7 @@ const Status = () => {
                 />
               </div>
               
-              <div className="mt-8 bg-gradient-to-r from-gray-50 to-gray-100 p-6 rounded-lg border border-gray-200">
+              <div className="mt-8 bg-gradient-to-r from-gray-50 to-gray-100 p-4 sm:p-6 rounded-lg border border-gray-200">
                 <h3 className="text-lg font-semibold mb-4">Connection Status</h3>
                 
                 <div className="flex items-center">
@@ -462,7 +419,7 @@ const Status = () => {
                   </p>
                 </div>
               </div>
-            </motion.div>
+            </div>
           )}
         </>
       )}

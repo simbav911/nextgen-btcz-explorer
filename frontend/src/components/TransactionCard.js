@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import { FaExchangeAlt, FaClock, FaCheck, FaArrowRight, FaCoins, FaLock, FaLockOpen, FaExclamationTriangle } from 'react-icons/fa';
 import { formatRelativeTime, formatNumber } from '../utils/formatting';
 
@@ -52,6 +52,7 @@ const TransactionCard = ({ transaction }) => {
   
   const [isLoading, setIsLoading] = useState(isPlaceholder || initialLoadingState);
   const [hasTransitioned, setHasTransitioned] = useState(false);
+  const navigate = useNavigate();
   
   // Effect to transition from loading to loaded state after component mounts
   useEffect(() => {
@@ -172,7 +173,7 @@ const TransactionCard = ({ transaction }) => {
       className={`transaction-tile block card p-3 sm:p-4 hover:shadow-lg transition-shadow duration-200 border-l-4 ${style.borderColor} hover:border-bitcoinz-200 max-w-5xl mx-auto mb-4 ${hasTransitioned ? 'loaded' : 'loading-blur'} ${isPending ? 'pending-transaction' : ''}`}
     >
       <div className="flex flex-col md:flex-row md:items-center justify-between">
-        <div className="flex items-center">
+        <div className="flex items-center min-w-0">
           <div className={`${style.bgColor} p-2 rounded-full mr-2 sm:mr-3 flex-shrink-0`}>
             {style.icon}
           </div>
@@ -204,8 +205,9 @@ const TransactionCard = ({ transaction }) => {
               type="button"
               className="text-bitcoinz-600 hover:underline bg-transparent border-none p-0 font-inherit"
               onClick={(e) => {
-                e.stopPropagation(); // Prevent outer link navigation
-                window.location.href = `/blocks/${blockhash}`;
+                e.preventDefault(); // Prevent outer link navigation
+                e.stopPropagation();
+                navigate(`/blocks/${blockhash}`);
               }}
             >
               {transaction.height || blockhash.substring(0, 6)}...
@@ -229,7 +231,7 @@ const TransactionCard = ({ transaction }) => {
       </div>
       
       <div className="flex flex-col md:flex-row gap-2 mt-3 text-xs items-center">
-        <div className="bg-gray-50 p-2 rounded w-full md:w-2/5">
+        <div className="bg-gray-50 p-2 rounded w-full md:w-2/5 min-w-0">
           <div className="text-gray-500 mb-1 font-medium">
             {isCoinbase ? 'Coinbase (New Coins)' : `${vin?.length || 0} Input${vin?.length !== 1 ? 's' : ''}`}
           </div>
@@ -266,11 +268,11 @@ const TransactionCard = ({ transaction }) => {
           </div>
         </div>
         
-        <div className="bg-gray-50 p-2 rounded w-full md:w-2/5">
+        <div className="bg-gray-50 p-2 rounded w-full md:w-2/5 min-w-0">
           <div className="text-gray-500 mb-1 font-medium">{vout?.length || 0} Output{vout?.length !== 1 ? 's' : ''}</div>
           {vout && vout.length > 0 && vout.slice(0, 2).map((output, index) => (
-            <div key={index} className="flex justify-between text-xs">
-              <span className="font-mono truncate max-w-[60%]">
+            <div key={index} className="flex justify-between text-xs min-w-0">
+              <span className="font-mono truncate min-w-0">
                 {output.scriptPubKey && output.scriptPubKey.addresses ? output.scriptPubKey.addresses[0] : 'Unknown Address'}
               </span>
               <span className="whitespace-nowrap ml-2">{output.value} BTCZ</span>

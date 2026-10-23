@@ -4,6 +4,12 @@
   z-index: 1000;
   box-shadow: 0 4px 15px rgba(0, 0, 0, 0.2);
   overflow: hidden;
+  /* The header is forced to position: static elsewhere, so it is only the
+     containing block for .animated-gradient because of the glass
+     backdrop-filter. Make that explicit so the oversized gradient can never
+     escape the header (and blend over the page) */
+  contain: paint;
+  isolation: isolate;
 }
 
 /* Glass effect for the header */
@@ -14,7 +20,17 @@
   border-bottom: 1px solid rgba(255, 255, 255, 0.2);
 }
 
-/* Animated gradient background */
+/* Animated gradient background.
+ * Previously this animated `background-position` of a 600%-sized background,
+ * which repaints the whole (viewport-sized) layer on every frame for the
+ * entire 240s cycle. Now the wrapper keeps the exact same box (inset: 0,
+ * blend mode, opacity) but clips an oversized ::before that is moved with a
+ * GPU-composited transform:
+ *   width/height 600%          == background-size 600% 600%
+ *   top: -250%                 == background-position-y 50%
+ *   translateX(-83.333%)       == background-position-x 100%
+ * so the result looks the same without per-frame repaints.
+ * Colors come from --header-gradient (set by headerAnimationManager). */
 .animated-gradient {
   position: absolute;
   top: 0;
@@ -22,26 +38,39 @@
   right: 0;
   bottom: 0;
   z-index: -1;
-  background: linear-gradient(
-    45deg,
-    #9900ff, #3333ff, #00ccff, #00ffff, #6600cc, #cc00ff
-  );
-  background-size: 400% 400%;
-  animation: gradientAnimation 240s ease infinite;
+  overflow: hidden;
   opacity: 0.9;
   mix-blend-mode: screen;
+  pointer-events: none;
+}
+
+.animated-gradient::before {
+  content: '';
+  position: absolute;
+  top: -250%;
+  left: 0;
+  width: 600%;
+  height: 600%;
+  background: var(--header-gradient, linear-gradient(
+    45deg,
+    #9900ff, #3333ff, #00ccff, #00ffff, #6600cc, #cc00ff
+  ));
+  background-size: 100% 100%;
+  animation: gradientAnimation var(--header-gradient-duration, 240s) ease infinite;
+  animation-play-state: var(--header-gradient-state, running);
+  will-change: transform;
 }
 
 /* Gradient animation keyframes */
 @keyframes gradientAnimation {
   0% {
-    background-position: 0% 50%;
+    transform: translate3d(0, 0, 0);
   }
   50% {
-    background-position: 100% 50%;
+    transform: translate3d(-83.3333%, 0, 0);
   }
   100% {
-    background-position: 0% 50%;
+    transform: translate3d(0, 0, 0);
   }
 }
 

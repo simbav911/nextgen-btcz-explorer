@@ -4,12 +4,14 @@ import { Pie } from 'react-chartjs-2';
 import { getChartColors, formatNumber, formatDisplayDate, isToday, formatDate } from './chartUtils';
 import './chartConfig'; // Import chart configuration to ensure all elements are registered
 import './pie3d.css'; // Import enhanced 3D pie chart styles
+import { useIsMobile } from '../../hooks/useMediaQuery';
 
 /**
  * PieChartDisplay component for rendering pie/doughnut charts with enhanced 3D effect
  */
 const PieChartDisplay = ({ chartData }) => {
   const chartRef = useRef(null);
+  const isMobile = useIsMobile();
   const { poolColors } = getChartColors();
 
   useEffect(() => {
@@ -171,26 +173,28 @@ const PieChartDisplay = ({ chartData }) => {
               easing: 'easeOutQuart'
             },
             layout: {
-              padding: {
-                top: 20,
-                bottom: 60,
-                left: 20,
-                right: 20
-              }
+              padding: isMobile
+                ? { top: 36, bottom: 8, left: 4, right: 4 }
+                : {
+                  top: 20,
+                  bottom: 60,
+                  left: 20,
+                  right: 20
+                }
             },
             cutout: '0%', // No cutout for a solid pie chart
             rotation: 270, // Start from top
             plugins: {
               legend: {
-                position: 'right', // Put legend on right side
-                align: 'center',
+                position: isMobile ? 'bottom' : 'right', // Right side; below the pie on phones
+                align: isMobile ? 'start' : 'center',
                 labels: {
                   font: {
                     family: "'Inter', 'Segoe UI', Roboto, sans-serif",
-                    size: 14,
+                    size: isMobile ? 12 : 14,
                     weight: 'bold'
                   },
-                  padding: 15,
+                  padding: isMobile ? 8 : 15,
                   usePointStyle: true,
                   pointStyle: 'circle',
                   boxWidth: 15,
@@ -208,7 +212,8 @@ const PieChartDisplay = ({ chartData }) => {
                         const value = data.datasets[0].data[i] || 0;
                       
                         return {
-                          text: `${label}: ${value}%`,
+                          // canvas legends don't wrap: shorten long pool names on phones
+                          text: `${isMobile && label.length > 26 ? `${label.slice(0, 16)}…${label.slice(-7)}` : label}: ${value}%`,
                           fillStyle: style.backgroundColor,
                           strokeStyle: style.borderColor,
                           lineWidth: style.borderWidth,

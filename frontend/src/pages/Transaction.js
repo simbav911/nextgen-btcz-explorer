@@ -301,15 +301,15 @@ const Transaction = () => {
     (transaction.valueBalance !== undefined && transaction.valueBalance !== 0);
   
   return (
-    <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pb-12">
-      <h1 className="page-title mb-6">
+    <div className="max-w-7xl mx-auto px-3 sm:px-6 lg:px-8 pb-12">
+      <h1 className="page-title mb-4 sm:mb-6">
         <FaExchangeAlt />
         Transaction Details
       </h1>
       
       {/* Transaction Summary Card - Redesigned for better space usage */}
       <div className="bg-white rounded-lg shadow-md overflow-hidden mb-6">
-        <div className="px-6 py-4 bg-gradient-to-r from-blue-600 via-bitcoinz-600 to-blue-500">
+        <div className="px-4 sm:px-6 py-4 bg-gradient-to-r from-blue-600 via-bitcoinz-600 to-blue-500">
           <h2 className="text-xl font-semibold text-white flex justify-between items-center" style={{ textShadow: '0 1px 2px rgba(0,0,0,0.3)' }}>
             <span>Transaction Summary</span>
           </h2>
@@ -318,7 +318,7 @@ const Transaction = () => {
           </div>
         </div>
         
-        <div className="p-6">
+        <div className="p-4 sm:p-6">
           {/* Two-column layout for transaction details */}
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
             {/* Left column - Basic Information */}
@@ -326,7 +326,7 @@ const Transaction = () => {
               <h3 className="text-lg font-medium mb-4 text-gray-700 border-b pb-2">Basic Information</h3>
               
               <div className="space-y-3">
-                <div className="flex justify-between">
+                <div className="flex justify-between gap-3">
                   <span className="text-gray-600">Status</span>
                   <span className={`badge ${confirmationInfo.class} inline-flex items-center`}>
                     {transaction.confirmations > 0 ? 
@@ -337,8 +337,8 @@ const Transaction = () => {
                   </span>
                 </div>
                 
-                <div className="flex justify-between">
-                  <span className="text-gray-600">Timestamp</span>
+                <div className="flex justify-between gap-3">
+                  <span className="text-gray-600 flex-shrink-0">Timestamp</span>
                   <span className="text-right">
                     {transaction.time ? 
                       `${formatTimestamp(transaction.time)} (${formatRelativeTime(transaction.time)})` : 
@@ -363,9 +363,9 @@ const Transaction = () => {
               <h3 className="text-lg font-medium mb-4 text-gray-700 border-b pb-2">Technical Details</h3>
               
               <div className="space-y-3">
-                <div className="flex justify-between">
-                  <span className="text-gray-600">Block</span>
-                  <span className="text-right">
+                <div className="flex justify-between items-center gap-3">
+                  <span className="text-gray-600 flex-shrink-0">Block</span>
+                  <span className="text-right min-w-0">
                     {transaction.blockhash ? (
                       <HashLink hash={transaction.blockhash} type="block" length={10} />
                     ) : 'Pending'}
@@ -411,7 +411,7 @@ const Transaction = () => {
       {/* Inputs - Modernized */}
       <div className="mb-6">
         <div className="bg-white rounded-lg shadow-md overflow-hidden">
-          <div className="px-6 py-4 bg-gradient-to-r from-green-600 to-teal-600">
+          <div className="px-4 sm:px-6 py-4 bg-gradient-to-r from-green-600 to-teal-600">
             <h2 className="text-xl font-semibold text-white flex justify-between items-center" style={{ textShadow: '0 1px 2px rgba(0,0,0,0.3)' }}>
               <span>Inputs ({transaction.vin ? transaction.vin.length : 0})</span>
               {transaction.vin && transaction.vin.length === 0 && (
@@ -420,7 +420,7 @@ const Transaction = () => {
             </h2>
           </div>
           
-          <div className="p-6">
+          <div className="p-4 sm:p-6">
             {transaction.vin && transaction.vin.length > 0 ? (
               <div className="divide-y divide-gray-200" style={contentStyle}>
                 {transaction.vin.map((input, index) => (
@@ -435,10 +435,10 @@ const Transaction = () => {
                     ) : (
                       <div>
                         <div className="flex flex-wrap justify-between">
-                          <div className="w-full md:w-1/2 break-words">
-                            <div className="font-medium"> {/* Changed p to div */}
+                          <div className="w-full md:w-1/2 break-words min-w-0">
+                            <div className="font-medium min-w-0"> {/* Changed p to div */}
                               {input.address ? (
-                                <HashLink hash={input.address} type="address" length={24} />
+                                <HashLink hash={input.address} type="address" length={24} wrap />
                               ) : (
                                 <span className="italic text-gray-500">Nonstandard Input (No Address or Shielded)</span>
                               )}
@@ -484,7 +484,7 @@ const Transaction = () => {
       {/* Outputs - Modernized */}
       <div className="mb-6">
         <div className="bg-white rounded-lg shadow-md overflow-hidden">
-          <div className="px-6 py-4 bg-gradient-to-r from-amber-600 to-orange-600">
+          <div className="px-4 sm:px-6 py-4 bg-gradient-to-r from-amber-600 to-orange-600">
             <h2 className="text-xl font-semibold text-white flex justify-between items-center" style={{ textShadow: '0 1px 2px rgba(0,0,0,0.3)' }}>
               <span>Outputs ({transaction.vout ? transaction.vout.length : 0})</span>
               {transaction.vout && transaction.vout.length === 0 && (
@@ -493,20 +493,20 @@ const Transaction = () => {
             </h2>
           </div>
           
-          <div className="p-6">
+          <div className="p-4 sm:p-6">
             {transaction.vout && transaction.vout.length > 0 ? (
               <div className="divide-y divide-gray-200" style={contentStyle}>
                 {transaction.vout.map((output, index) => (
                   <div key={index} className="py-4 first:pt-0 last:pb-0">
                     <div className="flex flex-wrap justify-between">
-                      <div className="w-full md:w-1/2 break-words">
-                        <div className="flex items-center">
-                          <span className="bg-gray-200 text-gray-700 text-xs px-2 py-1 rounded mr-2">
+                      <div className="w-full md:w-1/2 break-words min-w-0">
+                        <div className="flex items-center min-w-0">
+                          <span className="bg-gray-200 text-gray-700 text-xs px-2 py-1 rounded mr-2 flex-shrink-0">
                             #{output.n}
                           </span>
-                          <div className="font-medium"> {/* Changed p to div */}
+                          <div className="font-medium min-w-0 flex-1"> {/* Changed p to div */}
                             {output.scriptPubKey && output.scriptPubKey.addresses && output.scriptPubKey.addresses.length > 0 ? (
-                              <HashLink hash={output.scriptPubKey.addresses[0]} type="address" length={24} />
+                              <HashLink hash={output.scriptPubKey.addresses[0]} type="address" length={24} wrap />
                             ) : (
                               <span className="text-gray-500">{output.scriptPubKey.type || 'Unknown'}</span>
                             )}

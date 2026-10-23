@@ -4,7 +4,6 @@ import ChartSidebar from './ChartSidebar';
 import TimeFilter from './TimeFilter';
 import ChartContainer from './ChartContainer';
 import { chartTypes, getChartTitle, formatDate, getDaysFromRange } from './chartUtils';
-import { removeUnwantedText } from '../../utils/removeText';
 import './Charts.css';
 
 /**

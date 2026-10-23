@@ -5,7 +5,6 @@ import axios from 'axios'; // Import axios for CancelToken
 
 // Components
 import Spinner from '../components/Spinner';
-import BlockCard from '../components/BlockCard';
 import Pagination from '../components/Pagination';
 
 // Contexts
@@ -216,8 +215,8 @@ const BlockList = () => {
   return (
     <div className="flex flex-col min-h-screen">
       <div className="flex-1 flex flex-col justify-center">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 pt-6 pb-24">
-          <div className="flex flex-col md:flex-row items-center justify-between mb-8">
+        <div className="max-w-7xl mx-auto w-full px-3 sm:px-6 pt-2 sm:pt-6 pb-12 sm:pb-24">
+          <div className="flex flex-col md:flex-row items-center justify-between gap-3 mb-6 sm:mb-8">
             <h1 className="page-title">
               <FaLayerGroup />
               Blocks

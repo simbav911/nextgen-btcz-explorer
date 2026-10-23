@@ -7,10 +7,14 @@ module.exports = {
       env: {
         NODE_ENV: 'production',
       },
-      instances: 2,
+      // One instance: the indexer runs only on instance 0, and the API is
+      // light enough after caching; a second copy just doubles memory.
+      instances: 1,
       exec_mode: 'cluster',
       autorestart: true,
       watch: false,
+      // Let V8 collect garbage well before pm2's hard restart limit
+      node_args: '--max-old-space-size=768',
       max_memory_restart: '1G'
     }
     // The frontend is a static build served by the backend or Apache.

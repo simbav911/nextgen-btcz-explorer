@@ -4,6 +4,24 @@ const bitcoinzService = require('../services/bitcoinzService'); // Keep for fall
 const models = require('../models'); // Import the models module
 const logger = require('../utils/logger');
 const { Op } = require('sequelize'); // Import Op for queries
+const cache = require('../utils/cache');
+
+// The DB variant of the latest-transactions list used to run
+// findAndCountAll ordered by the unindexed "blocktime" column: a parallel
+// seq-scan + sort (~8 s) plus count(*) (~7 s) over 4.7M rows on every request.
+// It never finished inside its 500 ms race, so clients always got the RPC
+// result below while Postgres kept burning all CPUs. It is now opt-in
+// (TX_LIST_FROM_DB=1) and uses the indexed "time" column (equal to blocktime
+// for every indexed row) plus the planner's row estimate instead of count(*).
+// Note: DB rows have a different shape (compact vin/vout, stored
+// confirmations), which is why this stays off by default.
+const TX_LIST_FROM_DB = process.env.TX_LIST_FROM_DB === '1';
+
+const getEstimatedTransactionCount = () => cache.wrap('txcount:estimate', 60000, async () => {
+  const db = require('../db').getSequelize();
+  const [rows] = await db.query("SELECT reltuples::bigint AS n FROM pg_class WHERE oid = 'transactions'::regclass");
+  return Number(rows[0]?.n) || 0;
+});
 
 // Get latest transactions (Hybrid approach for faster loading)
 router.get('/', async (req, res, next) => {
@@ -12,34 +30,47 @@ router.get('/', async (req, res, next) => {
     const offset = parseInt(req.query.offset) || 0;
     logger.info(`Fetching latest transactions (limit: ${limit}, offset: ${offset})`);
 
-    // Try DB first for cached results
-    try {
-      const Transaction = await models.getTransaction(); // Get Transaction model instance
-      if (Transaction) {
-        // Fetch latest transactions from the database with a short timeout
-        const { count, rows: transactions } = await Promise.race([
-          Transaction.findAndCountAll({
-            order: [['blocktime', 'DESC']],
-            limit: limit,
-            offset: offset,
-            raw: true
-          }),
-          new Promise((_, reject) => setTimeout(() => reject(new Error('DB query timeout')), 500))
-        ]);
+    if (TX_LIST_FROM_DB) {
+      try {
+        const Transaction = await models.getTransaction(); // Get Transaction model instance
+        if (Transaction) {
+          const [transactions, estimated] = await Promise.all([
+            Transaction.findAll({
+              order: [['time', 'DESC']],
+              limit: Math.min(Math.max(limit, 1), 100),
+              offset: Math.max(offset, 0),
+              raw: true
+            }),
+            getEstimatedTransactionCount()
+          ]);
 
-        if (transactions && transactions.length > 0) {
-          logger.info(`Fetched ${transactions.length} transactions from DB, total count: ${count}`);
-          return res.json({
-            transactions,
-            count: count,
-            offset,
-            source: 'db'
-          });
+          if (transactions && transactions.length > 0) {
+            const count = Math.max(estimated, offset + transactions.length);
+            logger.info(`Fetched ${transactions.length} transactions from DB, total count (estimate): ${count}`);
+            return res.json({
+              transactions,
+              count: count,
+              offset,
+              source: 'db'
+            });
+          }
         }
+      } catch (dbError) {
+        logger.warn(`DB transaction fetch failed: ${dbError.message}, falling back to RPC`);
       }
-    } catch (dbError) {
-      logger.warn(`DB transaction fetch failed or timed out: ${dbError.message}, falling back to RPC`);
     }
+
+    // RPC path (what clients have effectively always received). Responses are
+    // shared for a few seconds so concurrent page loads don't each fan out.
+    const result = await cache.wrap(`txlist:rpc:${limit}:${offset}`, 5000, () => fetchLatestTransactionsRpc(limit, offset));
+    res.json(result);
+  } catch (error) {
+    logger.error('Error fetching latest transactions:', error);
+    next(error);
+  }
+});
+
+const fetchLatestTransactionsRpc = async (limit, offset) => {
 
     // Fallback to direct RPC if DB fails or is empty
     // Fetch recent blocks first
@@ -101,17 +132,13 @@ router.get('/', async (req, res, next) => {
     
     logger.info(`Fetched ${paginatedTransactions.length} transactions via RPC from ${blocksProcessed} blocks`);
     
-    res.json({
+    return {
       transactions: paginatedTransactions,
       count: fetchedTransactions.length,
       offset,
       source: 'rpc'
-    });
-  } catch (error) {
-    logger.error('Error fetching latest transactions:', error);
-    next(error);
-  }
-});
+    };
+};
 
 // Get specific transaction by txid (DB first, then RPC fallback)
 router.get('/:txid', async (req, res, next) => {

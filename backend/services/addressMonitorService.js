@@ -13,7 +13,9 @@ const { Op } = require('sequelize');
 const { getSequelize } = require('../db');
 
 // Configuration
-const CHECK_INTERVAL = 5 * 60 * 1000; // Check every 5 minutes
+// Each check is a full pass over the addresses table. The indexer keeps
+// balance = max(0, received - sent) itself, so checks almost always fix 0 rows.
+const CHECK_INTERVAL = 15 * 60 * 1000; // Check every 15 minutes
 const IMMEDIATE_CHECK_DELAY = 30 * 1000; // Run first check after 30 seconds
 const RECOVERY_CHECK_INTERVAL = 60 * 1000; // Recovery check interval (1 minute)
 const MAX_RETRY_ATTEMPTS = 3; // Maximum retry attempts
@@ -148,8 +150,9 @@ const fixInconsistentBalances = async () => {
             WHEN (total_received - total_sent) < 0 THEN 0 
             ELSE (total_received - total_sent) 
           END)
-          RETURNING address
         `);
+        // (no RETURNING: the row count is all we need, and returning every
+        // fixed address could pull a huge result set into memory)
         
         const updatedCount = bulkFixResult[1]?.rowCount || 0;
         if (updatedCount > 0) {
@@ -162,8 +165,11 @@ const fixInconsistentBalances = async () => {
       }
     }
     
-    // Determine if we still need to process with the model approach
-    if (!useDirectSql || totalFixed === 0) {
+    // Determine if we still need to process with the model approach.
+    // After a successful bulk UPDATE nothing can match the batch query below
+    // (both of its conditions are covered by the UPDATE's WHERE clause), so it
+    // only runs when the bulk SQL path is unavailable or failed.
+    if (!useDirectSql) {
       // Process in multiple smaller batches to avoid memory issues
       const BATCH_SIZE = 500;
       let hasMoreAddresses = true;

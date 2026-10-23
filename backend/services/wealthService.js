@@ -11,6 +11,18 @@ const cache = {
   totalSupply: { data: null, timestamp: 0 },
 };
 const CACHE_DURATION_MS = 5 * 60 * 1000; // 5 minutes
+// The distribution is a full pass over ~1.6M addresses; it changes slowly
+const DISTRIBUTION_CACHE_DURATION_MS = 15 * 60 * 1000;
+// /wealth/top-holders?limit=99999999 used to load every funded address
+const MAX_TOP_HOLDERS = 1000;
+const topHoldersByLimit = new Map(); // limit (> 100) -> { data, timestamp }
+const inflight = new Map();
+const once = (key, fn) => {
+  if (inflight.has(key)) return inflight.get(key);
+  const p = Promise.resolve().then(fn).finally(() => inflight.delete(key));
+  inflight.set(key, p);
+  return p;
+};
 
 // Helper function to calculate circulating supply based on block height
 // (Keep this function as it is)
@@ -33,7 +45,7 @@ function calculateCirculatingSupply(blockHeight) {
 async function getTotalSupply() {
   const now = Date.now();
   if (cache.totalSupply.data && (now - cache.totalSupply.timestamp < CACHE_DURATION_MS)) {
-    logger.info('Returning cached total supply');
+    logger.debug('Returning cached total supply');
     return cache.totalSupply.data;
   }
 
@@ -56,6 +68,23 @@ async function getTotalSupply() {
 
 // Get top holders (Refactored to use Database with proper balance filtering and caching)
 async function getTopHolders(limit = 100) {
+  limit = Math.max(1, Math.min(parseInt(limit) || 100, MAX_TOP_HOLDERS));
+  if (limit > 100) {
+    const hit = topHoldersByLimit.get(limit);
+    if (hit && Date.now() - hit.timestamp < CACHE_DURATION_MS) return hit.data;
+    return once(`top:${limit}`, async () => {
+      const data = await loadTopHolders(limit);
+      if (data.length > 0) {
+        if (topHoldersByLimit.size >= 10) topHoldersByLimit.clear();
+        topHoldersByLimit.set(limit, { data, timestamp: Date.now() });
+      }
+      return data;
+    });
+  }
+  return once(`top:${limit}`, () => loadTopHolders(limit));
+}
+
+async function loadTopHolders(limit = 100) {
   const now = Date.now();
   // Cache key could be more specific if limit changes often, but for now, one cache for default limit.
   // For simplicity, we'll cache based on a general request, assuming limit is mostly 100.
@@ -123,8 +152,10 @@ async function getTopHolders(limit = 100) {
       }
     }
     
-    cache.topHolders.data = holders; // Cache the full fetched list (typically 100)
-    cache.topHolders.timestamp = now;
+    if (validLimit <= 100) {
+      cache.topHolders.data = holders; // Cache the full fetched list (typically 100)
+      cache.topHolders.timestamp = now;
+    }
     return holders.slice(0, limit); // Return the requested slice
 
   } catch (error) {
@@ -136,10 +167,15 @@ async function getTopHolders(limit = 100) {
 // Get wealth distribution (Optimized with a single raw SQL query and caching)
 async function getDistribution() {
   const now = Date.now();
-  if (cache.distribution.data && (now - cache.distribution.timestamp < CACHE_DURATION_MS)) {
-    logger.info('Returning cached wealth distribution');
+  if (cache.distribution.data && (now - cache.distribution.timestamp < DISTRIBUTION_CACHE_DURATION_MS)) {
+    logger.debug('Returning cached wealth distribution');
     return cache.distribution.data;
   }
+  return once('distribution', loadDistribution);
+}
+
+async function loadDistribution() {
+  const now = Date.now();
 
   logger.info('Calculating wealth distribution from database using optimized query');
   const sequelize = getSequelize();
@@ -177,7 +213,9 @@ async function getDistribution() {
 
   try {
     const results = await sequelize.query(query, { type: sequelize.QueryTypes.SELECT });
-    const totalAddresses = await Address.count(); // Still efficient for total count
+    // Every row falls in exactly one group (incl. 'Other'), so the group
+    // counts add up to COUNT(*) - no second full scan needed
+    const totalAddresses = results.reduce((sum, r) => sum + parseInt(r.count, 10), 0);
 
     // Map results to the desired format, ensuring all ranges are present even if count is 0
     const distributionMap = new Map(results.map(r => [r.balance_range_label, parseInt(r.count, 10)]));

@@ -3,11 +3,24 @@ const router = express.Router();
 const axios = require('axios');
 const bitcoinzService = require('../services/bitcoinzService');
 const logger = require('../utils/logger');
+const cache = require('../utils/cache');
 
 const COINGECKO_API_URL = 'https://api.coingecko.com/api/v3';
+const PRICE_CACHE_TTL_MS = 60000;
+
+// Price is cached for a minute (it used to be fetched from CoinGecko on every
+// request, which is also subject to CoinGecko's rate limits). Failed lookups
+// (null) are retried on the next request.
+async function getBitcoinZPrice() {
+  const price = await cache.wrap('coingecko:btcz', PRICE_CACHE_TTL_MS, async () => {
+    const result = await fetchBitcoinZPrice();
+    return result === null ? undefined : result; // undefined = don't cache
+  });
+  return price === undefined ? null : price;
+}
 
 // Helper function to fetch BTCZ price from CoinGecko
-async function getBitcoinZPrice() {
+async function fetchBitcoinZPrice() {
   try {
     const response = await axios.get(`${COINGECKO_API_URL}/simple/price`, {
       params: {
@@ -35,8 +48,10 @@ router.get('/info', async (req, res) => {
     // We can reuse getLatestBlocks from bitcoinzService if it fetches detailed blocks,
     // or call getBlock for the last few block hashes.
     // For simplicity, let's get network stats which include current block height and difficulty.
-    const networkStats = await bitcoinzService.getNetworkStats();
-    const priceData = await getBitcoinZPrice();
+    const [networkStats, priceData] = await Promise.all([
+      bitcoinzService.getNetworkStats(),
+      getBitcoinZPrice()
+    ]);
 
     if (!networkStats || !networkStats.blockchainInfo || !networkStats.miningInfo) {
       logger.error('Failed to retrieve complete network stats for mining info.');
@@ -51,20 +66,22 @@ router.get('/info', async (req, res) => {
     const latestBlocksData = [];
     const blockCountToFetch = Math.min(latestBlockHeight, 5); // Fetch up to 5 latest blocks
 
-    for (let i = 0; i < blockCountToFetch; i++) {
-      try {
-        const block = await bitcoinzService.getBlockByHeight(latestBlockHeight - i, 1); // verbosity 1 for basic info
-        if (block) {
-          latestBlocksData.push({
-            height: block.height,
-            hash: block.hash,
-            time: block.time,
-            txCount: block.tx ? block.tx.length : 0,
-          });
-        }
-      } catch (blockError) {
-        logger.warn(`Could not fetch block at height ${latestBlockHeight - i}: ${blockError.message}`);
-        // Continue if a single block fetch fails
+    const fetched = await Promise.all(Array.from({ length: blockCountToFetch }, (_, i) =>
+      bitcoinzService.getBlockByHeight(latestBlockHeight - i, 1) // verbosity 1 for basic info
+        .catch(blockError => {
+          logger.warn(`Could not fetch block at height ${latestBlockHeight - i}: ${blockError.message}`);
+          // Continue if a single block fetch fails
+          return null;
+        })
+    ));
+    for (const block of fetched) {
+      if (block) {
+        latestBlocksData.push({
+          height: block.height,
+          hash: block.hash,
+          time: block.time,
+          txCount: block.tx ? block.tx.length : 0,
+        });
       }
     }
 

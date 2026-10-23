@@ -1,13 +1,33 @@
 const express = require('express');
 const router = express.Router();
 const logger = require('../utils/logger');
-const { executeRpcCommand, getBlockByHeight, getRawTransaction } = require('../services/bitcoinzService');
+const { executeRpcCommand, getBlockByHeight, getRawTransaction, getBlockchainInfo } = require('../services/bitcoinzService');
+const { getSequelize } = require('../db');
+const { createBoundedMap } = require('../utils/cache');
 
-// In-memory cache for pool data
-const poolDataCache = {};
+// In-memory caches keyed by request date (bounded: the date is user input).
+// Results for a day that is not over yet expire so they get refreshed.
+const poolDataCache = createBoundedMap(200);
+const minedBlocksCache = createBoundedMap(100);
+const OPEN_DAY_TTL_MS = 5 * 60 * 1000;
+const MAX_MINED_BLOCKS_DAYS = 31;
+const cacheTtlForDate = (date) => {
+  const end = new Date(date).getTime() + 86400000;
+  return (isNaN(end) || end > Date.now()) ? OPEN_DAY_TTL_MS : Infinity;
+};
 
-// Cache for pool signatures to avoid repeating the same detection work
-const poolSignatureCache = {};
+// Cache for pool signatures to avoid repeating the same detection work.
+// Coinbase texts are nearly unique per block, so this must be bounded.
+const poolSignatureCache = createBoundedMap(5000);
+
+/**
+ * Coinbase transaction of a block: from the DB row attached by
+ * getBlocksForDate when available, otherwise via RPC.
+ */
+const getCoinbaseTx = async (block) => {
+  if (block._coinbaseTx) return block._coinbaseTx;
+  return getRawTransaction(block.tx[0], 1);
+};
 
 /**
  * Extract text from coinbase transaction
@@ -124,8 +144,9 @@ const extractPoolFromText = (coinbaseText) => {
  */
 const identifyPool = (coinbaseText, coinbaseTx = null) => {
   // Check if we've already identified this signature
-  if (poolSignatureCache[coinbaseText]) {
-    return poolSignatureCache[coinbaseText];
+  const cachedSignature = poolSignatureCache.get(coinbaseText);
+  if (cachedSignature) {
+    return cachedSignature;
   }
   
   let poolName = 'Unknown';
@@ -148,7 +169,7 @@ const identifyPool = (coinbaseText, coinbaseTx = null) => {
   
   // Cache the result
   const result = { name: poolName, address };
-  poolSignatureCache[coinbaseText] = result;
+  poolSignatureCache.set(coinbaseText, result);
   
   return result;
 };
@@ -158,15 +179,76 @@ const identifyPool = (coinbaseText, coinbaseTx = null) => {
  * @param {string} date - Date in YYYY-MM-DD format
  * @returns {Promise<Array>} Array of blocks
  */
+/**
+ * Blocks of a day from the indexed DB (blocks.time is indexed) together with
+ * their coinbase transaction, in one query. Returns null if unavailable.
+ */
+const getBlocksForDateFromDb = async (startTimestamp, endTimestamp) => {
+  const sequelize = getSequelize();
+  if (!sequelize) return null;
+  const [rows] = await sequelize.query(
+    `SELECT b.hash, b.height, b.time, b.size, b.tx[1] AS "coinbaseTxid", t.vin, t.vout
+     FROM blocks b
+     LEFT JOIN transactions t ON t.txid = b.tx[1]
+     WHERE b.time >= $1 AND b.time < $2
+     ORDER BY b.height`,
+    { bind: [startTimestamp, endTimestamp] }
+  );
+  const blocks = rows.map(r => ({
+    hash: r.hash,
+    height: r.height,
+    time: r.time,
+    size: r.size,
+    tx: [r.coinbaseTxid],
+    _coinbaseTx: r.vin ? { txid: r.coinbaseTxid, vin: r.vin, vout: r.vout || [] } : null
+  }));
+
+  // The blocks table has holes (heights the indexer failed on); fill gaps
+  // inside the range from the node so per-day counts stay complete.
+  if (blocks.length > 1) {
+    const have = new Set(blocks.map(b => b.height));
+    const first = blocks[0].height;
+    const last = blocks[blocks.length - 1].height;
+    for (let h = first + 1; h < last; h++) {
+      if (have.has(h)) continue;
+      try {
+        const block = await getBlockByHeight(h);
+        if (block.time >= startTimestamp && block.time < endTimestamp) blocks.push(block);
+      } catch (error) {
+        logger.warn(`Could not fetch missing block ${h}: ${error.message}`);
+      }
+    }
+    blocks.sort((a, b) => a.height - b.height);
+  }
+  return blocks;
+};
+
 const getBlocksForDate = async (date) => {
   try {
     // Convert date to timestamp range (start and end of the day)
     const targetDate = new Date(date);
     const startTimestamp = Math.floor(targetDate.getTime() / 1000);
     const endTimestamp = startTimestamp + 86400; // 24 hours
+
+    // An unparseable date matches no block (the binary search below used to
+    // spend ~20 RPC calls to find that out)
+    if (isNaN(startTimestamp)) {
+      logger.warn(`Could not find any blocks close to date ${date}`);
+      return [];
+    }
+
+    try {
+      const dbBlocks = await getBlocksForDateFromDb(startTimestamp, endTimestamp);
+      if (dbBlocks && dbBlocks.length > 0) {
+        logger.info(`Found ${dbBlocks.length} blocks for date ${date} in DB`);
+        return dbBlocks;
+      }
+    } catch (dbError) {
+      logger.warn(`DB lookup of blocks for ${date} failed, using RPC: ${dbError.message}`);
+    }
     
     // Get current blockchain info to determine latest block
-    const blockchainInfo = await executeRpcCommand('getblockchaininfo');
+    const blockchainInfo = await getBlockchainInfo();
     const latestHeight = blockchainInfo.blocks;
     
     logger.info(`Searching for blocks on date ${date} (timestamp ${startTimestamp}-${endTimestamp})`);
@@ -270,9 +352,10 @@ const getBlocksForDate = async (date) => {
 const getRealPoolDistribution = async (date) => {
   try {
     // Check if we have cached data for this date
-    if (poolDataCache[date]) {
+    const cachedPoolData = poolDataCache.get(date);
+    if (cachedPoolData) {
       logger.info(`Using cached pool data for ${date}`);
-      return poolDataCache[date];
+      return cachedPoolData;
     }
     
     logger.info(`Getting real pool distribution for date: ${date}`);
@@ -321,8 +404,7 @@ const getRealPoolDistribution = async (date) => {
     for (const block of blocks) {
       try {
         // Get the coinbase transaction (first transaction in the block)
-        const coinbaseTxid = block.tx[0];
-        const coinbaseTx = await getRawTransaction(coinbaseTxid, 1);
+        const coinbaseTx = await getCoinbaseTx(block);
         
         // Extract text from coinbase and identify the pool
         const coinbaseText = extractCoinbaseText(coinbaseTx);
@@ -474,7 +556,7 @@ const getRealPoolDistribution = async (date) => {
     poolDistribution.sort((a, b) => b.percentage - a.percentage);
     
     // Cache the results
-    poolDataCache[date] = poolDistribution;
+    poolDataCache.set(date, poolDistribution, cacheTtlForDate(date));
     
     return poolDistribution;
   } catch (error) {
@@ -489,6 +571,14 @@ const getRealPoolDistribution = async (date) => {
  * @returns {Promise<Array>} Mined blocks data
  */
 const getMinedBlocksData = async (date) => {
+  const cached = minedBlocksCache.get(date);
+  if (cached) return cached;
+  const result = await loadMinedBlocksData(date);
+  if (result.length > 0) minedBlocksCache.set(date, result, cacheTtlForDate(date));
+  return result;
+};
+
+const loadMinedBlocksData = async (date) => {
   try {
     // Get blocks for the specified date using binary search
     const blocks = await getBlocksForDate(date);
@@ -504,8 +594,7 @@ const getMinedBlocksData = async (date) => {
     for (const block of blocks) {
       try {
         // Get the coinbase transaction (first transaction in the block)
-        const coinbaseTxid = block.tx[0];
-        const coinbaseTx = await getRawTransaction(coinbaseTxid, 1);
+        const coinbaseTx = await getCoinbaseTx(block);
         
         // Extract text from coinbase and identify the pool
         const coinbaseText = extractCoinbaseText(coinbaseTx);
@@ -558,8 +647,7 @@ const debugCoinbaseTexts = async (date, searchText) => {
     for (const block of blocks) {
       try {
         // Get the coinbase transaction (first transaction in the block)
-        const coinbaseTxid = block.tx[0];
-        const coinbaseTx = await getRawTransaction(coinbaseTxid, 1);
+        const coinbaseTx = await getCoinbaseTx(block);
         
         // Extract text from coinbase
         const coinbaseText = extractCoinbaseText(coinbaseTx);
@@ -630,8 +718,7 @@ const sampleCoinbaseTexts = async (date, sampleSize = 20) => {
     for (const block of sampleBlocks) {
       try {
         // Get the coinbase transaction (first transaction in the block)
-        const coinbaseTxid = block.tx[0];
-        const coinbaseTx = await getRawTransaction(coinbaseTxid, 1);
+        const coinbaseTx = await getCoinbaseTx(block);
         
         // Extract text from coinbase
         const coinbaseText = extractCoinbaseText(coinbaseTx);
@@ -694,7 +781,8 @@ router.get('/real-pool-stat', async (req, res) => {
 router.get('/mined-blocks', async (req, res) => {
   try {
     const date = req.query.date || new Date().toISOString().split('T')[0];
-    const days = parseInt(req.query.days || '1', 10);
+    // Capped: each day is a separate scan
+    const days = Math.min(parseInt(req.query.days || '1', 10), MAX_MINED_BLOCKS_DAYS);
     
     logger.info(`MINED-BLOCKS endpoint hit for date: ${date}, days: ${days}`);
     

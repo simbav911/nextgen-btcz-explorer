@@ -144,8 +144,13 @@ const startUpdateIntervals = () => {
   
   // Cache for storing previous data to reduce redundant emissions
   const dataCache = {
-    lastTransactions: new Set()
+    lastTransactions: new Set(),
+    // Tip hash of the last complete transaction scan. Latest transactions are
+    // read from the newest blocks only, so while the tip is unchanged a new
+    // scan returns the same (already emitted) txids and can be skipped.
+    lastTxScanTip: null
   };
+  const LATEST_TX_COUNT = 8;
   
   // Update latest block
   blockInterval = setInterval(async () => {
@@ -202,8 +207,16 @@ const startUpdateIntervals = () => {
   // Update latest transactions
   txInterval = setInterval(async () => {
     try {
+      const tip = await getBestBlockHash();
+      if (tip && tip === dataCache.lastTxScanTip) {
+        return;
+      }
+
       // Get latest transactions from the node
-      const transactions = await getLatestTransactions(8);
+      const transactions = await getLatestTransactions(LATEST_TX_COUNT);
+      if (transactions.length >= LATEST_TX_COUNT) {
+        dataCache.lastTxScanTip = tip;
+      }
       
       // Process transactions to ensure confirmations field is set correctly
       const processedTransactions = transactions.map(tx => {

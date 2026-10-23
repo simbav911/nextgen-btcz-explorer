@@ -1,12 +1,23 @@
 const express = require('express');
 const router = express.Router();
 const logger = require('../utils/logger');
-const { executeRpcCommand } = require('../services/bitcoinzService');
+const { executeRpcCommand, getBlockchainInfo } = require('../services/bitcoinzService');
+const { getSequelize } = require('../db');
+const { createBoundedMap } = require('../utils/cache');
 
-// In-memory cache for chart data
+// In-memory cache for chart data (date -> data). Bounded, because the date
+// comes straight from the query string; days that are not over yet expire.
 const chartDataCache = {
-  'pool-stat': {},  // date -> data
-  'mined-block': {} // date -> data
+  'pool-stat': createBoundedMap(100),
+  'mined-block': createBoundedMap(100)
+};
+const OPEN_DAY_TTL_MS = 5 * 60 * 1000;
+const cacheTtlForDate = (date) => {
+  const next = new Date(date);
+  next.setDate(next.getDate() + 1);
+  next.setHours(0, 0, 0, 0);
+  const t = next.getTime();
+  return (isNaN(t) || t > Date.now()) ? OPEN_DAY_TTL_MS : Infinity;
 };
 
 /**
@@ -16,7 +27,12 @@ const chartDataCache = {
  */
 const identifyMiningPool = (coinbaseTx) => {
   try {
-    // The pool identifier is in the coinbase input script
+    // The pool identifier is in the coinbase input script. Coinbase inputs
+    // from bitcoinzd carry `coinbase` and no `scriptSig`, which used to throw
+    // (and log an error per block) before returning 'Unknown' anyway.
+    if (!coinbaseTx || !coinbaseTx.vin || !coinbaseTx.vin[0] || !coinbaseTx.vin[0].scriptSig) {
+      return 'Unknown';
+    }
     const scriptSigHex = coinbaseTx.vin[0].scriptSig.hex;
     
     // Convert hex to buffer
@@ -78,7 +94,7 @@ const identifyMiningPool = (coinbaseTx) => {
 const getBlocksForDate = async (date, maxBlocks = 1000) => {
   try {
     // Get current blockchain info
-    const blockchainInfo = await executeRpcCommand('getblockchaininfo');
+    const blockchainInfo = await getBlockchainInfo();
     const currentHeight = blockchainInfo.blocks;
     
     // Calculate target date timestamps
@@ -90,13 +106,15 @@ const getBlocksForDate = async (date, maxBlocks = 1000) => {
     nextDate.setDate(nextDate.getDate() + 1);
     nextDate.setHours(0, 0, 0, 0);
     const nextTimestamp = Math.floor(nextDate.getTime() / 1000);
+
+    // An unparseable date matches no block (the scan below used to walk all
+    // `maxBlocks` blocks via RPC before returning nothing)
+    if (isNaN(targetTimestamp) || isNaN(nextTimestamp)) {
+      logger.info(`Invalid date ${date}, no blocks to scan`);
+      return [];
+    }
     
     logger.info(`Scanning for blocks mined on ${date} (timestamps ${targetTimestamp}-${nextTimestamp})`);
-    
-    // Scan blocks to find ones mined on the target date
-    const blocks = [];
-    let height = currentHeight;
-    let blocksScanned = 0;
     
     // For testing, limit the number of blocks to scan based on date
     // If the date is more than 30 days ago, we'll only scan a few blocks to save time
@@ -104,51 +122,94 @@ const getBlocksForDate = async (date, maxBlocks = 1000) => {
     const thirtyDaysAgo = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000);
     const isOldDate = targetDate < thirtyDaysAgo;
     const scanLimit = isOldDate ? 50 : maxBlocks;
-    
-    while (height > 0 && blocksScanned < scanLimit) {
+    const lowestHeight = Math.max(1, currentHeight - scanLimit + 1);
+
+    // Same scan as before (newest block first, stop at the first block older
+    // than the target day), but reading block headers and coinbase inputs from
+    // the indexed DB in two queries instead of 2-3 RPC calls per block.
+    const dbBlocks = new Map();
+    const sequelize = getSequelize();
+    if (sequelize) {
       try {
-        const blockHash = await executeRpcCommand('getblockhash', [height]);
-        const block = await executeRpcCommand('getblock', [blockHash]);
-        
-        blocksScanned++;
-        
+        const [rows] = await sequelize.query(
+          `SELECT height, hash, time, size, cardinality(tx) AS "txCount", difficulty, tx[1] AS "coinbaseTxid"
+           FROM blocks WHERE height BETWEEN $1 AND $2`,
+          { bind: [lowestHeight, currentHeight] }
+        );
+        for (const r of rows) dbBlocks.set(r.height, r);
+      } catch (dbError) {
+        logger.warn(`DB block scan failed, using RPC: ${dbError.message}`);
+      }
+    }
+
+    const blocks = [];
+    const matched = [];
+    for (let height = currentHeight; height >= lowestHeight && height > 0; height--) {
+      try {
+        let block = dbBlocks.get(height);
+        if (!block) {
+          const blockHash = await executeRpcCommand('getblockhash', [height]);
+          const rpcBlock = await executeRpcCommand('getblock', [blockHash]);
+          block = {
+            height: rpcBlock.height,
+            hash: rpcBlock.hash,
+            time: rpcBlock.time,
+            size: rpcBlock.size,
+            txCount: rpcBlock.tx.length,
+            difficulty: rpcBlock.difficulty,
+            coinbaseTxid: rpcBlock.tx[0]
+          };
+        }
+
         if (block.time >= targetTimestamp && block.time < nextTimestamp) {
-          logger.debug(`Found block ${height} mined on ${date}`);
-          
-          // Get full block with transaction data
-          const fullBlock = await executeRpcCommand('getblock', [blockHash, 2]);
-          
-          // The coinbase transaction is always the first transaction
-          const coinbaseTx = fullBlock.tx[0];
-          
-          // Identify the mining pool
-          const pool = identifyMiningPool(coinbaseTx);
-          
-          blocks.push({
-            height: block.height,
-            hash: block.hash,
-            time: block.time,
-            size: block.size,
-            txCount: block.tx.length,
-            pool,
-            difficulty: block.difficulty
-          });
+          matched.push(block);
         } else if (block.time < targetTimestamp) {
           // We've gone past the target date, so stop scanning
           logger.debug(`Stopping scan at block ${height}, time before target date`);
           break;
         }
-        
-        height--;
-        
-        // Log progress every 10 blocks
-        if (blocksScanned % 10 === 0) {
-          logger.debug(`Scanned ${blocksScanned} blocks, currently at height ${height}`);
-        }
       } catch (error) {
         logger.error(`Error scanning block at height ${height}:`, error);
-        height--;
       }
+    }
+
+    // Coinbase inputs of the matching blocks (DB first, RPC for misses)
+    const coinbaseVins = new Map();
+    if (sequelize && matched.length > 0) {
+      try {
+        const [rows] = await sequelize.query(
+          'SELECT txid, vin FROM transactions WHERE txid = ANY($1::varchar[])',
+          { bind: [matched.map(b => b.coinbaseTxid)] }
+        );
+        for (const r of rows) coinbaseVins.set(r.txid, r.vin);
+      } catch (dbError) {
+        logger.warn(`DB coinbase lookup failed, using RPC: ${dbError.message}`);
+      }
+    }
+
+    for (const block of matched) {
+      let coinbaseTx;
+      const vin = coinbaseVins.get(block.coinbaseTxid);
+      if (vin) {
+        coinbaseTx = { txid: block.coinbaseTxid, vin };
+      } else {
+        // Get full block with transaction data
+        const fullBlock = await executeRpcCommand('getblock', [block.hash, 2]);
+        coinbaseTx = fullBlock.tx[0];
+      }
+
+      // Identify the mining pool
+      const pool = identifyMiningPool(coinbaseTx);
+
+      blocks.push({
+        height: block.height,
+        hash: block.hash,
+        time: block.time,
+        size: block.size,
+        txCount: block.txCount,
+        pool,
+        difficulty: block.difficulty
+      });
     }
     
     logger.info(`Found ${blocks.length} blocks mined on ${date}`);
@@ -438,13 +499,13 @@ router.get('/pool-stat', async (req, res) => {
   try {
     const date = req.query.date || new Date().toISOString().split('T')[0];
     
-    console.log('==== NEW IMPLEMENTATION: Pool-stat endpoint hit for date:', date, '====');
     logger.info(`NEW IMPLEMENTATION: Pool-stat endpoint hit for date: ${date}`);
     
     // Check if we have cached data for this date
-    if (chartDataCache['pool-stat'][date]) {
+    const cachedPoolStat = chartDataCache['pool-stat'].get(date);
+    if (cachedPoolStat) {
       logger.info(`Returning cached pool-stat data for ${date}`);
-      return res.json(chartDataCache['pool-stat'][date]);
+      return res.json(cachedPoolStat);
     }
     
     // Get blocks mined on the specified date
@@ -461,7 +522,7 @@ router.get('/pool-stat', async (req, res) => {
     };
     
     // Cache the results
-    chartDataCache['pool-stat'][date] = data;
+    chartDataCache['pool-stat'].set(date, data, cacheTtlForDate(date));
     
     return res.json(data);
   } catch (error) {
@@ -481,9 +542,10 @@ router.get('/mined-block', async (req, res) => {
     logger.info(`Mined-block endpoint hit for date: ${date}`);
     
     // Check if we have cached data for this date
-    if (chartDataCache['mined-block'][date]) {
+    const cachedMinedBlock = chartDataCache['mined-block'].get(date);
+    if (cachedMinedBlock) {
       logger.info(`Returning cached mined-block data for ${date}`);
-      return res.json(chartDataCache['mined-block'][date]);
+      return res.json(cachedMinedBlock);
     }
     
     // Get blocks mined on the specified date
@@ -500,7 +562,7 @@ router.get('/mined-block', async (req, res) => {
     };
     
     // Cache the results
-    chartDataCache['mined-block'][date] = data;
+    chartDataCache['mined-block'].set(date, data, cacheTtlForDate(date));
     
     return res.json(data);
   } catch (error) {

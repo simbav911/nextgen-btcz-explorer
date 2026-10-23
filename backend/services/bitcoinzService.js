@@ -1,4 +1,5 @@
 const axios = require('axios');
+const http = require('http');
 const logger = require('../utils/logger');
 const cache = require('../utils/cache');
 const fs = require('fs');
@@ -6,6 +7,33 @@ const path = require('path');
 const os = require('os');
 
 let rpcClient = null;
+
+// Reuse TCP connections to bitcoinzd instead of opening one per RPC call
+const rpcHttpAgent = new http.Agent({ keepAlive: true, maxSockets: 16 });
+
+// Global cap on concurrent RPC calls. bitcoinzd has a small RPC work queue
+// (shared with lightwalletd); unbounded Promise.all fan-outs caused
+// "Work queue depth exceeded" errors and huge memory spikes.
+const RPC_MAX_CONCURRENCY = parseInt(process.env.RPC_MAX_CONCURRENCY, 10) || 8;
+let rpcActive = 0;
+const rpcWaiters = [];
+const acquireRpcSlot = () => {
+  if (rpcActive < RPC_MAX_CONCURRENCY) {
+    rpcActive++;
+    return Promise.resolve();
+  }
+  return new Promise(resolve => rpcWaiters.push(resolve));
+};
+const releaseRpcSlot = () => {
+  const next = rpcWaiters.shift();
+  if (next) {
+    next(); // hand the slot over directly
+  } else {
+    rpcActive--;
+  }
+};
+
+const isDebugEnabled = () => typeof logger.isDebugEnabled === 'function' ? logger.isDebugEnabled() : false;
 
 let lastReindexProgress = {
   percentage: 52,
@@ -84,13 +112,8 @@ const getReindexProgressFromLog = () => {
   }
 };
 
-const startReindexProgressMonitor = () => {
-  setInterval(() => {
-    getReindexProgressFromLog();
-  }, 10000);
-};
-
-startReindexProgressMonitor();
+// Reindex progress is refreshed lazily from getNetworkStats() while the node
+// is reindexing (it used to synchronously read debug.log every 10s forever).
 
 /**
  * Initialize the BitcoinZ node connection
@@ -158,18 +181,27 @@ const executeRpcCommand = async (method, params = [], timeout = 30000) => {
         lastLogTime = now;
       }
 
-      const response = await axios.post(rpcClient.url, {
-        jsonrpc: '1.0',
-        id: 'bitcoinz-explorer',
-        method: method,
-        params: params
-      }, {
-        auth: rpcClient.auth,
-        headers: {
-          'Content-Type': 'application/json'
-        },
-        timeout: timeout
-      });
+      let response;
+      await acquireRpcSlot();
+      try {
+        response = await axios.post(rpcClient.url, {
+          jsonrpc: '1.0',
+          id: 'bitcoinz-explorer',
+          method: method,
+          params: params
+        }, {
+          auth: rpcClient.auth,
+          headers: {
+            'Content-Type': 'application/json'
+          },
+          timeout: timeout,
+          httpAgent: rpcHttpAgent,
+          maxContentLength: Infinity,
+          maxBodyLength: Infinity
+        });
+      } finally {
+        releaseRpcSlot();
+      }
 
       if (response.data.error) {
         logger.error(`RPC Error from ${method}: ${JSON.stringify(response.data.error)}`);
@@ -177,7 +209,9 @@ const executeRpcCommand = async (method, params = [], timeout = 30000) => {
       }
 
       // Debug log the response for certain commands to help with troubleshooting
-      if (['getaddressbalance', 'getaddresstxids', 'getaddressutxos'].includes(method)) {
+      // (only stringify when debug logging is actually enabled: getaddresstxids
+      // results can be tens of MB)
+      if (isDebugEnabled() && ['getaddressbalance', 'getaddresstxids', 'getaddressutxos'].includes(method)) {
         logger.debug(`RPC ${method} response: ${JSON.stringify(response.data.result)}`);
       }
 
@@ -204,18 +238,14 @@ const executeRpcCommand = async (method, params = [], timeout = 30000) => {
  * Get blockchain info (cached 5s)
  */
 const getBlockchainInfo = async () => {
-  const cached = cache.get('blockchaininfo');
-  if (cached) return cached;
-  const result = await executeRpcCommand('getblockchaininfo');
-  cache.set('blockchaininfo', result, 5000);
-  return result;
+  return cache.wrap('blockchaininfo', 5000, () => executeRpcCommand('getblockchaininfo'));
 };
 
 /**
- * Get the latest block hash
+ * Get the latest block hash (cached 1s; polled by several timers)
  */
 const getBestBlockHash = async () => {
-  return executeRpcCommand('getbestblockhash');
+  return cache.wrap('bestblockhash', 1000, () => executeRpcCommand('getbestblockhash'));
 };
 
 /**
@@ -231,21 +261,19 @@ const getBlock = async (hash, verbosity = 1) => {
       throw new Error(`Invalid block hash format: ${hash}`);
     }
 
-    // Cache blocks for 60s (immutable once confirmed)
+    // Cache blocks for 60s (immutable once confirmed); concurrent requests
+    // for the same block share one RPC call
     const cacheKey = `block:${hash}:${verbosity}`;
-    const cached = cache.get(cacheKey);
-    if (cached) return cached;
+    return await cache.wrap(cacheKey, 60000, async () => {
+      // Add timeout to get better error messages
+      const result = await executeRpcCommand('getblock', [hash, verbosity], 15000);
 
-    // Add timeout to get better error messages
-    const result = await executeRpcCommand('getblock', [hash, verbosity], 15000);
-    
-    if (verbosity >= 1) {
-      // Log some basic block information
-      logger.debug(`Block ${hash.substring(0, 8)}... retrieved: height=${result.height}, txs=${result.tx.length}, size=${result.size}`);
-    }
-
-    cache.set(cacheKey, result, 60000);
-    return result;
+      if (verbosity >= 1) {
+        // Log some basic block information
+        logger.debug(`Block ${hash.substring(0, 8)}... retrieved: height=${result.height}, txs=${result.tx.length}, size=${result.size}`);
+      }
+      return result;
+    });
   } catch (error) {
     // Improve error reporting
     if (error.message && error.message.includes('Block not found')) {
@@ -317,13 +345,22 @@ const getTransaction = async (txid, includeWatchonly = true) => {
 /**
  * Get raw transaction details
  */
-const getRawTransaction = async (txid, verbose = 1) => {
-  try {
-    // Cache raw transactions for 60s (immutable once confirmed)
-    const cacheKey = `rawtx:${txid}:${verbose}`;
-    const cached = cache.get(cacheKey);
-    if (cached) return cached;
+/**
+ * Plain getrawtransaction (verbose, no input resolution), cached 60s and
+ * de-duplicated. Used for previous-output lookups.
+ */
+const getRawTransactionPlain = async (txid) => {
+  return cache.wrap(`rawtxp:${txid}`, 60000, () => executeRpcCommand('getrawtransaction', [txid, 1]));
+};
 
+const getRawTransaction = async (txid, verbose = 1) => {
+  // Cache raw transactions for 60s (immutable once confirmed); concurrent
+  // requests for the same txid share one lookup.
+  return cache.wrap(`rawtx:${txid}:${verbose}`, 60000, () => loadRawTransaction(txid, verbose));
+};
+
+const loadRawTransaction = async (txid, verbose = 1) => {
+  try {
     const transaction = await executeRpcCommand('getrawtransaction', [txid, verbose]);
 
     if (verbose === 1 && transaction) {
@@ -354,7 +391,7 @@ const getRawTransaction = async (txid, verbose = 1) => {
 
           const prevTxResults = await Promise.all(
             uniqueTxids.map(prevTxid =>
-              executeRpcCommand('getrawtransaction', [prevTxid, 1])
+              getRawTransactionPlain(prevTxid)
                 .then(tx => ({ txid: prevTxid, tx }))
                 .catch(err => {
                   logger.error(`Failed to fetch previous transaction ${prevTxid}: ${err.message}`);
@@ -385,7 +422,6 @@ const getRawTransaction = async (txid, verbose = 1) => {
       }
     }
 
-    cache.set(cacheKey, transaction, 60000);
     return transaction;
   } catch (error) {
     logger.error(`Failed to get raw transaction ${txid}:`, error.message);
@@ -443,7 +479,7 @@ const getLatestTransactions = async (count = 10) => {
       blocksChecked++;
     }
     
-    logger.info(`Retrieved ${transactions.length} transactions from ${blocksChecked + 1} blocks`);
+    logger.debug(`Retrieved ${transactions.length} transactions from ${blocksChecked + 1} blocks`);
     return transactions;
   } catch (error) {
     logger.error('Failed to get latest transactions:', error.message);
@@ -455,8 +491,10 @@ const getLatestTransactions = async (count = 10) => {
  * Get network stats
  */
 const getNetworkStats = async () => {
-  const cached = cache.get('networkstats');
-  if (cached) return cached;
+  return cache.wrap('networkstats', 30000, loadNetworkStats);
+};
+
+const loadNetworkStats = async () => {
   try {
     const [blockchainInfo, networkInfo, miningInfo] = await Promise.all([
       executeRpcCommand('getblockchaininfo'),
@@ -485,9 +523,7 @@ const getNetworkStats = async () => {
       logger.debug(`Using reindexing progress: ${lastReindexProgress.percentage}%`);
     }
     
-    const result = { blockchainInfo, networkInfo, miningInfo };
-    cache.set('networkstats', result, 30000);
-    return result;
+    return { blockchainInfo, networkInfo, miningInfo };
   } catch (error) {
     logger.error('Failed to get network stats:', error.message);
     throw error;
@@ -956,34 +992,188 @@ const getAddressTransactions = async (address, limit = 10, offset = 0) => {
   }
 };
 
+// ---------------------------------------------------------------------------
+// Address txid list (shared by /addresses/:address, /balance, /transactions)
+// ---------------------------------------------------------------------------
+
+// getaddresstxids for busy addresses returns 100k-300k txids (8-20 MB JSON).
+// A single address page used to call it up to 4 times. Results are shared
+// for a short time, de-duplicated, and kept within a total-size budget.
+const ADDRESS_TXIDS_TTL_MS = 30000;
+const ADDRESS_TXIDS_BUDGET = 600000; // max txids held across all cached addresses
+const addressTxidsCache = new Map(); // address -> { txids, expires }
+const addressTxidsInflight = new Map();
+
+const pruneAddressTxidsCache = () => {
+  const now = Date.now();
+  let total = 0;
+  for (const [addr, e] of addressTxidsCache) {
+    if (now > e.expires) addressTxidsCache.delete(addr);
+    else total += e.txids.length;
+  }
+  for (const [addr, e] of addressTxidsCache) {
+    if (total <= ADDRESS_TXIDS_BUDGET) break;
+    total -= e.txids.length;
+    addressTxidsCache.delete(addr);
+  }
+};
+
+/**
+ * getaddresstxids for one address (oldest first, as returned by the node).
+ * The returned array is shared: callers must not mutate it.
+ */
+const getAddressTxids = async (address, timeout = 60000) => {
+  const hit = addressTxidsCache.get(address);
+  if (hit && Date.now() <= hit.expires) return hit.txids;
+  if (addressTxidsInflight.has(address)) return addressTxidsInflight.get(address);
+
+  const p = executeRpcCommand('getaddresstxids', [{ addresses: [address] }], timeout)
+    .then((txids) => {
+      if (Array.isArray(txids) && txids.length <= ADDRESS_TXIDS_BUDGET) {
+        addressTxidsCache.set(address, { txids, expires: Date.now() + ADDRESS_TXIDS_TTL_MS });
+        pruneAddressTxidsCache();
+      }
+      return txids;
+    })
+    .finally(() => addressTxidsInflight.delete(address));
+  addressTxidsInflight.set(address, p);
+  return p;
+};
+
+setInterval(pruneAddressTxidsCache, 60000).unref();
+
+// ---------------------------------------------------------------------------
+// Address balance history
+// ---------------------------------------------------------------------------
+
+const MAX_HISTORY_DAYS = 3660;
+const HISTORY_CACHE_TTL_MS = 5 * 60 * 1000;
+
+/**
+ * Map block heights to block times: DB first (blocks table), RPC for misses.
+ */
+const getBlockTimesForHeights = async (heights) => {
+  const times = new Map();
+  try {
+    const { getSequelize } = require('../db');
+    const db = getSequelize();
+    if (db && heights.length > 0) {
+      const [rows] = await db.query(
+        'SELECT height, time FROM blocks WHERE height = ANY($1::int[])',
+        { bind: [heights] }
+      );
+      for (const r of rows) times.set(r.height, r.time);
+    }
+  } catch (e) {
+    logger.warn(`Block time lookup from DB failed: ${e.message}`);
+  }
+  const missing = heights.filter(h => !times.has(h));
+  for (const h of missing) {
+    try {
+      const hash = await executeRpcCommand('getblockhash', [h]);
+      const header = await executeRpcCommand('getblockheader', [hash]);
+      times.set(h, header.time);
+    } catch (e) {
+      logger.warn(`Could not get time for block ${h}: ${e.message}`);
+    }
+  }
+  return times;
+};
+
+/**
+ * Per-transaction balance effects ({ time, effect }) from the address index
+ * (one getaddressdeltas call instead of one getrawtransaction per tx plus one
+ * per input).
+ */
+const getAddressEffectsFromDeltas = async (address) => {
+  const deltas = await executeRpcCommand('getaddressdeltas', [{ addresses: [address] }], 120000);
+  if (!Array.isArray(deltas)) throw new Error('Invalid getaddressdeltas response');
+
+  // Sum satoshis per transaction
+  const perTx = new Map(); // txid -> { height, sats }
+  for (const d of deltas) {
+    const e = perTx.get(d.txid);
+    if (e) e.sats += d.satoshis;
+    else perTx.set(d.txid, { height: d.height, sats: d.satoshis });
+  }
+  const heights = [...new Set([...perTx.values()].map(e => e.height))];
+  const times = await getBlockTimesForHeights(heights);
+
+  const effects = [];
+  for (const e of perTx.values()) {
+    const time = times.get(e.height);
+    if (time === undefined) continue;
+    effects.push({ time, height: e.height, effect: e.sats / 100000000 });
+  }
+  return effects;
+};
+
+/**
+ * Legacy path (no address index deltas): same computation as before, but with
+ * bounded concurrency and only { time, effect } kept per transaction.
+ */
+const getAddressEffectsFromTransactions = async (txids, address) => {
+  const effects = [];
+  const BATCH = RPC_MAX_CONCURRENCY;
+  for (let i = 0; i < txids.length; i += BATCH) {
+    const batch = txids.slice(i, i + BATCH);
+    const txs = await Promise.all(batch.map(txid =>
+      getRawTransaction(txid, 1).catch(err => {
+        logger.error(`Failed to fetch transaction ${txid}: ${err.message}`);
+        return null;
+      })
+    ));
+    for (const tx of txs) {
+      if (!tx) continue;
+      let txEffect = 0;
+      for (const output of tx.vout || []) {
+        if (output.scriptPubKey &&
+            output.scriptPubKey.addresses &&
+            output.scriptPubKey.addresses.includes(address)) {
+          txEffect += parseFloat(output.value) || 0;
+        }
+      }
+      for (const input of tx.vin || []) {
+        if (input.coinbase) continue;
+        if (input.address === address) {
+          txEffect -= parseFloat(input.value) || 0;
+        } else if (input.prevout &&
+                   input.prevout.scriptPubKey &&
+                   input.prevout.scriptPubKey.addresses &&
+                   input.prevout.scriptPubKey.addresses.includes(address)) {
+          txEffect -= parseFloat(input.prevout.value) || 0;
+        }
+      }
+      effects.push({ time: tx.time, height: tx.height || 0, effect: txEffect });
+    }
+  }
+  return effects;
+};
+
 /**
  * Get address balance history
  */
 const getAddressBalanceHistory = async (address, days = 30) => {
+  days = Math.min(days, MAX_HISTORY_DAYS);
+  return cache.wrap(`addrhistory:${address}:${days}`, HISTORY_CACHE_TTL_MS, () => loadAddressBalanceHistory(address, days));
+};
+
+const loadAddressBalanceHistory = async (address, days) => {
   try {
     logger.info(`Fetching balance history for ${address}`);
-    
-    // Get all transactions for this address (not just the first page)
-    const txids = await executeRpcCommand('getaddresstxids', [{"addresses": [address]}]);
-    let allTransactions = [];
-    
-    if (txids && Array.isArray(txids) && txids.length > 0) {
-      logger.info(`Found ${txids.length} transactions for address ${address}`);
-      
-      // Get details for each transaction
-      const txPromises = txids.map(txid => 
-        getRawTransaction(txid, 1).catch(err => {
-          logger.error(`Failed to fetch transaction ${txid}: ${err.message}`);
-          return null;
-        })
-      );
-      
-      const txResults = await Promise.all(txPromises);
-      allTransactions = txResults.filter(tx => tx !== null);
-      
-      // Sort by time (oldest first)
-      allTransactions.sort((a, b) => a.time - b.time);
-    } else {
+
+    let effects;
+    try {
+      effects = await getAddressEffectsFromDeltas(address);
+    } catch (deltaError) {
+      logger.warn(`getaddressdeltas failed for ${address} (${deltaError.message}), falling back to per-transaction lookups`);
+      const txids = await getAddressTxids(address);
+      effects = (txids && Array.isArray(txids) && txids.length > 0)
+        ? await getAddressEffectsFromTransactions(txids, address)
+        : [];
+    }
+
+    if (effects.length === 0) {
       logger.warn(`No transactions found for address ${address}`);
       return {
         address,
@@ -993,78 +1183,46 @@ const getAddressBalanceHistory = async (address, days = 30) => {
         }]
       };
     }
-    
-    // Process all transactions to build daily balance history
+
+    logger.info(`Found ${effects.length} transactions for address ${address}`);
+
+    // Sort by time (oldest first)
+    effects.sort((a, b) => (a.time - b.time) || (a.height - b.height));
+
+    // Balance at the end of each (UTC) day that had activity
     const dailyBalances = new Map();
     let runningBalance = 0;
-    
-    for (const tx of allTransactions) {
-      // Calculate the effect of this transaction on the address's balance
-      let txEffect = 0;
-      
-      // Add outputs sent to this address
-      for (const output of tx.vout) {
-        if (output.scriptPubKey && 
-            output.scriptPubKey.addresses && 
-            output.scriptPubKey.addresses.includes(address)) {
-          txEffect += parseFloat(output.value) || 0;
-        }
-      }
-      
-      // Subtract inputs from this address
-      for (const input of tx.vin) {
-        if (input.coinbase) continue;
-        
-        // Check if the input is from this address
-        if (input.address === address) {
-          txEffect -= parseFloat(input.value) || 0;
-        }
-        // Also check prevout for address match
-        else if (input.prevout && 
-                input.prevout.scriptPubKey && 
-                input.prevout.scriptPubKey.addresses && 
-                input.prevout.scriptPubKey.addresses.includes(address)) {
-          txEffect -= parseFloat(input.prevout.value) || 0;
-        }
-      }
-      
-      // Update running balance
-      runningBalance += txEffect;
-      
-      // Store the balance for this day
-      const txDate = new Date(tx.time * 1000).toISOString().split('T')[0];
+    for (const e of effects) {
+      runningBalance += e.effect;
+      const txDate = new Date(e.time * 1000).toISOString().split('T')[0];
       dailyBalances.set(txDate, runningBalance);
     }
-    
-    // Create a history array for the requested number of days
+
+    // Activity dates in ascending order, walked once alongside the output days
+    const activityDates = Array.from(dailyBalances.keys()).sort();
+
     const now = new Date();
     const history = [];
-    
-    // Fill in the history with known balances or the last known balance
+    let idx = -1;
+    let balance = 0;
+
     for (let i = days - 1; i >= 0; i--) {
       const date = new Date(now);
       date.setDate(date.getDate() - i);
       const dateStr = date.toISOString().split('T')[0];
-      
-      let balance = 0;
-      // Find the last known balance on or before this date
-      const relevantDates = Array.from(dailyBalances.keys())
-        .filter(d => d <= dateStr)
-        .sort((a, b) => b.localeCompare(a)); // Latest date first
-      
-      if (relevantDates.length > 0) {
-        balance = dailyBalances.get(relevantDates[0]);
-      } else {
-        // If no transaction before this date, balance is 0
-        balance = 0;
+
+      // Last known balance on or before this date (0 if none)
+      while (idx + 1 < activityDates.length && activityDates[idx + 1] <= dateStr) {
+        idx++;
+        balance = dailyBalances.get(activityDates[idx]);
       }
-      
+
       history.push({
         date: dateStr,
-        balance: Math.max(0, balance)
+        balance: Math.max(0, idx >= 0 ? balance : 0)
       });
     }
-    
+
     return {
       address,
       history
@@ -1088,5 +1246,7 @@ module.exports = {
   getNetworkStats,
   getAddressInfo,
   getAddressTransactions,
-  getAddressBalanceHistory
+  getAddressBalanceHistory,
+  getAddressTxids,
+  getRawTransactionPlain
 };

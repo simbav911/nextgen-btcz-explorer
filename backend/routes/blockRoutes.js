@@ -9,8 +9,10 @@ const { Op } = require('sequelize');
 // Get latest blocks — DB-first with RPC fallback (eliminates 101 RPC calls per page)
 router.get('/', async (req, res, next) => {
   try {
-    const limit = parseInt(req.query.limit) || 10;
-    const offset = parseInt(req.query.offset) || 0;
+    // Bounded page size: an unbounded limit loaded the whole blocks table
+    // (1.8M rows incl. tx arrays) into memory
+    const limit = Math.min(Math.max(parseInt(req.query.limit) || 10, 1), 100);
+    const offset = Math.max(parseInt(req.query.offset) || 0, 0);
 
     // Check server-side response cache first (10s TTL)
     const cacheKey = `blocklist:${limit}:${offset}`;

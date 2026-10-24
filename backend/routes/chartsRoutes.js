@@ -4,6 +4,10 @@ const logger = require('../utils/logger');
 const { executeRpcCommand, getBlockchainInfo } = require('../services/bitcoinzService');
 const { getSequelize } = require('../db');
 const { createBoundedMap } = require('../utils/cache');
+const chartStats = require('../services/chartStatsService');
+
+// Warm the chart rollup in the background
+chartStats.start();
 
 // In-memory cache for chart data (date -> data). Bounded, because the date
 // comes straight from the query string; days that are not over yet expire.
@@ -329,170 +333,52 @@ const generateMockMinedBlockData = () => {
   return hourlyData;
 };
 
-// Block size chart data
-router.get('/block-size', (req, res) => {
+// Block size / interval / difficulty / mining revenue: real data aggregated
+// per time bucket from the blocks and transactions tables (see
+// services/chartStatsService.js). Query: days (1, 7, 30, 90, 365; >= 3000
+// means all time) and date (YYYY-MM-DD start day, used for past custom days).
+// Each point has blockHeight (last block in the bucket), timestamp (time of
+// that block), date and the chart's value; points are ordered oldest first.
+const seriesRoute = (chartType, pick) => async (req, res) => {
   try {
-    const days = parseInt(req.query.days) || 30;
-    
-    // Generate some random data
-    const data = {
+    const series = await chartStats.getSeries(req.query);
+    const days = parseInt(req.query.days, 10) || 30;
+    return res.json({
       days,
-      chartType: 'block-size',
-      data: []
-    };
-    
-    // For single day requests, generate more detailed hourly data
-    if (days === 1) {
-      // Generate hourly data points for a single day (24 hours)
-      for (let hour = 0; hour < 24; hour++) {
-        const date = new Date();
-        date.setHours(hour);
-        
-        // Use smaller increments for more detailed view
-        data.data.push({
-          blockHeight: 1545720 - (23 - hour), // Decreasing block height throughout the day
-          blockSize: Math.floor(Math.random() * 1000) + 500, // Random block size in bytes
-          timestamp: date.toISOString() // Include timestamp for tooltip display
-        });
-      }
-    } else {
-      // Generate daily data points for multiple days
-      for (let i = 0; i < days; i++) {
-        const date = new Date();
-        date.setDate(date.getDate() - i);
-        
-        data.data.push({
-          blockHeight: 1545720 - (i * 10), // Start from a reasonable block height
-          blockSize: Math.floor(Math.random() * 1000) + 500, // Random block size in bytes
-          timestamp: date.toISOString() // Include timestamp for tooltip display
-        });
-      }
-    }
-    
-    // Ensure we always have at least one data point
-    if (data.data.length === 0) {
-      const now = new Date();
-      data.data.push({
-        blockHeight: 1545720,
-        blockSize: Math.floor(Math.random() * 1000) + 500,
-        timestamp: now.toISOString()
-      });
-    }
-    
-    // Sort data by blockHeight (ascending)
-    data.data.sort((a, b) => a.blockHeight - b.blockHeight);
-    
-    // Log the data being sent for debugging
-    logger.debug(`Sending block-size data for ${days} days: ${data.data.length} data points`);
-    
-    return res.json(data);
+      chartType,
+      from: new Date(series.from * 1000).toISOString(),
+      to: new Date(series.to * 1000).toISOString(),
+      bucketSeconds: series.bucketSeconds,
+      ...(chartType === 'mining-revenue' ? { partial: series.partial } : {}),
+      data: series.points.map((p) => ({
+        blockHeight: p.blockHeight,
+        timestamp: new Date(p.lastBlockTime * 1000).toISOString(),
+        date: new Date(p.lastBlockTime * 1000).toISOString().split('T')[0],
+        blocks: p.blocks,
+        ...pick(p)
+      }))
+    });
   } catch (error) {
-    logger.error('Error in block-size endpoint:', error);
+    logger.error(`Error in ${chartType} endpoint: ${error.message}`);
     return res.status(500).json({
       error: 'An unexpected error occurred',
       message: error.message
     });
   }
-});
+};
 
-// Block interval chart data
-router.get('/block-interval', (req, res) => {
-  try {
-    const days = parseInt(req.query.days) || 30;
-    
-    // Generate some random data
-    const data = {
-      days,
-      chartType: 'block-interval',
-      data: []
-    };
-    
-    // Generate data points
-    for (let i = 0; i < days; i++) {
-      const date = new Date();
-      date.setDate(date.getDate() - i);
-      
-      data.data.push({
-        date: date.toISOString().split('T')[0],
-        interval: Math.floor(Math.random() * 60) + 120
-      });
-    }
-    
-    return res.json(data);
-  } catch (error) {
-    logger.error('Error in block-interval endpoint:', error);
-    return res.status(500).json({
-      error: 'An unexpected error occurred',
-      message: error.message
-    });
-  }
-});
+// Average block size (bytes) per bucket
+router.get('/block-size', seriesRoute('block-size', (p) => ({ blockSize: p.blockSize })));
 
-// Difficulty chart data
-router.get('/difficulty', (req, res) => {
-  try {
-    const days = parseInt(req.query.days) || 30;
-    
-    // Generate some random data
-    const data = {
-      days,
-      chartType: 'difficulty',
-      data: []
-    };
-    
-    // Generate data points
-    for (let i = 0; i < days; i++) {
-      const date = new Date();
-      date.setDate(date.getDate() - i);
-      
-      data.data.push({
-        date: date.toISOString().split('T')[0],
-        difficulty: Math.floor(Math.random() * 10000000) + 5000000
-      });
-    }
-    
-    return res.json(data);
-  } catch (error) {
-    logger.error('Error in difficulty endpoint:', error);
-    return res.status(500).json({
-      error: 'An unexpected error occurred',
-      message: error.message
-    });
-  }
-});
+// Average block interval (seconds) per bucket
+router.get('/block-interval', seriesRoute('block-interval', (p) => ({ interval: p.interval })));
 
-// Mining revenue chart data
-router.get('/mining-revenue', (req, res) => {
-  try {
-    const days = parseInt(req.query.days) || 30;
-    
-    // Generate some random data
-    const data = {
-      days,
-      chartType: 'mining-revenue',
-      data: []
-    };
-    
-    // Generate data points
-    for (let i = 0; i < days; i++) {
-      const date = new Date();
-      date.setDate(date.getDate() - i);
-      
-      data.data.push({
-        date: date.toISOString().split('T')[0],
-        revenue: Math.floor(Math.random() * 10000) + 5000
-      });
-    }
-    
-    return res.json(data);
-  } catch (error) {
-    logger.error('Error in mining-revenue endpoint:', error);
-    return res.status(500).json({
-      error: 'An unexpected error occurred',
-      message: error.message
-    });
-  }
-});
+// Average difficulty per bucket
+router.get('/difficulty', seriesRoute('difficulty', (p) => ({ difficulty: p.difficulty })));
+
+// Total coinbase output (block subsidy incl. fund outputs + fees, BTCZ) per
+// bucket; null while that period's coinbase data is still being loaded
+router.get('/mining-revenue', seriesRoute('mining-revenue', (p) => ({ revenue: p.revenue })));
 
 // Pool stat chart data
 router.get('/pool-stat', async (req, res) => {

@@ -545,7 +545,7 @@ const indexBlock = async (height, isBulkSync = false) => {
     if (txRecords.length > 0) {
       try {
         await TransactionModel.bulkCreate(txRecords, {
-          updateOnDuplicate: ['blockhash', 'confirmations', 'vin', 'vout', 'time', 'blocktime']
+          updateOnDuplicate: ['blockhash', 'confirmations', 'vin', 'vout', 'time', 'blocktime', 'isCoinbase']
         });
       } catch (bulkError) {
         logger.warn(`[IndexBlock ${height}] Bulk tx insert failed, falling back to individual: ${bulkError.message}`);

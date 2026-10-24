@@ -641,6 +641,31 @@ html, body {
   max-width: 100%;
   overflow-x: clip;
 }
+/* Safari < 16 (iOS 15) has no overflow: clip. Fall back to hidden on body
+   only (it propagates to the viewport), so html stays the scroller. */
+@supports not (overflow-x: clip) {
+  body {
+    overflow-x: hidden;
+  }
+}
+
+/* iOS Safari: 100vh is the *large* viewport (toolbars hidden), so a
+   min-height of 100vh pushes the footer under the bottom toolbar on short
+   pages. Use the small viewport where supported (Safari 15.4+). */
+@supports (min-height: 100svh) {
+  html, body, .min-h-screen {
+    min-height: 100svh;
+  }
+}
+
+/* The fixed animated background must cover the screen even while the iOS
+   toolbars collapse; size it to the large viewport (100vh == lvh on iOS),
+   so its height no longer changes (and the canvas is not re-allocated)
+   every time the toolbars show/hide during scrolling. */
+#bg-animation-container.bg-animation-container {
+  height: 100vh;
+  height: 100lvh;
+}
 
 /* Full transaction cards (block / address pages) must not be clipped by the
    compact home-page tile height limit */

@@ -489,7 +489,7 @@ const TimeFilter = ({ date, setDate, applyFilter, showTodayDefault = false, acti
               zIndex: 9999,
               width: '350px',
               maxWidth: 'calc(100vw - 16px)',
-              maxHeight: 'calc(100vh - 16px)',
+              // max-height lives in Charts.css so it can use dvh (iOS toolbars)
               overflowY: 'auto',
               boxSizing: 'border-box',
               background: 'white',

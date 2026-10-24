@@ -110,7 +110,8 @@ const Charts = () => {
       
       // Use the chart service with the correct chart type and parameters
       const days = getDaysFromRange(timeRange);
-      const params = { days, date: displayDate };
+      // range lets the backend tell a custom day apart from "last N days"
+      const params = { days, date: displayDate, range: timeRange };
       
       // Debug logging to track date values
       console.log(`Starting fetch for ${activeChart} with date:`, displayDate);

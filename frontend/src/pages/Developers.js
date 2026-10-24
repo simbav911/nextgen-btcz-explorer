@@ -10,7 +10,7 @@ const Developers = () => {
           This explorer provides complete REST and WebSocket APIs that can be used for writing web wallets and other apps that need more advanced blockchain queries than provided by bitcoinzd RPC.
         </p>
         <p className="mb-4">
-          Check out the source code on GitHub: <a href="https://github.com/simbav911/nextgen-btcz-explorer" target="_blank" rel="noopener noreferrer" className="text-blue-500 hover:text-blue-700">https://github.com/simbav911/nextgen-btcz-explorer</a>
+          Check out the source code on GitHub: <a href="https://github.com/simbav911/nextgen-btcz-explorer" target="_blank" rel="noopener noreferrer" className="text-blue-500 hover:text-blue-700 break-all">https://github.com/simbav911/nextgen-btcz-explorer</a>
         </p>
 
         <h3 className="text-xl font-semibold mb-3 mt-6">Available API Endpoints</h3>

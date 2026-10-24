@@ -130,8 +130,17 @@ class BackgroundAnimation {
 
   handleResize() {
     if (!this.canvas) return;
-    const newWidth = window.innerWidth;
-    const newHeight = window.innerHeight;
+    // Size the canvas to its fixed container (100lvh, see index.css) rather
+    // than innerHeight: on iOS Safari innerHeight changes whenever the
+    // toolbars show/hide while scrolling, and re-allocating the canvas then
+    // caused jank and left the bottom strip uncovered.
+    const container = this.canvas.parentElement;
+    const newWidth = (container && container.clientWidth) || window.innerWidth;
+    const newHeight = Math.max((container && container.clientHeight) || 0, window.innerHeight);
+    if (this.particles.length && newWidth === this.width && newHeight === this.height &&
+        this.canvas.width === newWidth && this.canvas.height === newHeight) {
+      return;
+    }
     const widthChanged = newWidth !== this.width || !this.particles.length;
     const wasMobile = this.isMobile;
 

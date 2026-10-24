@@ -12,20 +12,13 @@ const SearchBox = ({ placeholder = 'Enter a block height, transaction hash, or a
     const styleEl = document.createElement('style');
     
     // Define the animation keyframes
+    // Only opacity is animated (compositor-only). Animating filter here forced a
+    // repaint every frame, which is especially costly in iOS Safari.
     const animationCSS = `
       @keyframes electricPulse {
-        0% {
-          opacity: 0.3;
-          filter: blur(5px);
-        }
-        50% {
-          opacity: 0.7;
-          filter: blur(7px);
-        }
-        100% {
-          opacity: 0.3;
-          filter: blur(5px);
-        }
+        0% { opacity: 0.3; }
+        50% { opacity: 0.7; }
+        100% { opacity: 0.3; }
       }
     `;
     
@@ -60,6 +53,7 @@ const SearchBox = ({ placeholder = 'Enter a block height, transaction hash, or a
           onChange={(e) => setQuery(e.target.value)}
           style={{ 
             minHeight: '50px',
+            WebkitBackdropFilter: 'blur(5px)',
             backdropFilter: 'blur(5px)',
             boxShadow: `
               0 4px 20px rgba(0, 0, 0, 0.15), 
@@ -97,9 +91,10 @@ const SearchBox = ({ placeholder = 'Enter a block height, transaction hash, or a
           height: '5px',
           background: 'linear-gradient(90deg, rgba(59, 130, 246, 0), rgba(59, 130, 246, 0.7), rgba(59, 130, 246, 0))',
           borderRadius: '50%',
-          filter: 'blur(5px)',
+          filter: 'blur(6px)',
           left: '5%',
           marginTop: '2px',
+          willChange: 'opacity',
           animation: 'electricPulse 2s infinite'
         }}
       />

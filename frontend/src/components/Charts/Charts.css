@@ -1396,3 +1396,29 @@ canvas + .chartjs-legend {
     min-height: 260px;
   }
 }
+
+/* Date picker modal: keep Apply reachable above the iOS toolbar */
+.date-picker-container {
+  max-height: calc(100vh - 16px);
+  max-height: calc(100dvh - 16px);
+  overscroll-behavior: contain;
+  -webkit-overflow-scrolling: touch;
+}
+
+@media (max-width: 640px) {
+  .month-select, .year-select {
+    font-size: 16px;
+  }
+}
+
+@media (max-width: 360px) {
+  .month-year {
+    gap: 6px;
+    min-width: 0;
+  }
+
+  .month-select, .year-select {
+    min-width: 0;
+    padding: 5px 6px;
+  }
+}

@@ -507,23 +507,13 @@ const Home = () => {
     const styleEl = document.createElement('style');
 
     // Define the animation keyframes
+    // Only opacity is animated (compositor-only); animating filter/box-shadow
+    // repainted the glow every frame, which is costly in iOS Safari.
     const animationCSS = `
       @keyframes electricTilePulse {
-        0% {
-          opacity: 0.4;
-          filter: blur(10px);
-          box-shadow: 0 0 20px rgba(37, 99, 235, 0.6);
-        }
-        50% {
-          opacity: 0.8;
-          filter: blur(15px);
-          box-shadow: 0 0 40px rgba(37, 99, 235, 0.8);
-        }
-        100% {
-          opacity: 0.4;
-          filter: blur(10px);
-          box-shadow: 0 0 20px rgba(37, 99, 235, 0.6);
-        }
+        0% { opacity: 0.4; }
+        50% { opacity: 0.8; }
+        100% { opacity: 0.4; }
       }
     `;
 
@@ -570,9 +560,11 @@ const Home = () => {
             height: '10px',
             background: 'linear-gradient(90deg, rgba(37, 99, 235, 0), rgba(37, 99, 235, 0.8), rgba(37, 99, 235, 0))',
             borderRadius: '50%',
-            filter: 'blur(10px)',
+            filter: 'blur(12px)',
+            boxShadow: '0 0 30px rgba(37, 99, 235, 0.7)',
             left: '5%',
             bottom: '-15px',
+            willChange: 'opacity',
             animation: 'electricTilePulse 3s infinite'
           }}
         />

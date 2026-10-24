@@ -87,24 +87,24 @@ const ModernHeader = () => {
           </div>
 
           {/* Desktop Navigation Links */}
-          <nav className="hidden md:flex space-x-4">
+          <nav className="hidden md:flex md:space-x-1 lg:space-x-4">
             <Link to="/" className="text-white px-2 py-1 rounded-md text-sm font-medium nav-item-hover transition-colors flex items-center sharp-text">
-              <FaHome className="mr-1" size={14} /> Home
+              <FaHome className="mr-1 hidden lg:inline" size={14} /> Home
             </Link>
             <Link to="/blocks" className="text-white px-2 py-1 rounded-md text-sm font-medium nav-item-hover transition-colors flex items-center sharp-text">
-              <FaCube className="mr-1" size={14} /> Blocks
+              <FaCube className="mr-1 hidden lg:inline" size={14} /> Blocks
             </Link>
             <Link to="/transactions" className="text-white px-2 py-1 rounded-md text-sm font-medium nav-item-hover transition-colors flex items-center sharp-text">
-              <FaExchangeAlt className="mr-1" size={14} /> Transactions
+              <FaExchangeAlt className="mr-1 hidden lg:inline" size={14} /> Transactions
             </Link>
             <Link to="/charts" className="text-white px-2 py-1 rounded-md text-sm font-medium nav-item-hover transition-colors flex items-center sharp-text">
-              <FaChartLine className="mr-1" size={14} /> Charts
+              <FaChartLine className="mr-1 hidden lg:inline" size={14} /> Charts
             </Link>
             <Link to="/wealth-distribution" className="text-white px-2 py-1 rounded-md text-sm font-medium nav-item-hover transition-colors flex items-center sharp-text">
-              <FaCoins className="mr-1" size={14} /> Wealth
+              <FaCoins className="mr-1 hidden lg:inline" size={14} /> Wealth
             </Link>
             <Link to="/stats" className="text-white px-2 py-1 rounded-md text-sm font-medium nav-item-hover transition-colors flex items-center sharp-text">
-              <FaInfoCircle className="mr-1" size={14} /> Statistics
+              <FaInfoCircle className="mr-1 hidden lg:inline" size={14} /> Statistics
             </Link>
           </nav>
         </div>
